@@ -74,11 +74,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup SSH key
+        env:
+          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          SSH_HOST: ${{ secrets.HETZNER_HOST }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          # printf preserves newlines exactly; echo can mangle the PEM body
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -t ed25519 "${{ secrets.HETZNER_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null  # validate key parses
+          ssh-keyscan -t ed25519 "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Copy compose files to server
         run: |
