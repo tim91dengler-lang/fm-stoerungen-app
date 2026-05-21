@@ -134,7 +134,7 @@ async def update_user(
         user.roles = await _fetch_roles(db, role_ids, mandant_id)
 
     await db.flush()
-    await db.refresh(user, ["roles"])
+    await db.refresh(user, ["updated_at", "roles"])
     return user
 
 

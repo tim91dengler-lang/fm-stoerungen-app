@@ -190,7 +190,9 @@ async def update_ticket(
         ticket.status = new_status
 
     await db.flush()
-    await db.refresh(ticket, ["eroeffnet_von", "zugewiesen_an"])
+    # Refresh server-side-updated columns (updated_at via onupdate, status fields)
+    # plus eagerly load relationships for the response serializer.
+    await db.refresh(ticket, ["updated_at", "eroeffnet_von", "zugewiesen_an"])
     return ticket
 
 
