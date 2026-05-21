@@ -1,5 +1,5 @@
-import enum
 from datetime import datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from fm_api.models.user import User
 
 
-class TicketStatus(str, enum.Enum):
+class TicketStatus(StrEnum):
     NEU = "neu"
     ZUGEWIESEN = "zugewiesen"
     IN_ARBEIT = "in_arbeit"
@@ -23,7 +23,7 @@ class TicketStatus(str, enum.Enum):
     GESCHLOSSEN = "geschlossen"
 
 
-class TicketPrioritaet(str, enum.Enum):
+class TicketPrioritaet(StrEnum):
     NIEDRIG = "niedrig"
     MITTEL = "mittel"
     HOCH = "hoch"
@@ -80,9 +80,7 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     geschlossen_am: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     mandant: Mapped["Mandant"] = relationship(back_populates="tickets", lazy="raise")
-    eroeffnet_von: Mapped["User"] = relationship(
-        foreign_keys=[eroeffnet_von_id], lazy="raise"
-    )
+    eroeffnet_von: Mapped["User"] = relationship(foreign_keys=[eroeffnet_von_id], lazy="raise")
     zugewiesen_an: Mapped["User | None"] = relationship(
         foreign_keys=[zugewiesen_an_id], lazy="raise"
     )

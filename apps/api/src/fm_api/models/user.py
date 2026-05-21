@@ -33,9 +33,7 @@ user_roles = Table(
 
 class User(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "users"
-    __table_args__ = (
-        UniqueConstraint("mandant_id", "email", name="uq_users_mandant_id_email"),
-    )
+    __table_args__ = (UniqueConstraint("mandant_id", "email", name="uq_users_mandant_id_email"),)
 
     mandant_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -46,7 +44,9 @@ class User(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
 
     mandant: Mapped["Mandant"] = relationship(back_populates="users", lazy="raise")
     roles: Mapped[list["Role"]] = relationship(

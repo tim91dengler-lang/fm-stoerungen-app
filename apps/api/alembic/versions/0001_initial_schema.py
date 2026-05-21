@@ -159,10 +159,7 @@ def upgrade() -> None:
         "CREATE TYPE ticket_status AS ENUM "
         "('neu','zugewiesen','in_arbeit','erledigt','geschlossen');"
     )
-    op.execute(
-        "CREATE TYPE ticket_prioritaet AS ENUM "
-        "('niedrig','mittel','hoch','kritisch');"
-    )
+    op.execute("CREATE TYPE ticket_prioritaet AS ENUM ('niedrig','mittel','hoch','kritisch');")
 
     # ---------- tickets ----------
     op.create_table(
@@ -180,7 +177,11 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "neu", "zugewiesen", "in_arbeit", "erledigt", "geschlossen",
+                "neu",
+                "zugewiesen",
+                "in_arbeit",
+                "erledigt",
+                "geschlossen",
                 name="ticket_status",
                 create_type=False,
             ),
@@ -190,7 +191,10 @@ def upgrade() -> None:
         sa.Column(
             "prioritaet",
             postgresql.ENUM(
-                "niedrig", "mittel", "hoch", "kritisch",
+                "niedrig",
+                "mittel",
+                "hoch",
+                "kritisch",
                 name="ticket_prioritaet",
                 create_type=False,
             ),

@@ -37,18 +37,13 @@ async def list_users(
         base = base.where(User.is_active.is_(True))
     if search:
         like = f"%{search.lower()}%"
-        base = base.where(
-            func.lower(User.full_name).like(like) | func.lower(User.email).like(like)
-        )
+        base = base.where(func.lower(User.full_name).like(like) | func.lower(User.email).like(like))
 
     count_stmt = select(func.count()).select_from(base.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
 
     items_stmt = (
-        base.options(selectinload(User.roles))
-        .order_by(User.full_name)
-        .limit(limit)
-        .offset(offset)
+        base.options(selectinload(User.roles)).order_by(User.full_name).limit(limit).offset(offset)
     )
     items = (await db.execute(items_stmt)).scalars().unique().all()
     return list(items), total

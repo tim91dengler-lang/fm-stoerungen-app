@@ -6,11 +6,10 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+# Import models so Alembic autogenerate sees them
+from fm_api import models
 from fm_api.core.config import get_settings
 from fm_api.db.base import Base
-
-# Import models so Alembic autogenerate sees them
-from fm_api import models  # noqa: F401
 
 config = context.config
 settings = get_settings()

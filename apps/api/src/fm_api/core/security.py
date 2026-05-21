@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -29,7 +29,7 @@ def _create_token(
     extra_claims: dict[str, Any] | None = None,
 ) -> str:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims: dict[str, Any] = {
         "sub": str(subject),
         "iat": now,
@@ -79,7 +79,5 @@ def decode_token(token: str, expected_type: str | None = None) -> dict[str, Any]
         raise TokenError(f"invalid token: {exc}") from exc
 
     if expected_type and payload.get("type") != expected_type:
-        raise TokenError(
-            f"wrong token type: expected {expected_type}, got {payload.get('type')}"
-        )
+        raise TokenError(f"wrong token type: expected {expected_type}, got {payload.get('type')}")
     return payload

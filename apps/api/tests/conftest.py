@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 # Test env must be set BEFORE app imports
 os.environ.setdefault("ENV", "test")
@@ -18,12 +18,12 @@ os.environ.setdefault(
     "test-secret-32-chars-long-not-for-prod",
 )
 
-from fm_api.core.config import get_settings  # noqa: E402
-from fm_api.core.security import hash_password  # noqa: E402
-from fm_api.db.base import Base  # noqa: E402
-from fm_api.db.session import SessionLocal  # noqa: E402
-from fm_api.main import create_app  # noqa: E402
-from fm_api.models import Mandant, Role, User  # noqa: E402
+from fm_api.core.config import get_settings
+from fm_api.core.security import hash_password
+from fm_api.db.base import Base
+from fm_api.db.session import SessionLocal
+from fm_api.main import create_app
+from fm_api.models import Mandant, Role, User
 
 
 def _engine():
@@ -93,9 +93,7 @@ async def admin_role(db: AsyncSession, mandant: Mandant) -> Role:
 
 
 @pytest.fixture
-async def admin_user(
-    db: AsyncSession, mandant: Mandant, admin_role: Role
-) -> tuple[User, str]:
+async def admin_user(db: AsyncSession, mandant: Mandant, admin_role: Role) -> tuple[User, str]:
     raw_pw = "TestPassword123!"
     u = User(
         mandant_id=mandant.id,
@@ -112,9 +110,7 @@ async def admin_user(
 
 
 @pytest.fixture
-async def techniker_user(
-    db: AsyncSession, mandant: Mandant
-) -> tuple[User, str]:
+async def techniker_user(db: AsyncSession, mandant: Mandant) -> tuple[User, str]:
     raw_pw = "TechPassword123!"
     u = User(
         mandant_id=mandant.id,

@@ -15,9 +15,7 @@ if TYPE_CHECKING:
 
 class Role(UuidPkMixin, TimestampMixin, Base):
     __tablename__ = "roles"
-    __table_args__ = (
-        UniqueConstraint("mandant_id", "name", name="uq_roles_mandant_id_name"),
-    )
+    __table_args__ = (UniqueConstraint("mandant_id", "name", name="uq_roles_mandant_id_name"),)
 
     mandant_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),

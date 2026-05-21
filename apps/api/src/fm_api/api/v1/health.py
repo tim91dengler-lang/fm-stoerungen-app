@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter
@@ -15,7 +15,7 @@ async def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "version": __version__,
-        "now": datetime.now(timezone.utc).isoformat(),
+        "now": datetime.now(UTC).isoformat(),
     }
 
 

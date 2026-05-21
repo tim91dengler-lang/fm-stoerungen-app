@@ -39,9 +39,7 @@ class Settings(BaseSettings):
     def jwt_secret_in_prod_must_not_be_default(cls, v: str, info) -> str:
         env = info.data.get("env", "dev")
         if env in ("staging", "prod") and v.startswith("dev-only"):
-            raise ValueError(
-                "JWT_SECRET must be set to a strong random value in staging/prod"
-            )
+            raise ValueError("JWT_SECRET must be set to a strong random value in staging/prod")
         return v
 
 

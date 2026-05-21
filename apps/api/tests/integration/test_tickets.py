@@ -39,12 +39,8 @@ async def test_ticket_nummer_increments_per_mandant(client, admin_user) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
-    res1 = await client.post(
-        "/api/v1/tickets", headers=headers, json={"titel": "Erstes"}
-    )
-    res2 = await client.post(
-        "/api/v1/tickets", headers=headers, json={"titel": "Zweites"}
-    )
+    res1 = await client.post("/api/v1/tickets", headers=headers, json={"titel": "Erstes"})
+    res2 = await client.post("/api/v1/tickets", headers=headers, json={"titel": "Zweites"})
     assert res1.status_code == 201
     assert res2.status_code == 201
     assert res2.json()["nummer"] == res1.json()["nummer"] + 1
@@ -73,9 +69,7 @@ async def test_update_ticket_status_transitions(client, admin_user) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
-    create_res = await client.post(
-        "/api/v1/tickets", headers=headers, json={"titel": "Test"}
-    )
+    create_res = await client.post("/api/v1/tickets", headers=headers, json={"titel": "Test"})
     ticket_id = create_res.json()["id"]
 
     patch_res = await client.patch(
@@ -100,17 +94,11 @@ async def test_cannot_reopen_closed_ticket(client, admin_user) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
-    create_res = await client.post(
-        "/api/v1/tickets", headers=headers, json={"titel": "Closed"}
-    )
+    create_res = await client.post("/api/v1/tickets", headers=headers, json={"titel": "Closed"})
     tid = create_res.json()["id"]
-    await client.patch(
-        f"/api/v1/tickets/{tid}", headers=headers, json={"status": "geschlossen"}
-    )
+    await client.patch(f"/api/v1/tickets/{tid}", headers=headers, json={"status": "geschlossen"})
 
-    reopen = await client.patch(
-        f"/api/v1/tickets/{tid}", headers=headers, json={"status": "neu"}
-    )
+    reopen = await client.patch(f"/api/v1/tickets/{tid}", headers=headers, json={"status": "neu"})
     assert reopen.status_code == 409
 
 

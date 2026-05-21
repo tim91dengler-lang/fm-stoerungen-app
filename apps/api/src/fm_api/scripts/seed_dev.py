@@ -24,9 +24,7 @@ DEFAULT_ADMIN_PASSWORD = os.environ.get("DEV_ADMIN_PASSWORD", "admin-dev-pass-12
 async def main() -> int:
     async with SessionLocal() as db:
         tenant = (
-            await db.execute(
-                select(Mandant).where(Mandant.slug == DEFAULT_TENANT_SLUG)
-            )
+            await db.execute(select(Mandant).where(Mandant.slug == DEFAULT_TENANT_SLUG))
         ).scalar_one_or_none()
         if tenant is None:
             tenant = Mandant(name="FM-Staging Default", slug=DEFAULT_TENANT_SLUG)
@@ -37,11 +35,7 @@ async def main() -> int:
         roles_to_have = ["admin", "techniker", "leitstand"]
         existing_roles = {
             r.name: r
-            for r in (
-                await db.execute(
-                    select(Role).where(Role.mandant_id == tenant.id)
-                )
-            )
+            for r in (await db.execute(select(Role).where(Role.mandant_id == tenant.id)))
             .scalars()
             .all()
         }

@@ -70,8 +70,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "S106", "S311"]
+"tests/**/*.py" = ["S101", "S105", "S106", "S311"]
 "alembic/**/*.py" = ["E402", "F401"]
+# FastAPI route handlers use Query/Header/Depends as default arg values by design
+"src/fm_api/api/**/*.py" = ["B008"]
+# token_type literals like "bearer" / "access" / "refresh" are protocol identifiers, not credentials
+"src/fm_api/core/security.py" = ["S105", "S106"]
+"src/fm_api/schemas/auth.py" = ["S105"]
+# Pydantic generics still need typing.Generic[T] in Pydantic 2.x — type-parameter syntax (PEP 695) not fully supported yet
+"src/fm_api/schemas/common.py" = ["UP046"]
 
 [tool.ruff.format]
 quote-style = "double"

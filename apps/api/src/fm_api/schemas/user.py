@@ -12,7 +12,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str = Field(min_length=12, max_length=200)
-    role_ids: list[UUID] = []
+    role_ids: list[UUID] = Field(default_factory=list)
 
 
 class UserUpdate(BaseModel):
@@ -35,4 +35,4 @@ class UserRead(TimestampedRead):
     email: EmailStr
     full_name: str
     is_active: bool
-    roles: list[RoleRead] = []
+    roles: list[RoleRead] = Field(default_factory=list)

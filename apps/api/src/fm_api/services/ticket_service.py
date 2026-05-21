@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import desc, func, select
@@ -63,8 +63,7 @@ async def list_tickets(
     if search:
         like = f"%{search.lower()}%"
         base = base.where(
-            func.lower(Ticket.titel).like(like)
-            | func.lower(Ticket.beschreibung).like(like)
+            func.lower(Ticket.titel).like(like) | func.lower(Ticket.beschreibung).like(like)
         )
     if status_filter:
         base = base.where(Ticket.status.in_(status_filter))
@@ -122,7 +121,7 @@ async def create_ticket(
     prioritaet: TicketPrioritaet,
     zugewiesen_an_id: UUID | None = None,
 ) -> Ticket:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     initial_status = TicketStatus.NEU
     zugewiesen_am: datetime | None = None
 
@@ -156,7 +155,7 @@ async def update_ticket(
     updates: dict,  # only keys the client explicitly set (model_dump(exclude_unset=True))
 ) -> Ticket:
     ticket = await get_ticket(db, ticket_id, mandant_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if "titel" in updates:
         ticket.titel = updates["titel"]
@@ -198,5 +197,5 @@ async def soft_delete_ticket(
     mandant_id: UUID,
 ) -> None:
     ticket = await get_ticket(db, ticket_id, mandant_id)
-    ticket.deleted_at = datetime.now(timezone.utc)
+    ticket.deleted_at = datetime.now(UTC)
     await db.flush()

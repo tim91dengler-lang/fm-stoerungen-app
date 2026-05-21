@@ -15,7 +15,7 @@ class UserInToken(ORMModel):
     email: EmailStr
     full_name: str
     mandant_id: UUID
-    roles: list[str] = []
+    roles: list[str] = Field(default_factory=list)
 
 
 class LoginResponse(BaseModel):
