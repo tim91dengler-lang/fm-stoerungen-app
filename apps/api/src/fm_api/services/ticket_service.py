@@ -145,7 +145,9 @@ async def create_ticket(
     )
     db.add(ticket)
     await db.flush()
-    await db.refresh(ticket, ["eroeffnet_von", "zugewiesen_an"])
+    # Refresh `nummer` because the Postgres BEFORE-INSERT trigger overwrites it;
+    # SQLAlchemy keeps the Python-side value (0) otherwise.
+    await db.refresh(ticket, ["nummer", "eroeffnet_von", "zugewiesen_an"])
     return ticket
 
 
