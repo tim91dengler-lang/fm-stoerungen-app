@@ -1,4 +1,3 @@
-import asyncio
 import os
 from collections.abc import AsyncGenerator
 from uuid import UUID, uuid4
@@ -33,13 +32,6 @@ def _engine():
         echo=False,
         future=True,
     )
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session", autouse=True)
