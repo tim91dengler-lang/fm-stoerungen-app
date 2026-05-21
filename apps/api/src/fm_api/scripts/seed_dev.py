@@ -17,7 +17,9 @@ from fm_api.db.session import SessionLocal
 from fm_api.models import Mandant, Role, User
 
 DEFAULT_TENANT_SLUG = "fm-staging-default"
-DEFAULT_ADMIN_EMAIL = os.environ.get("DEV_ADMIN_EMAIL", "admin@fm-staging.local")
+# `.local`, `.test`, `.localhost` etc. are rejected by Pydantic's EmailStr
+# (reserved TLDs per RFC 6761). Use a normal TLD even for fake dev users.
+DEFAULT_ADMIN_EMAIL = os.environ.get("DEV_ADMIN_EMAIL", "admin@example.com")
 DEFAULT_ADMIN_PASSWORD = os.environ.get("DEV_ADMIN_PASSWORD", "admin-dev-pass-12")
 
 
