@@ -1,0 +1,28 @@
+# Production Caddyfile.
+# Once DOMAIN is set, Caddy auto-issues TLS via Let's Encrypt.
+
+:80 {
+    encode gzip
+
+    @api path /api/* /health /health/*
+    handle @api {
+        reverse_proxy api:8000
+    }
+
+    handle {
+        reverse_proxy web:8080
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}

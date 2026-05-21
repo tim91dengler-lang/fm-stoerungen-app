@@ -1,0 +1,28 @@
+# Staging Caddyfile — HTTP only until a real domain is configured.
+# Once a domain is wired up: replace `:80` with `staging.fm-app.tdengler-consulting.com`
+# and Caddy will auto-issue Let's Encrypt certificates.
+
+:80 {
+    encode gzip
+
+    @api path /api/* /health /health/* /api/docs /api/openapi.json /api/redoc
+    handle @api {
+        reverse_proxy api:8000
+    }
+
+    handle {
+        reverse_proxy web:8080
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}

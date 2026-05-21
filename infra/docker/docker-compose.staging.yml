@@ -1,0 +1,82 @@
+# Staging stack — runs on the Hetzner server side-by-side with prod (different ports + volumes).
+#
+# Deploy via:  HETZNER_HOST=178.105.172.110 make deploy-staging
+# or manually: scp -> docker compose pull && docker compose up -d
+#
+# Schicht 7 + 8 of the security architecture: staging is the mirror; prod
+# promotion is a manual workflow_dispatch trigger in CI.
+
+name: fm-staging
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: fm-staging-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fm_stoerungen}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data_staging:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+      - /var/backups/pg/staging:/backups
+    networks:
+      - staging_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${REGISTRY}/fm-api:${API_TAG:-latest}
+    container_name: fm-staging-api
+    restart: unless-stopped
+    environment:
+      ENV: staging
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fm_stoerungen}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOW_ORIGINS: '["https://staging.${DOMAIN}"]'
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - staging_net
+
+  web:
+    image: ${REGISTRY}/fm-web:${WEB_TAG:-latest}
+    container_name: fm-staging-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - staging_net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: fm-staging-caddy
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy_data_staging:/data
+      - caddy_config_staging:/config
+    depends_on:
+      - api
+      - web
+    networks:
+      - staging_net
+
+networks:
+  staging_net:
+    driver: bridge
+
+volumes:
+  pg_data_staging:
+  caddy_data_staging:
+  caddy_config_staging:
