@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- builder ----------
-FROM node:20-alpine AS builder
+# Force builder to run on the native build platform (e.g. x86 in CI) — Vite output
+# is platform-agnostic static HTML/JS/CSS, so we never need to emulate arm64 for the build.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 
 WORKDIR /build
 
