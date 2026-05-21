@@ -124,3 +124,100 @@ export interface TicketListFilters {
   limit?: number;
   offset?: number;
 }
+
+// ---------------------------------------------------------------- Auswahllisten
+
+export interface AuswahllistenWertRead {
+  id: UUID;
+  auswahlliste_id: UUID;
+  key: string;
+  label: string;
+  reihenfolge: number;
+  farbe: string | null;
+  ist_aktiv: boolean;
+  ist_system: boolean;
+  meta: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuswahllistenWertCreate {
+  key: string;
+  label: string;
+  reihenfolge?: number;
+  farbe?: string | null;
+  ist_aktiv?: boolean;
+  meta?: Record<string, unknown> | null;
+}
+
+export interface AuswahllistenWertUpdate {
+  label?: string;
+  reihenfolge?: number;
+  farbe?: string | null;
+  ist_aktiv?: boolean;
+  meta?: Record<string, unknown> | null;
+}
+
+export interface AuswahllisteRead {
+  id: UUID;
+  mandant_id: UUID;
+  key: string;
+  label: string;
+  beschreibung: string | null;
+  ist_system: boolean;
+  werte: AuswahllistenWertRead[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuswahllisteCreate {
+  key: string;
+  label: string;
+  beschreibung?: string | null;
+}
+
+// ---------------------------------------------------------------- Adressen
+
+export interface AdresseRead {
+  id: UUID;
+  mandant_id: UUID;
+  strasse: string;
+  hausnummer: string | null;
+  adresszusatz: string | null;
+  plz: string;
+  ort: string;
+  land: string;
+  bemerkung: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geocode_source: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdresseWriteBase {
+  strasse: string;
+  hausnummer?: string | null;
+  adresszusatz?: string | null;
+  plz: string;
+  ort: string;
+  land?: string;
+  bemerkung?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  geocode_source?: string | null;
+}
+
+export type AdresseCreate = AdresseWriteBase;
+export type AdresseUpdate = Partial<AdresseWriteBase>;
+
+export interface AdresseSuggestion {
+  strasse: string | null;
+  hausnummer: string | null;
+  plz: string | null;
+  ort: string | null;
+  land: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  label: string;
+}
