@@ -57,6 +57,34 @@ async def _prepare_schema():
             text("CREATE TYPE ticket_prioritaet AS ENUM ('niedrig','mittel','hoch','kritisch')")
         )
         await conn.run_sync(Base.metadata.create_all)
+
+        # Tickets-Nummer auto-increment per Mandant (Alembic owns this in production)
+        await conn.execute(
+            text("""
+            CREATE OR REPLACE FUNCTION set_ticket_nummer() RETURNS TRIGGER AS $$
+            DECLARE
+                next_nummer INT;
+            BEGIN
+                IF NEW.nummer IS NULL OR NEW.nummer = 0 THEN
+                    PERFORM pg_advisory_xact_lock(hashtext(NEW.mandant_id::text));
+                    SELECT COALESCE(MAX(nummer), 0) + 1
+                      INTO next_nummer
+                      FROM tickets
+                     WHERE mandant_id = NEW.mandant_id;
+                    NEW.nummer := next_nummer;
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+            """)
+        )
+        await conn.execute(
+            text("""
+            CREATE TRIGGER trg_tickets_set_nummer
+            BEFORE INSERT ON tickets
+            FOR EACH ROW EXECUTE FUNCTION set_ticket_nummer();
+            """)
+        )
     await engine.dispose()
 
 
