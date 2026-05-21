@@ -1,4 +1,5 @@
-"""Dev seed — creates a default tenant + admin user + sample roles.
+"""Dev seed — creates a default tenant + admin user + sample roles +
+System-Auswahllisten (Status / Priorität / Kategorie).
 
 Idempotent: re-running is safe; existing rows are kept.
 
@@ -15,6 +16,7 @@ from sqlalchemy import select
 from fm_api.core.security import hash_password
 from fm_api.db.session import SessionLocal
 from fm_api.models import Mandant, Role, User
+from fm_api.services.auswahlliste_service import ensure_system_auswahllisten
 
 DEFAULT_TENANT_SLUG = "fm-staging-default"
 # `.local`, `.test`, `.localhost` etc. are rejected by Pydantic's EmailStr
@@ -33,6 +35,9 @@ async def main() -> int:
             db.add(tenant)
             await db.flush()
             print(f"[seed] created tenant '{tenant.slug}'")
+
+        await ensure_system_auswahllisten(db, tenant.id)
+        print("[seed] ensured system auswahllisten for tenant")
 
         roles_to_have = ["admin", "techniker", "leitstand"]
         existing_roles = {
