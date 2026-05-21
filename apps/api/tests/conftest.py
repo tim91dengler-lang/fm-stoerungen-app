@@ -23,32 +23,8 @@ from fm_api.core.security import hash_password
 from fm_api.db.base import Base
 from fm_api.db.session import SessionLocal
 from fm_api.main import create_app
-from fm_api.models import Auswahlliste, AuswahllistenWert, Mandant, Role, User
-
-SYSTEM_AUSWAHLLISTEN: dict[str, list[tuple[str, str, int, str | None, bool]]] = {
-    # liste_key: (wert_key, label, reihenfolge, farbe, ist_system)
-    "ticket_status": [
-        ("neu", "Neu", 0, "slate", True),
-        ("pruefung", "In Prüfung", 1, "amber", True),
-        ("bearbeitung", "In Bearbeitung", 2, "blue", True),
-        ("wartet", "Wartet", 3, "orange", True),
-        ("erledigt", "Erledigt", 4, "emerald", True),
-    ],
-    "ticket_prioritaet": [
-        ("niedrig", "Niedrig", 0, "slate", True),
-        ("mittel", "Mittel", 1, "blue", True),
-        ("hoch", "Hoch", 2, "orange", True),
-        ("kritisch", "Kritisch", 3, "red", True),
-    ],
-    "ticket_kategorie": [
-        ("heizung", "Heizung", 0, "red", False),
-        ("sanitaer", "Sanitär", 1, "cyan", False),
-        ("elektro", "Elektro", 2, "yellow", False),
-        ("aufzug", "Aufzug", 3, "purple", False),
-        ("sicherheit", "Sicherheit", 4, "rose", False),
-        ("allgemein", "Allgemein", 5, "slate", False),
-    ],
-}
+from fm_api.models import Mandant, Role, User
+from fm_api.services.auswahlliste_service import ensure_system_auswahllisten
 
 
 def _engine():
@@ -131,41 +107,12 @@ async def client(app) -> AsyncGenerator[AsyncClient, None]:
         yield ac
 
 
-async def _seed_system_auswahllisten(db: AsyncSession, mandant_id: UUID) -> None:
-    """Seed der drei System-Auswahllisten für einen Test-Mandanten.
-
-    Bildet die in Migration 0002 verankerte Logik nach, damit Tests, die
-    ohne Alembic auskommen, identische Daten haben.
-    """
-    for liste_key, werte in SYSTEM_AUSWAHLLISTEN.items():
-        liste = Auswahlliste(
-            mandant_id=mandant_id,
-            key=liste_key,
-            label=liste_key.replace("_", "-"),
-            ist_system=liste_key in ("ticket_status", "ticket_prioritaet"),
-        )
-        db.add(liste)
-        await db.flush()
-        for wert_key, label, reihenfolge, farbe, ist_system in werte:
-            db.add(
-                AuswahllistenWert(
-                    auswahlliste_id=liste.id,
-                    key=wert_key,
-                    label=label,
-                    reihenfolge=reihenfolge,
-                    farbe=farbe,
-                    ist_system=ist_system,
-                )
-            )
-    await db.flush()
-
-
 @pytest.fixture
 async def mandant(db: AsyncSession) -> Mandant:
     m = Mandant(name="Test-Mandant", slug=f"test-{uuid4().hex[:8]}")
     db.add(m)
     await db.flush()
-    await _seed_system_auswahllisten(db, m.id)
+    await ensure_system_auswahllisten(db, m.id)
     await db.commit()
     await db.refresh(m)
     return m
