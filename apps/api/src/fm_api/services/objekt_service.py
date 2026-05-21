@@ -116,8 +116,10 @@ async def create_objekt(
             )
         )
     await db.flush()
-    await db.refresh(objekt, ["adresse", "partner_links"])
-    return objekt
+    # Reload mit allen Relationships (inkl. partner_links.partner für die
+    # Response-Serialisierung), weil refresh() nur die explizit gelisteten
+    # Felder lädt und partner_links.partner sonst lazy="raise" greifen würde.
+    return await get_objekt(db, objekt.id, mandant_id)
 
 
 async def update_objekt(
@@ -151,8 +153,8 @@ async def update_objekt(
             )
 
     await db.flush()
-    await db.refresh(objekt, ["adresse", "partner_links"])
-    return objekt
+    # Reload für komplette Relationship-Tiefe (s. create_objekt)
+    return await get_objekt(db, objekt.id, mandant_id)
 
 
 async def soft_delete_objekt(db: AsyncSession, objekt_id: UUID, mandant_id: UUID) -> None:
