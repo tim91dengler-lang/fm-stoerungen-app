@@ -49,6 +49,9 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # Build artifacts
 .turbo/
 .next/
