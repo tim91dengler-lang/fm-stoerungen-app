@@ -1,0 +1,41 @@
+version: 2
+
+# Schicht 4 der 12-Schichten-Sicherheitsarchitektur (Tech-Spec Kapitel 10.3):
+# Auto-Updates bei CVE-Fixes, Lockfile-Pflicht.
+
+updates:
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - github-actions
+
+  # Python Backend (aktivieren sobald pyproject.toml in apps/api existiert)
+  # - package-ecosystem: pip
+  #   directory: /apps/api
+  #   schedule:
+  #     interval: weekly
+  #   open-pull-requests-limit: 10
+  #   labels:
+  #     - dependencies
+  #     - backend
+
+  # Node Frontend (aktivieren sobald package.json in apps/web existiert)
+  # - package-ecosystem: npm
+  #   directory: /apps/web
+  #   schedule:
+  #     interval: weekly
+  #   open-pull-requests-limit: 10
+  #   labels:
+  #     - dependencies
+  #     - frontend
+
+  # Docker (aktivieren sobald Dockerfiles existieren)
+  # - package-ecosystem: docker
+  #   directory: /apps/api
+  #   schedule:
+  #     interval: weekly

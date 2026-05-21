@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Sicherheits-Schichten gemäß Tech-Spec Kapitel 10.3 (12-Schichten-Architektur).
+# Dieses Skelett ist Phase 0 — wird erweitert sobald Code im Repo ist.
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+
+  # ---------------- Schicht 5: Pre-Commit-Checks (Secrets, Filesize) ----------
+  pre-checks:
+    name: Pre-Checks (Secrets, Großdateien)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks — Secret-Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Dateigröße (max 10 MB pro Datei)
+        run: |
+          large=$(find . -type f -size +10M -not -path './.git/*' || true)
+          if [ -n "$large" ]; then
+            echo "::error::Dateien > 10 MB im Repo gefunden:"
+            echo "$large"
+            exit 1
+          fi
+
+  # ---------------- Schicht 4: Dependency-Audit ----------------------
+  # Aktiviert, sobald package.json / pyproject.toml im Repo
+  # deps-audit:
+  #   name: Dependency-Audit (npm + pip)
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: npm audit
+  #       working-directory: apps/web
+  #       run: pnpm audit --audit-level=high
+  #     - name: pip-audit
+  #       working-directory: apps/api
+  #       run: |
+  #         python -m pip install pip-audit
+  #         pip-audit
+
+  # ---------------- Schicht 2: Static Analysis (Lint + Type-Check) ----------
+  # Aktiviert, sobald Code im Repo
+  # lint:
+  #   name: Lint + Type-Check
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Frontend (ESLint + TypeScript)
+  #       working-directory: apps/web
+  #       run: |
+  #         pnpm install --frozen-lockfile
+  #         pnpm lint
+  #         pnpm type-check
+  #     - name: Backend (ruff + mypy)
+  #       working-directory: apps/api
+  #       run: |
+  #         pip install -e ".[dev]"
+  #         ruff check .
+  #         mypy --strict .
+
+  # ---------------- Schicht 2: Security-Linter (Semgrep, Bandit) ----------
+  # semgrep:
+  #   name: Semgrep (OWASP-Regeln)
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: semgrep/semgrep-action@v1
+  #       with:
+  #         config: >-
+  #           p/security-audit
+  #           p/owasp-top-ten
+  #           p/python
+  #           p/typescript
+
+  # ---------------- Schicht 1: Tests ----------
+  # tests:
+  #   name: Unit + Integration Tests
+  #   runs-on: ubuntu-latest
+  #   services:
+  #     postgres:
+  #       image: postgres:16
+  #       env:
+  #         POSTGRES_PASSWORD: test
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Backend-Tests
+  #       working-directory: apps/api
+  #       run: pytest --cov=. --cov-report=xml
+  #     - name: Frontend-Tests
+  #       working-directory: apps/web
+  #       run: pnpm test
+
+  # ---------------- Build (Pflicht-Gate) ----------
+  # build:
+  #   name: Build (Frontend + Backend)
+  #   runs-on: ubuntu-latest
+  #   needs: [pre-checks]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Build Frontend
+  #       working-directory: apps/web
+  #       run: pnpm build
+  #     - name: Build Backend (Container)
+  #       run: docker build apps/api -t fm-stoerungen-api:${{ github.sha }}
+
+  doc-check:
+    name: Doku-Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Markdown-Lint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        continue-on-error: true
+        with:
+          globs: |
+            docs/**/*.md
+            README.md
+
+      - name: Tote Markdown-Links prüfen
+        uses: lycheeverse/lychee-action@v1
+        continue-on-error: true
+        with:
+          args: --no-progress --max-concurrency 5 --exclude-mail './**/*.md'
+          fail: false

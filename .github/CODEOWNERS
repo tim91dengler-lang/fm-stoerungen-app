@@ -1,0 +1,5 @@
+# Alle Pull Requests brauchen Approval von Tim (Plattform-Eigner).
+# Während Phase 0+1 ist Tim alleiniger Code-Owner — Claude entwickelt,
+# Tim macht Acceptance-Review im Staging vor Promote auf Produktion.
+
+* @tim91dengler-lang
