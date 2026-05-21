@@ -37,11 +37,17 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
 .tox/
 .venv/
 venv/
 env/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
 
 # Build artifacts
 .turbo/

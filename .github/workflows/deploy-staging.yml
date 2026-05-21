@@ -1,0 +1,139 @@
+name: Deploy → Staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Schicht 7: jeder Merge auf main deployt automatisch nach Staging.
+# Prod-Promote ist ein separater Workflow (deploy-prod.yml) mit workflow_dispatch.
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+  IMAGE_API: ghcr.io/${{ github.repository_owner }}/fm-api
+  IMAGE_WEB: ghcr.io/${{ github.repository_owner }}/fm-web
+
+jobs:
+  build-and-push:
+    name: Build + Push Container
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute tag
+        id: meta
+        run: echo "tag=$(date -u +%Y%m%d)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build + push API
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          push: true
+          tags: |
+            ${{ env.IMAGE_API }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_API }}:staging
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+          platforms: linux/arm64
+
+      - name: Build + push Web
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          push: true
+          tags: |
+            ${{ env.IMAGE_WEB }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_WEB }}:staging
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+          platforms: linux/arm64
+
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: staging
+      url: http://178.105.172.110:8080
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 "${{ secrets.HETZNER_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy compose files to server
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+              root@${{ secrets.HETZNER_HOST }} \
+              "mkdir -p /srv/fm-stoerungen/staging /var/backups/pg/staging"
+          scp -i ~/.ssh/id_ed25519 \
+              infra/docker/docker-compose.staging.yml \
+              infra/docker/Caddyfile.staging \
+              infra/docker/postgres-init.sql \
+              root@${{ secrets.HETZNER_HOST }}:/srv/fm-stoerungen/staging/
+          scp -i ~/.ssh/id_ed25519 \
+              infra/scripts/migrate.sh \
+              infra/scripts/restore.sh \
+              root@${{ secrets.HETZNER_HOST }}:/srv/fm-stoerungen/staging/
+          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.HETZNER_HOST }} \
+              "chmod +x /srv/fm-stoerungen/staging/*.sh"
+
+      - name: Write .env file on server
+        run: |
+          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.HETZNER_HOST }} \
+              "cat > /srv/fm-stoerungen/staging/.env <<EOF
+          REGISTRY=${{ env.REGISTRY }}
+          API_TAG=${{ needs.build-and-push.outputs.image_tag }}
+          WEB_TAG=${{ needs.build-and-push.outputs.image_tag }}
+          POSTGRES_DB=fm_stoerungen
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=${{ secrets.STAGING_POSTGRES_PASSWORD }}
+          JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}
+          DOMAIN=fm-staging.local
+          EOF
+          chmod 600 /srv/fm-stoerungen/staging/.env"
+
+      - name: Pull + restart staging stack
+        run: |
+          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.HETZNER_HOST }} bash -lc '
+            cd /srv/fm-stoerungen/staging
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose --env-file .env -f docker-compose.staging.yml pull
+            # pg_dump + alembic upgrade head before swapping API
+            ENV=staging ./migrate.sh || true
+            docker compose --env-file .env -f docker-compose.staging.yml up -d
+          '
+
+      - name: Wait for health
+        run: |
+          for i in {1..30}; do
+            code=$(curl -sf -o /dev/null -w "%{http_code}" \
+              "http://${{ secrets.HETZNER_HOST }}:8080/health" || echo "000")
+            if [[ "$code" == "200" ]]; then
+              echo "Staging healthy."
+              exit 0
+            fi
+            echo "Attempt $i: $code — retrying …"
+            sleep 5
+          done
+          echo "::error::Staging did not become healthy."
+          exit 1

@@ -1,0 +1,77 @@
+# Production stack — same shape as staging, different ports + volumes.
+# Promotion is a manual workflow_dispatch in GitHub Actions (Schicht 7).
+
+name: fm-prod
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: fm-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fm_stoerungen}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data_prod:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+      - /var/backups/pg/prod:/backups
+    networks:
+      - prod_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${REGISTRY}/fm-api:${API_TAG:-latest}
+    container_name: fm-prod-api
+    restart: unless-stopped
+    environment:
+      ENV: prod
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fm_stoerungen}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ALLOW_ORIGINS: '["https://${DOMAIN}"]'
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - prod_net
+
+  web:
+    image: ${REGISTRY}/fm-web:${WEB_TAG:-latest}
+    container_name: fm-prod-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - prod_net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: fm-prod-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data_prod:/data
+      - caddy_config_prod:/config
+    depends_on:
+      - api
+      - web
+    networks:
+      - prod_net
+
+networks:
+  prod_net:
+    driver: bridge
+
+volumes:
+  pg_data_prod:
+  caddy_data_prod:
+  caddy_config_prod:
