@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 # Test env must be set BEFORE app imports
@@ -45,12 +46,27 @@ def event_loop():
 async def _prepare_schema():
     """Drop + recreate schema once per test session.
 
-    For Slice 1 we let SQLAlchemy create tables directly; the audit-trigger
-    integration is exercised in dedicated integration tests that run real Alembic.
+    Postgres ENUMs are dropped + recreated manually because SQLAlchemy's Enum
+    columns are configured with ``create_type=False`` (Alembic migration owns
+    the type lifecycle in production).
     """
     engine = _engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+        await conn.execute(text("DROP TYPE IF EXISTS ticket_status CASCADE"))
+        await conn.execute(text("DROP TYPE IF EXISTS ticket_prioritaet CASCADE"))
+        await conn.execute(
+            text(
+                "CREATE TYPE ticket_status AS ENUM "
+                "('neu','zugewiesen','in_arbeit','erledigt','geschlossen')"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE TYPE ticket_prioritaet AS ENUM "
+                "('niedrig','mittel','hoch','kritisch')"
+            )
+        )
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
 
