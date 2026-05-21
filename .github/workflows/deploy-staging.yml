@@ -73,39 +73,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup SSH key
+      - name: Setup SSH agent
+        # webfactory/ssh-agent parses the key robustly (handles CR, BOM, missing
+        # trailing newline) and registers it with ssh-agent, so subsequent ssh/scp
+        # calls don't need `-i ~/.ssh/id_ed25519`.
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
+      - name: Trust server host key
         env:
-          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
           SSH_HOST: ${{ secrets.HETZNER_HOST }}
         run: |
           mkdir -p ~/.ssh
-          # printf preserves newlines; tr -d removes \r (Windows clipboard adds CRLF
-          # when pasting into a GitHub Secret, which then trips OpenSSH key parsing)
-          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null  # validate key parses
           ssh-keyscan -t ed25519 "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Copy compose files to server
         run: |
-          ssh -i ~/.ssh/id_ed25519 \
-              root@${{ secrets.HETZNER_HOST }} \
+          ssh root@${{ secrets.HETZNER_HOST }} \
               "mkdir -p /srv/fm-stoerungen/staging /var/backups/pg/staging"
-          scp -i ~/.ssh/id_ed25519 \
-              infra/docker/docker-compose.staging.yml \
+          scp infra/docker/docker-compose.staging.yml \
               infra/docker/Caddyfile.staging \
               infra/docker/postgres-init.sql \
               root@${{ secrets.HETZNER_HOST }}:/srv/fm-stoerungen/staging/
-          scp -i ~/.ssh/id_ed25519 \
-              infra/scripts/migrate.sh \
+          scp infra/scripts/migrate.sh \
               infra/scripts/restore.sh \
               root@${{ secrets.HETZNER_HOST }}:/srv/fm-stoerungen/staging/
-          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.HETZNER_HOST }} \
+          ssh root@${{ secrets.HETZNER_HOST }} \
               "chmod +x /srv/fm-stoerungen/staging/*.sh"
 
       - name: Write .env file on server
         run: |
-          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.HETZNER_HOST }} \
+          ssh root@${{ secrets.HETZNER_HOST }} \
               "cat > /srv/fm-stoerungen/staging/.env <<EOF
           REGISTRY=${{ env.REGISTRY }}
           API_TAG=${{ needs.build-and-push.outputs.image_tag }}
@@ -120,7 +119,7 @@ jobs:
 
       - name: Pull + restart staging stack
         run: |
-          ssh -i ~/.ssh/id_ed25519 root@${{ secrets.HETZNER_HOST }} bash -lc '
+          ssh root@${{ secrets.HETZNER_HOST }} bash -lc '
             cd /srv/fm-stoerungen/staging
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose --env-file .env -f docker-compose.staging.yml pull
