@@ -62,10 +62,7 @@ async def _prepare_schema():
             )
         )
         await conn.execute(
-            text(
-                "CREATE TYPE ticket_prioritaet AS ENUM "
-                "('niedrig','mittel','hoch','kritisch')"
-            )
+            text("CREATE TYPE ticket_prioritaet AS ENUM ('niedrig','mittel','hoch','kritisch')")
         )
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
