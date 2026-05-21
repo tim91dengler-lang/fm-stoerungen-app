@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import desc, func, select
@@ -152,7 +153,7 @@ async def update_ticket(
     db: AsyncSession,
     ticket_id: UUID,
     mandant_id: UUID,
-    updates: dict,  # only keys the client explicitly set (model_dump(exclude_unset=True))
+    updates: dict[str, Any],  # only keys the client explicitly set (model_dump(exclude_unset=True))
 ) -> Ticket:
     ticket = await get_ticket(db, ticket_id, mandant_id)
     now = datetime.now(UTC)

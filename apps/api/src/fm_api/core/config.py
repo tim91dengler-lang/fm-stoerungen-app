@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     app_name: str = "fm-api"
     api_v1_prefix: str = "/api/v1"
 
-    database_url: PostgresDsn = Field(
+    database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/fm_stoerungen",
     )
 
@@ -30,13 +30,15 @@ class Settings(BaseSettings):
     jwt_access_token_expires_minutes: int = 15
     jwt_refresh_token_expires_days: int = 7
 
-    cors_allow_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_allow_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173", "http://localhost:3000"]
+    )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     @field_validator("jwt_secret")
     @classmethod
-    def jwt_secret_in_prod_must_not_be_default(cls, v: str, info) -> str:
+    def jwt_secret_in_prod_must_not_be_default(cls, v: str, info: ValidationInfo) -> str:
         env = info.data.get("env", "dev")
         if env in ("staging", "prod") and v.startswith("dev-only"):
             raise ValueError("JWT_SECRET must be set to a strong random value in staging/prod")

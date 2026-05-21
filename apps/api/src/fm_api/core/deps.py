@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 from uuid import UUID
 
@@ -68,7 +69,7 @@ async def get_current_user(
 CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
 
 
-def require_role(role: str):
+def require_role(role: str) -> Callable[[CurrentUser], Awaitable[CurrentUser]]:
     async def _checker(current: CurrentUserDep) -> CurrentUser:
         if not current.has_role(role):
             raise HTTPException(

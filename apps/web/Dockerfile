@@ -16,18 +16,17 @@ ENV VITE_API_BASE=$VITE_API_BASE
 
 RUN npm run build
 
-# ---------- runtime (static files served by Caddy in compose) ----------
-FROM nginx:alpine AS runtime
-
-# Non-root nginx (Schicht 2)
-RUN addgroup -S app && adduser -S -G app -u 1000 app
+# ---------- runtime ----------
+# nginx-unprivileged: ships with `nginx` user pre-configured and listens on 8080
+FROM nginxinc/nginx-unprivileged:alpine AS runtime
 
 COPY --from=builder /build/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
 
+# Image already drops to non-root user `nginx` (uid 101) by default — no USER directive needed
 CMD ["nginx", "-g", "daemon off;"]

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -144,5 +145,5 @@ async def soft_delete_user(
 ) -> None:
     user = await get_user(db, user_id, mandant_id)
     user.is_active = False
-    user.deleted_at = func.now()  # type: ignore[assignment]
+    user.deleted_at = datetime.now(UTC)
     await db.flush()
