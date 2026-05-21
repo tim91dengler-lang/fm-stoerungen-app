@@ -50,7 +50,7 @@ def create_access_token(
     return _create_token(
         subject=subject,
         expires_delta=timedelta(minutes=settings.jwt_access_token_expires_minutes),
-        token_type="access",
+        token_type="access",  # nosec B106 - JWT type identifier, not a credential
         extra_claims={
             "mandant_id": str(mandant_id),
             "roles": roles or [],
@@ -63,7 +63,7 @@ def create_refresh_token(subject: str | UUID) -> str:
     return _create_token(
         subject=subject,
         expires_delta=timedelta(days=settings.jwt_refresh_token_expires_days),
-        token_type="refresh",
+        token_type="refresh",  # nosec B106 - JWT type identifier, not a credential
     )
 
 

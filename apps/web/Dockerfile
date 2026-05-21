@@ -25,8 +25,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 
+# Image runs as user `nginx` (uid 101) by default; declare it explicitly for static analyzers
+USER nginx
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
 
-# Image already drops to non-root user `nginx` (uid 101) by default — no USER directive needed
 CMD ["nginx", "-g", "daemon off;"]
