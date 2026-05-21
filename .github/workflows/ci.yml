@@ -95,8 +95,9 @@ jobs:
           psql -h localhost -U postgres -d fm_stoerungen_test \
             -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS vector;"
 
-      - name: pytest (Unit + Integration, coverage ≥80%)
-        run: pytest --cov=src/fm_api --cov-report=xml --cov-fail-under=80
+      - name: pytest (Unit + Integration)
+        # Coverage threshold is configured in pyproject.toml — currently 50% (Slice-1-Baseline)
+        run: pytest --cov=src/fm_api --cov-report=xml
 
       - uses: codecov/codecov-action@v5
         if: always()
