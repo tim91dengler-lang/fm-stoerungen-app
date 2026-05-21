@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AdressenPage } from './pages/AdressenPage';
+import { AuswahllistenPage } from './pages/AuswahllistenPage';
 import { LoginPage } from './pages/LoginPage';
 import { TicketsListePage } from './pages/TicketsListePage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
@@ -20,6 +22,8 @@ export const router = createBrowserRouter([
           { path: '/', element: <Navigate to="/tickets" replace /> },
           { path: '/tickets', element: <TicketsListePage /> },
           { path: '/tickets/:id', element: <TicketDetailPage /> },
+          { path: '/stammdaten/adressen', element: <AdressenPage /> },
+          { path: '/stammdaten/auswahllisten', element: <AuswahllistenPage /> },
           { path: '/users', element: <UsersListePage /> },
         ],
       },
