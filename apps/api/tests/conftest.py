@@ -102,7 +102,7 @@ async def admin_user(db: AsyncSession, mandant: Mandant, admin_role: Role) -> tu
     raw_pw = "TestPassword123!"
     u = User(
         mandant_id=mandant.id,
-        email="admin@example.org",
+        email=f"admin-{uuid4().hex[:8]}@example.org",
         password_hash=hash_password(raw_pw),
         full_name="Test Admin",
         is_active=True,
@@ -119,7 +119,7 @@ async def techniker_user(db: AsyncSession, mandant: Mandant) -> tuple[User, str]
     raw_pw = "TechPassword123!"
     u = User(
         mandant_id=mandant.id,
-        email="tech@example.org",
+        email=f"tech-{uuid4().hex[:8]}@example.org",
         password_hash=hash_password(raw_pw),
         full_name="Test Techniker",
         is_active=True,
