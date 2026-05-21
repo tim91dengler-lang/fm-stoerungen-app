@@ -1,22 +1,22 @@
-import { classNamesForPrio, classNamesForStatus, labelForPrioritaet, labelForStatus } from '../lib/format';
-import type { TicketPrioritaet, TicketStatus } from '../api/types';
+import type { AuswahlWertRef } from '../api/types';
+import { classNamesForPrio, classNamesForStatus } from '../lib/format';
 
-export function StatusBadge({ status }: { status: TicketStatus }) {
+export function StatusBadge({ status }: { status: AuswahlWertRef }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classNamesForStatus(status)}`}
     >
-      {labelForStatus(status)}
+      {status.label}
     </span>
   );
 }
 
-export function PrioBadge({ prioritaet }: { prioritaet: TicketPrioritaet }) {
+export function PrioBadge({ prioritaet }: { prioritaet: AuswahlWertRef }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classNamesForPrio(prioritaet)}`}
     >
-      {labelForPrioritaet(prioritaet)}
+      {prioritaet.label}
     </span>
   );
 }

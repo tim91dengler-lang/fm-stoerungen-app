@@ -2,29 +2,26 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ticketApi } from '../api/endpoints';
-import type { TicketPrioritaet, TicketStatus } from '../api/types';
+import type { TicketPrioritaetSlug, TicketStatusSlug } from '../api/types';
 import { PrioBadge, StatusBadge } from '../components/StatusBadge';
 import { TicketErfassenModal } from './TicketErfassenModal';
-import { formatDateTime } from '../lib/format';
-
-const STATUS_OPTIONS: TicketStatus[] = [
-  'neu',
-  'zugewiesen',
-  'in_arbeit',
-  'erledigt',
-  'geschlossen',
-];
-
-const PRIO_OPTIONS: TicketPrioritaet[] = ['niedrig', 'mittel', 'hoch', 'kritisch'];
+import {
+  PRIO_SLUGS,
+  STATUS_SLUGS,
+  formatDateTime,
+  labelForPrioSlug,
+  labelForStatusSlug,
+} from '../lib/format';
 
 export function TicketsListePage() {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<TicketStatus[]>([
+  const [statusFilter, setStatusFilter] = useState<TicketStatusSlug[]>([
     'neu',
-    'zugewiesen',
-    'in_arbeit',
+    'pruefung',
+    'bearbeitung',
+    'wartet',
   ]);
-  const [prioFilter, setPrioFilter] = useState<TicketPrioritaet[]>([]);
+  const [prioFilter, setPrioFilter] = useState<TicketPrioritaetSlug[]>([]);
   const [showErfassen, setShowErfassen] = useState(false);
 
   const filters = useMemo(
@@ -42,12 +39,12 @@ export function TicketsListePage() {
     queryFn: () => ticketApi.list(filters),
   });
 
-  function toggleStatus(s: TicketStatus) {
+  function toggleStatus(s: TicketStatusSlug) {
     setStatusFilter((cur) =>
       cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s],
     );
   }
-  function togglePrio(p: TicketPrioritaet) {
+  function togglePrio(p: TicketPrioritaetSlug) {
     setPrioFilter((cur) =>
       cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p],
     );
@@ -82,7 +79,7 @@ export function TicketsListePage() {
           />
 
           <div className="flex flex-wrap gap-1">
-            {STATUS_OPTIONS.map((s) => (
+            {STATUS_SLUGS.map((s) => (
               <button
                 key={s}
                 type="button"
@@ -93,13 +90,13 @@ export function TicketsListePage() {
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                {s}
+                {labelForStatusSlug(s)}
               </button>
             ))}
           </div>
 
           <div className="flex flex-wrap gap-1">
-            {PRIO_OPTIONS.map((p) => (
+            {PRIO_SLUGS.map((p) => (
               <button
                 key={p}
                 type="button"
@@ -110,7 +107,7 @@ export function TicketsListePage() {
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                {p}
+                {labelForPrioSlug(p)}
               </button>
             ))}
           </div>
@@ -124,7 +121,10 @@ export function TicketsListePage() {
       )}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          Fehler beim Laden. <button onClick={() => refetch()} className="underline">Erneut versuchen</button>
+          Fehler beim Laden.{' '}
+          <button onClick={() => refetch()} className="underline">
+            Erneut versuchen
+          </button>
         </div>
       )}
 

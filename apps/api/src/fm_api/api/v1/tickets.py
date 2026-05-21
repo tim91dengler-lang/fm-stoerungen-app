@@ -3,14 +3,16 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from fm_api.core.deps import AuditedDbSession, CurrentUserDep
-from fm_api.models.ticket import TicketPrioritaet, TicketStatus
 from fm_api.schemas.common import PaginatedResponse
 from fm_api.schemas.ticket import TicketCreate, TicketRead, TicketUpdate
 from fm_api.services import ticket_service
 from fm_api.services.ticket_service import (
     AssigneeNotFoundError,
     InvalidStatusTransitionError,
+    ObjektNotFoundError,
+    PartnerNotFoundError,
     TicketNotFoundError,
+    UnknownAuswahlSlugError,
 )
 
 router = APIRouter()
@@ -25,8 +27,8 @@ async def list_tickets(
     db: AuditedDbSession,
     current: CurrentUserDep,
     search: str | None = Query(default=None, max_length=200),
-    status_filter: list[TicketStatus] | None = Query(default=None, alias="status"),
-    prioritaet_filter: list[TicketPrioritaet] | None = Query(default=None, alias="prioritaet"),
+    status_filter: list[str] | None = Query(default=None, alias="status"),
+    prioritaet_filter: list[str] | None = Query(default=None, alias="prioritaet"),
     zugewiesen_an_id: UUID | None = Query(default=None),
     include_deleted: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=200),
@@ -44,7 +46,7 @@ async def list_tickets(
         offset=offset,
     )
     return PaginatedResponse[TicketRead](
-        items=[TicketRead.model_validate(t) for t in tickets],
+        items=[TicketRead.from_orm_ticket(t) for t in tickets],
         total=total,
         limit=limit,
         offset=offset,
@@ -69,13 +71,23 @@ async def create_ticket(
             current.user_id,
             titel=payload.titel,
             beschreibung=payload.beschreibung,
-            prioritaet=payload.prioritaet,
+            status_slug=payload.status,
+            prioritaet_slug=payload.prioritaet,
+            kategorie_slug=payload.kategorie,
+            objekt_id=payload.objekt_id,
+            partner_id=payload.partner_id,
             zugewiesen_an_id=payload.zugewiesen_an_id,
         )
     except AssigneeNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ObjektNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except PartnerNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except UnknownAuswahlSlugError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    return TicketRead.model_validate(ticket)
+    return TicketRead.from_orm_ticket(ticket)
 
 
 @router.get(
@@ -92,7 +104,7 @@ async def get_ticket(
         ticket = await ticket_service.get_ticket(db, ticket_id, current.mandant_id)
     except TicketNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return TicketRead.model_validate(ticket)
+    return TicketRead.from_orm_ticket(ticket)
 
 
 @router.patch(
@@ -113,10 +125,16 @@ async def update_ticket(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except AssigneeNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ObjektNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except PartnerNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except UnknownAuswahlSlugError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except InvalidStatusTransitionError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
-    return TicketRead.model_validate(ticket)
+    return TicketRead.from_orm_ticket(ticket)
 
 
 @router.delete(

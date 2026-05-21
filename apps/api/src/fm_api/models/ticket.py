@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,19 +11,28 @@ from fm_api.db.base import Base
 from fm_api.models.mixins import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 if TYPE_CHECKING:
+    from fm_api.models.auswahlliste import AuswahllistenWert
     from fm_api.models.mandant import Mandant
+    from fm_api.models.objekt import Objekt
+    from fm_api.models.partner import GeschaeftsPartner
     from fm_api.models.user import User
 
 
-class TicketStatus(StrEnum):
+class TicketStatusSlug(StrEnum):
+    """Bekannte System-Slugs für Ticket-Status (in der Migration als ist_system=TRUE geseedet).
+
+    Die DB-Tabelle ``auswahllisten_werte`` ist die Quelle der Wahrheit; dieser Enum
+    dient nur als Typ-Hilfe für die Service-Logik (Status-Transitions, Defaults).
+    """
+
     NEU = "neu"
-    ZUGEWIESEN = "zugewiesen"
-    IN_ARBEIT = "in_arbeit"
+    PRUEFUNG = "pruefung"
+    BEARBEITUNG = "bearbeitung"
+    WARTET = "wartet"
     ERLEDIGT = "erledigt"
-    GESCHLOSSEN = "geschlossen"
 
 
-class TicketPrioritaet(StrEnum):
+class TicketPrioritaetSlug(StrEnum):
     NIEDRIG = "niedrig"
     MITTEL = "mittel"
     HOCH = "hoch"
@@ -47,30 +56,33 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     titel: Mapped[str] = mapped_column(String(200), nullable=False)
     beschreibung: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
 
-    status: Mapped[TicketStatus] = mapped_column(
-        Enum(
-            TicketStatus,
-            name="ticket_status",
-            native_enum=True,
-            values_callable=lambda enum_cls: [e.value for e in enum_cls],
-            create_type=False,
-        ),
+    status_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auswahllisten_werte.id", ondelete="RESTRICT"),
         nullable=False,
-        default=TicketStatus.NEU,
-        server_default=TicketStatus.NEU.value,
         index=True,
     )
-    prioritaet: Mapped[TicketPrioritaet] = mapped_column(
-        Enum(
-            TicketPrioritaet,
-            name="ticket_prioritaet",
-            native_enum=True,
-            values_callable=lambda enum_cls: [e.value for e in enum_cls],
-            create_type=False,
-        ),
+    prioritaet_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auswahllisten_werte.id", ondelete="RESTRICT"),
         nullable=False,
-        default=TicketPrioritaet.MITTEL,
-        server_default=TicketPrioritaet.MITTEL.value,
+        index=True,
+    )
+    kategorie_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auswahllisten_werte.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    objekt_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("objekte.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    partner_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("geschaeftspartner.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
 
@@ -96,3 +108,12 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     zugewiesen_an: Mapped["User | None"] = relationship(
         foreign_keys=[zugewiesen_an_id], lazy="raise"
     )
+    status_wert: Mapped["AuswahllistenWert"] = relationship(foreign_keys=[status_id], lazy="raise")
+    prioritaet_wert: Mapped["AuswahllistenWert"] = relationship(
+        foreign_keys=[prioritaet_id], lazy="raise"
+    )
+    kategorie_wert: Mapped["AuswahllistenWert | None"] = relationship(
+        foreign_keys=[kategorie_id], lazy="raise"
+    )
+    objekt: Mapped["Objekt | None"] = relationship(lazy="raise")
+    partner: Mapped["GeschaeftsPartner | None"] = relationship(lazy="raise")

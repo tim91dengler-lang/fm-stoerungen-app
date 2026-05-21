@@ -3,21 +3,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ticketApi, userApi } from '../api/endpoints';
 import type {
-  TicketPrioritaet,
-  TicketStatus,
+  TicketPrioritaetSlug,
+  TicketStatusSlug,
   TicketUpdate,
 } from '../api/types';
 import { PrioBadge, StatusBadge } from '../components/StatusBadge';
-import { formatDateTime } from '../lib/format';
-
-const STATUS_OPTIONS: TicketStatus[] = [
-  'neu',
-  'zugewiesen',
-  'in_arbeit',
-  'erledigt',
-  'geschlossen',
-];
-const PRIO_OPTIONS: TicketPrioritaet[] = ['niedrig', 'mittel', 'hoch', 'kritisch'];
+import {
+  PRIO_SLUGS,
+  STATUS_SLUGS,
+  formatDateTime,
+  labelForPrioSlug,
+  labelForStatusSlug,
+} from '../lib/format';
 
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -117,15 +114,15 @@ export function TicketDetailPage() {
           <section className="rounded-lg border border-slate-200 bg-white p-4">
             <h2 className="mb-3 text-sm font-semibold text-slate-700">Status</h2>
             <select
-              value={t.status}
+              value={t.status.key}
               onChange={(e) =>
-                update.mutate({ status: e.target.value as TicketStatus })
+                update.mutate({ status: e.target.value as TicketStatusSlug })
               }
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
-              {STATUS_OPTIONS.map((s) => (
+              {STATUS_SLUGS.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {labelForStatusSlug(s)}
                 </option>
               ))}
             </select>
@@ -136,17 +133,17 @@ export function TicketDetailPage() {
               Priorität
             </h2>
             <select
-              value={t.prioritaet}
+              value={t.prioritaet.key}
               onChange={(e) =>
                 update.mutate({
-                  prioritaet: e.target.value as TicketPrioritaet,
+                  prioritaet: e.target.value as TicketPrioritaetSlug,
                 })
               }
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
-              {PRIO_OPTIONS.map((p) => (
+              {PRIO_SLUGS.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {labelForPrioSlug(p)}
                 </option>
               ))}
             </select>
@@ -194,10 +191,6 @@ export function TicketDetailPage() {
               <div className="flex justify-between">
                 <dt>Erledigt am</dt>
                 <dd>{formatDateTime(t.erledigt_am)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Geschlossen am</dt>
-                <dd>{formatDateTime(t.geschlossen_am)}</dd>
               </div>
             </dl>
           </section>

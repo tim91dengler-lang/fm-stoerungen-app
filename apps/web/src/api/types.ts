@@ -37,14 +37,34 @@ export interface UserRef {
   full_name: string;
 }
 
-export type TicketStatus =
-  | 'neu'
-  | 'zugewiesen'
-  | 'in_arbeit'
-  | 'erledigt'
-  | 'geschlossen';
+export interface AuswahlWertRef {
+  id: UUID;
+  key: string;
+  label: string;
+  farbe: string | null;
+}
 
-export type TicketPrioritaet = 'niedrig' | 'mittel' | 'hoch' | 'kritisch';
+export interface ObjektRef {
+  id: UUID;
+  name: string;
+}
+
+export interface PartnerRef {
+  id: UUID;
+  name: string;
+}
+
+// Bekannte System-Slugs (in Migration als ist_system=TRUE geseedet).
+// Frontend rechnet damit für hardcoded UI-Optionen; ab Iteration 2.2
+// werden die Optionen dynamisch aus /api/v1/auswahllisten geladen.
+export type TicketStatusSlug =
+  | 'neu'
+  | 'pruefung'
+  | 'bearbeitung'
+  | 'wartet'
+  | 'erledigt';
+
+export type TicketPrioritaetSlug = 'niedrig' | 'mittel' | 'hoch' | 'kritisch';
 
 export interface TicketRead {
   id: UUID;
@@ -52,8 +72,11 @@ export interface TicketRead {
   nummer: number;
   titel: string;
   beschreibung: string;
-  status: TicketStatus;
-  prioritaet: TicketPrioritaet;
+  status: AuswahlWertRef;
+  prioritaet: AuswahlWertRef;
+  kategorie: AuswahlWertRef | null;
+  objekt: ObjektRef | null;
+  partner: PartnerRef | null;
   eroeffnet_von: UserRef;
   zugewiesen_an: UserRef | null;
   eroeffnet_am: string;
@@ -74,22 +97,29 @@ export interface PaginatedResponse<T> {
 export interface TicketCreate {
   titel: string;
   beschreibung?: string;
-  prioritaet?: TicketPrioritaet;
+  status?: TicketStatusSlug | null;
+  prioritaet?: TicketPrioritaetSlug;
+  kategorie?: string | null;
+  objekt_id?: UUID | null;
+  partner_id?: UUID | null;
   zugewiesen_an_id?: UUID | null;
 }
 
 export interface TicketUpdate {
   titel?: string;
   beschreibung?: string;
-  prioritaet?: TicketPrioritaet;
-  status?: TicketStatus;
+  status?: TicketStatusSlug;
+  prioritaet?: TicketPrioritaetSlug;
+  kategorie?: string | null;
+  objekt_id?: UUID | null;
+  partner_id?: UUID | null;
   zugewiesen_an_id?: UUID | null;
 }
 
 export interface TicketListFilters {
   search?: string;
-  status?: TicketStatus[];
-  prioritaet?: TicketPrioritaet[];
+  status?: TicketStatusSlug[];
+  prioritaet?: TicketPrioritaetSlug[];
   zugewiesen_an_id?: UUID;
   limit?: number;
   offset?: number;
