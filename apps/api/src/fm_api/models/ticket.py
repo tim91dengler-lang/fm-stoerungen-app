@@ -48,14 +48,26 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     beschreibung: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
 
     status: Mapped[TicketStatus] = mapped_column(
-        Enum(TicketStatus, name="ticket_status", native_enum=True),
+        Enum(
+            TicketStatus,
+            name="ticket_status",
+            native_enum=True,
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            create_type=False,
+        ),
         nullable=False,
         default=TicketStatus.NEU,
         server_default=TicketStatus.NEU.value,
         index=True,
     )
     prioritaet: Mapped[TicketPrioritaet] = mapped_column(
-        Enum(TicketPrioritaet, name="ticket_prioritaet", native_enum=True),
+        Enum(
+            TicketPrioritaet,
+            name="ticket_prioritaet",
+            native_enum=True,
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            create_type=False,
+        ),
         nullable=False,
         default=TicketPrioritaet.MITTEL,
         server_default=TicketPrioritaet.MITTEL.value,
