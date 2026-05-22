@@ -8,6 +8,7 @@ from fm_api.models.partner import GeschaeftsPartner, PartnerTyp
 from fm_api.models.role import Role
 from fm_api.models.ticket import Ticket, TicketPrioritaetSlug, TicketStatusSlug
 from fm_api.models.ticket_message import TicketMessage
+from fm_api.models.ticket_photo import TicketPhoto
 from fm_api.models.user import User, user_roles
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     "SystemAudit",
     "Ticket",
     "TicketMessage",
+    "TicketPhoto",
     "TicketPrioritaetSlug",
     "TicketStatusSlug",
     "User",
