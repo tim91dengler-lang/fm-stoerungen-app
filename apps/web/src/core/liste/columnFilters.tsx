@@ -26,7 +26,7 @@ export function TextFilter({ value, onChange }: RendererProps): ReactNode {
       value={(value as string) ?? ''}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder="filtern …"
-      className="w-full rounded border border-slate-300 px-2 py-0.5 text-xs font-normal normal-case text-slate-700 focus:border-brand-500 focus:outline-none"
+      className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs font-normal normal-case text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none"
       onClick={(e) => e.stopPropagation()}
     />
   );
@@ -76,8 +76,8 @@ export function SelectFilter({
           onClick={() => toggle(o.value)}
           className={`rounded px-1.5 py-0.5 text-[10px] font-normal normal-case ${
             selected.includes(o.value)
-              ? 'bg-brand-600 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              ? 'bg-emerald-500 text-zinc-950'
+              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
           }`}
         >
           {o.label}
@@ -93,7 +93,7 @@ export function ToggleFilter({ value, onChange }: RendererProps): ReactNode {
     value === true ? 'yes' : value === false ? 'no' : 'all';
   return (
     <div
-      className="inline-flex overflow-hidden rounded border border-slate-300 text-[10px] font-normal normal-case"
+      className="inline-flex overflow-hidden rounded border border-zinc-700 text-[10px] font-normal normal-case"
       onClick={(e) => e.stopPropagation()}
     >
       {(['all', 'yes', 'no'] as const).map((s) => (
@@ -105,8 +105,8 @@ export function ToggleFilter({ value, onChange }: RendererProps): ReactNode {
           }
           className={`px-1.5 py-0.5 ${
             state === s
-              ? 'bg-brand-600 text-white'
-              : 'bg-white text-slate-700 hover:bg-slate-100'
+              ? 'bg-emerald-500 text-zinc-950'
+              : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-800'
           }`}
         >
           {s === 'all' ? '·' : s === 'yes' ? '✓' : '✗'}

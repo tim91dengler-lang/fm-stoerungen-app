@@ -41,41 +41,41 @@ export function AuswahllistenPage() {
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Auswahllisten</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-zinc-100">Auswahllisten</h1>
+          <p className="text-sm text-zinc-500">
             Konfigurierbare Status-, Prioritäts- und Kategorie-Werte je Mandant
           </p>
         </div>
         <button
           type="button"
           onClick={() => setShowCreateListe(true)}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
           Neue Liste
         </button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <aside className="rounded-lg border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <aside className="rounded-lg border border-zinc-800 bg-zinc-900">
+          <div className="border-b border-zinc-800 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Listen
           </div>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-zinc-800/60">
             {listenQuery.data?.map((liste) => (
               <li
                 key={liste.id}
                 onClick={() => setSelectedId(liste.id)}
-                className={`cursor-pointer px-4 py-2 text-sm hover:bg-slate-50 ${selectedId === liste.id ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-700'}`}
+                className={`cursor-pointer px-4 py-2 text-sm hover:bg-zinc-900/50 ${selectedId === liste.id ? 'bg-emerald-500/10 font-medium text-emerald-300' : 'text-zinc-300'}`}
               >
                 <div className="flex items-center justify-between">
                   <span>{liste.label}</span>
                   {liste.ist_system && (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-600">
+                    <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase text-zinc-400">
                       System
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-zinc-500">
                   {liste.key} · {liste.werte.length} Werte
                 </div>
               </li>
@@ -83,7 +83,7 @@ export function AuswahllistenPage() {
           </ul>
         </aside>
 
-        <section className="rounded-lg border border-slate-200 bg-white md:col-span-2">
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900 md:col-span-2">
           {selected ? (
             <ListeDetail
               liste={selected}
@@ -98,7 +98,7 @@ export function AuswahllistenPage() {
               }}
             />
           ) : (
-            <div className="p-8 text-center text-sm text-slate-500">
+            <div className="p-8 text-center text-sm text-zinc-500">
               Liste links auswählen, um Werte zu bearbeiten.
             </div>
           )}
@@ -109,17 +109,17 @@ export function AuswahllistenPage() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
           onClick={() => setShowCreateListe(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-xl bg-zinc-900 p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="mb-3 text-lg font-semibold">Neue Auswahlliste</h2>
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Key (Slug, kebab/snake)
                 </label>
                 <input
@@ -129,11 +129,11 @@ export function AuswahllistenPage() {
                     setNewListeKey(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '_'))
                   }
                   placeholder="z.B. gewerk"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Anzeige-Label
                 </label>
                 <input
@@ -141,7 +141,7 @@ export function AuswahllistenPage() {
                   value={newListeLabel}
                   onChange={(e) => setNewListeLabel(e.target.value)}
                   placeholder="z.B. Gewerk"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -149,7 +149,7 @@ export function AuswahllistenPage() {
               <button
                 type="button"
                 onClick={() => setShowCreateListe(false)}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
               >
                 Abbrechen
               </button>
@@ -159,7 +159,7 @@ export function AuswahllistenPage() {
                 disabled={
                   !newListeKey || !newListeLabel || createListe.isPending
                 }
-                className="rounded-md bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700 disabled:bg-slate-400"
+                className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
               >
                 Anlegen
               </button>
@@ -199,10 +199,10 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
 
   return (
     <div>
-      <div className="flex items-start justify-between border-b border-slate-200 px-4 py-3">
+      <div className="flex items-start justify-between border-b border-zinc-800 px-4 py-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">{liste.label}</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="text-lg font-semibold text-zinc-100">{liste.label}</h2>
+          <p className="text-xs text-zinc-500">
             Key: <span className="font-mono">{liste.key}</span>
             {liste.beschreibung ? ` · ${liste.beschreibung}` : ''}
           </p>
@@ -211,14 +211,14 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
           <button
             type="button"
             onClick={onDelete}
-            className="text-xs text-red-700 hover:underline"
+            className="text-xs text-red-400 hover:underline"
           >
             Liste löschen
           </button>
         )}
       </div>
 
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-zinc-800/60">
         {liste.werte.map((w) => (
           <li
             key={w.id}
@@ -231,8 +231,8 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
                 />
               )}
               <div>
-                <div className="font-medium text-slate-800">{w.label}</div>
-                <div className="text-xs text-slate-500">
+                <div className="font-medium text-zinc-200">{w.label}</div>
+                <div className="text-xs text-zinc-500">
                   {w.key} · Reihenfolge {w.reihenfolge}
                   {w.ist_system ? ' · System' : ''}
                 </div>
@@ -246,7 +246,7 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
                     removeWert.mutate(w.id);
                   }
                 }}
-                className="text-xs text-red-700 hover:underline"
+                className="text-xs text-red-400 hover:underline"
               >
                 Löschen
               </button>
@@ -255,8 +255,8 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
         ))}
       </ul>
 
-      <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 py-3">
+        <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">
           Neuen Wert hinzufügen
         </div>
         <div className="mt-2 flex gap-2">
@@ -267,19 +267,19 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
             onChange={(e) =>
               setNewKey(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '_'))
             }
-            className="w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            className="w-32 rounded-md border border-zinc-700 px-2 py-1 text-sm"
           />
           <input
             type="text"
             value={newLabel}
             placeholder="Anzeige-Label"
             onChange={(e) => setNewLabel(e.target.value)}
-            className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            className="flex-1 rounded-md border border-zinc-700 px-2 py-1 text-sm"
           />
           <select
             value={newFarbe}
             onChange={(e) => setNewFarbe(e.target.value)}
-            className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+            className="rounded-md border border-zinc-700 px-2 py-1 text-sm"
           >
             {[
               'slate',
@@ -307,7 +307,7 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
               })
             }
             disabled={!newKey || !newLabel || addWert.isPending}
-            className="rounded-md bg-brand-600 px-3 py-1 text-sm text-white hover:bg-brand-700 disabled:bg-slate-400"
+            className="rounded-md bg-emerald-500 px-3 py-1 text-sm text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
           >
             Hinzufügen
           </button>

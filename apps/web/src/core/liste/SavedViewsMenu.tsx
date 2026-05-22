@@ -59,14 +59,14 @@ export function SavedViewsMenu({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-900/50"
         >
           📌 {active ? active.name : 'Ansicht'}
         </button>
         {open && (
-          <div className="absolute left-0 z-30 mt-1 w-72 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+          <div className="absolute left-0 z-30 mt-1 w-72 rounded-md border border-zinc-800 bg-zinc-900 p-1 shadow-lg">
             {views.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-slate-500">
+              <div className="px-3 py-2 text-xs text-zinc-500">
                 Noch keine gespeicherten Ansichten.
               </div>
             ) : (
@@ -83,14 +83,14 @@ export function SavedViewsMenu({
                 />
               ))
             )}
-            <div className="my-1 border-t border-slate-200" />
+            <div className="my-1 border-t border-zinc-800" />
             <button
               type="button"
               onClick={() => {
                 setShowSaveDialog(true);
                 setOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm text-brand-700 hover:bg-brand-50"
+              className="block w-full px-3 py-2 text-left text-sm text-emerald-300 hover:bg-emerald-500/10"
             >
               + Aktuelle Ansicht speichern
             </button>
@@ -102,11 +102,11 @@ export function SavedViewsMenu({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
           onClick={() => setShowSaveDialog(false)}
         >
           <div
-            className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl"
+            className="w-full max-w-sm rounded-xl bg-zinc-900 p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-2 text-lg font-semibold">Ansicht speichern</h3>
@@ -116,7 +116,7 @@ export function SavedViewsMenu({
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="z. B. Offene Heizungs-Tickets"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
               />
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -131,7 +131,7 @@ export function SavedViewsMenu({
               <button
                 type="button"
                 onClick={() => setShowSaveDialog(false)}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
               >
                 Abbrechen
               </button>
@@ -139,7 +139,7 @@ export function SavedViewsMenu({
                 type="button"
                 onClick={() => saveMut.mutate()}
                 disabled={!newName || saveMut.isPending}
-                className="rounded-md bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700 disabled:bg-slate-400"
+                className="rounded-md bg-emerald-500 px-3 py-1.5 text-sm text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
               >
                 Speichern
               </button>
@@ -164,8 +164,8 @@ function ViewRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-slate-50 ${
-        active ? 'bg-brand-50' : ''
+      className={`flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-zinc-900/50 ${
+        active ? 'bg-emerald-500/10' : ''
       }`}
     >
       <button

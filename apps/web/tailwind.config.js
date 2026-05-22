@@ -4,30 +4,23 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Brand = Emerald (orientiert sich am Mockup zinc-950/emerald-500).
         brand: {
-          50: '#f0f7ff',
-          100: '#e0f0fe',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          900: '#0c4a6e',
-        },
-        status: {
-          neu: '#6b7280',
-          zugewiesen: '#3b82f6',
-          'in-arbeit': '#f59e0b',
-          erledigt: '#10b981',
-          geschlossen: '#374151',
-        },
-        prio: {
-          niedrig: '#9ca3af',
-          mittel: '#60a5fa',
-          hoch: '#f97316',
-          kritisch: '#ef4444',
+          50: '#ecfdf5',
+          100: '#d1fae5',
+          200: '#a7f3d0',
+          300: '#6ee7b7',
+          400: '#34d399',
+          500: '#10b981',
+          600: '#059669',
+          700: '#047857',
+          800: '#065f46',
+          900: '#064e3b',
         },
       },
       fontFamily: {
         sans: [
+          'IBM Plex Sans',
           'Inter',
           'system-ui',
           '-apple-system',

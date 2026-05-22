@@ -112,44 +112,44 @@ export function AdressenPage() {
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Adressen</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-zinc-100">Adressen</h1>
+          <p className="text-sm text-zinc-500">
             {listQuery.data ? `${listQuery.data.total} Adressen` : '—'}
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
           Neue Adresse
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <input
           type="search"
           placeholder="Suche in Straße, PLZ, Ort …"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
         />
       </div>
 
       {listQuery.isLoading && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Lade Adressen …
         </div>
       )}
       {listQuery.data && listQuery.data.items.length === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Keine Adressen gefunden.
         </div>
       )}
       {listQuery.data && listQuery.data.items.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+          <table className="min-w-full divide-y divide-zinc-800 text-sm">
+            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
               <tr>
                 <th className="px-4 py-2 font-medium">Straße</th>
                 <th className="px-4 py-2 font-medium">PLZ / Ort</th>
@@ -158,14 +158,14 @@ export function AdressenPage() {
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-zinc-800/60">
               {listQuery.data.items.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-50">
+                <tr key={a.id} className="hover:bg-zinc-900/50">
                   <td className="px-4 py-2">
                     {a.strasse}
                     {a.hausnummer ? ` ${a.hausnummer}` : ''}
                     {a.adresszusatz ? (
-                      <span className="ml-1 text-xs text-slate-500">
+                      <span className="ml-1 text-xs text-zinc-500">
                         ({a.adresszusatz})
                       </span>
                     ) : null}
@@ -174,7 +174,7 @@ export function AdressenPage() {
                     {a.plz} {a.ort}
                   </td>
                   <td className="px-4 py-2 font-mono text-xs uppercase">{a.land}</td>
-                  <td className="px-4 py-2 text-xs text-slate-500">
+                  <td className="px-4 py-2 text-xs text-zinc-500">
                     {a.latitude && a.longitude
                       ? `${a.latitude.toFixed(4)}, ${a.longitude.toFixed(4)}`
                       : '—'}
@@ -183,7 +183,7 @@ export function AdressenPage() {
                     <button
                       type="button"
                       onClick={() => openEdit(a)}
-                      className="mr-2 text-xs font-medium text-brand-700 hover:underline"
+                      className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
                     >
                       Bearbeiten
                     </button>
@@ -194,7 +194,7 @@ export function AdressenPage() {
                           deleteMut.mutate(a.id);
                         }
                       }}
-                      className="text-xs font-medium text-red-700 hover:underline"
+                      className="text-xs font-medium text-red-400 hover:underline"
                     >
                       Löschen
                     </button>
@@ -210,21 +210,21 @@ export function AdressenPage() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
           onClick={closeModal}
         >
           <div
-            className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl"
+            className="w-full max-w-xl rounded-xl bg-zinc-900 p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-zinc-100">
                 {editingId ? 'Adresse bearbeiten' : 'Neue Adresse'}
               </h2>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800"
                 aria-label="Schließen"
               >
                 ×
@@ -233,7 +233,7 @@ export function AdressenPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Adress-Suche (Photon)
                 </label>
                 <AdressSuggestCombobox
@@ -246,7 +246,7 @@ export function AdressenPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-xs font-medium text-zinc-300">
                     Straße
                   </label>
                   <input
@@ -255,11 +255,11 @@ export function AdressenPage() {
                     onChange={(e) =>
                       setForm({ ...form, strasse: e.target.value })
                     }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-xs font-medium text-zinc-300">
                     Hausnummer
                   </label>
                   <input
@@ -268,13 +268,13 @@ export function AdressenPage() {
                     onChange={(e) =>
                       setForm({ ...form, hausnummer: e.target.value })
                     }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Adresszusatz (z. B. Hinterhaus, 3. OG)
                 </label>
                 <input
@@ -283,37 +283,37 @@ export function AdressenPage() {
                   onChange={(e) =>
                     setForm({ ...form, adresszusatz: e.target.value })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-xs font-medium text-zinc-300">
                     PLZ
                   </label>
                   <input
                     type="text"
                     value={form.plz}
                     onChange={(e) => setForm({ ...form, plz: e.target.value })}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-xs font-medium text-zinc-300">
                     Ort
                   </label>
                   <input
                     type="text"
                     value={form.ort}
                     onChange={(e) => setForm({ ...form, ort: e.target.value })}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Land (ISO 2-Letter)
                 </label>
                 <input
@@ -322,13 +322,13 @@ export function AdressenPage() {
                   onChange={(e) =>
                     setForm({ ...form, land: e.target.value.toUpperCase() })
                   }
-                  className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm uppercase"
+                  className="w-24 rounded-md border border-zinc-700 px-3 py-2 text-sm uppercase"
                   maxLength={2}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Bemerkung
                 </label>
                 <textarea
@@ -337,7 +337,7 @@ export function AdressenPage() {
                     setForm({ ...form, bemerkung: e.target.value })
                   }
                   rows={2}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
@@ -353,7 +353,7 @@ export function AdressenPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
               >
                 Abbrechen
               </button>
@@ -361,7 +361,7 @@ export function AdressenPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isPending}
-                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:bg-slate-400"
+                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
               >
                 {isPending ? 'Speichere …' : 'Speichern'}
               </button>

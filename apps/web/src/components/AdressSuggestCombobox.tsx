@@ -59,16 +59,16 @@ export function AdressSuggestCombobox({
         }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
         autoComplete="off"
       />
       {open && debouncedQuery.length >= 3 && (
-        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-zinc-800 bg-zinc-900 shadow-lg">
           {suggestQuery.isLoading && (
-            <div className="px-3 py-2 text-xs text-slate-500">Suche …</div>
+            <div className="px-3 py-2 text-xs text-zinc-500">Suche …</div>
           )}
           {!suggestQuery.isLoading && suggestions.length === 0 && (
-            <div className="px-3 py-2 text-xs text-slate-500">
+            <div className="px-3 py-2 text-xs text-zinc-500">
               Keine Treffer. Bitte manuell eintragen.
             </div>
           )}
@@ -80,13 +80,13 @@ export function AdressSuggestCombobox({
                 onSelect(s);
                 setOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+              className="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-900/50"
             >
-              <span className="font-medium text-slate-800">
+              <span className="font-medium text-zinc-200">
                 {s.strasse}
                 {s.hausnummer ? ` ${s.hausnummer}` : ''}
               </span>
-              <span className="ml-2 text-slate-500">
+              <span className="ml-2 text-zinc-500">
                 {s.plz} {s.ort} {s.land ? `· ${s.land}` : ''}
               </span>
             </button>
