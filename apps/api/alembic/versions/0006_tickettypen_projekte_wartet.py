@@ -248,13 +248,16 @@ def upgrade() -> None:
             tt_reparatur UUID;
         BEGIN
             FOR m IN SELECT id FROM mandanten LOOP
-                -- Tickettypen (3 System-Defaults)
+                -- Tickettypen (3 System-Defaults): erst alle anlegen,
+                -- dann die reparatur-id separat selecten (INSERT ... RETURNING
+                -- INTO erlaubt nur eine Zeile pro Statement).
                 INSERT INTO tickettypen (mandant_id, key, label, beschreibung, icon, farbe, pflichtfelder, default_reminder_tage, reihenfolge, ist_system)
                 VALUES
                     (m.id, 'reparatur', 'Reparatur', 'Standard-Reparatur-Ticket', 'wrench', 'emerald', '["titel"]'::jsonb, 0, 0, TRUE),
                     (m.id, 'wartung',  'Wartung',  'Geplante Wartung mit Fälligkeit', 'calendar', 'blue', '["titel","faelligkeit_am"]'::jsonb, 7, 1, TRUE),
-                    (m.id, 'baubegehung', 'Baubegehung', 'Termingebundene Begehung', 'binoculars', 'amber', '["titel","faelligkeit_am"]'::jsonb, 3, 2, TRUE)
-                RETURNING id INTO tt_reparatur;
+                    (m.id, 'baubegehung', 'Baubegehung', 'Termingebundene Begehung', 'binoculars', 'amber', '["titel","faelligkeit_am"]'::jsonb, 3, 2, TRUE);
+                SELECT id INTO tt_reparatur FROM tickettypen
+                  WHERE mandant_id = m.id AND key = 'reparatur';
 
                 -- wartet_grund-Auswahlliste mit 4 Werten
                 INSERT INTO auswahllisten (mandant_id, key, label, beschreibung, ist_system)
