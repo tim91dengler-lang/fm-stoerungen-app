@@ -42,6 +42,10 @@ COPY --chown=app:app src ./src
 COPY --chown=app:app alembic ./alembic
 COPY --chown=app:app alembic.ini ./
 
+# Upload-Verzeichnis vorbereiten — beim ersten Mount eines benannten Volumes
+# übernimmt Docker die Berechtigungen aus dem Image-Layer ins Volume.
+RUN mkdir -p /var/uploads/fm && chown -R app:app /var/uploads
+
 USER app
 
 EXPOSE 8000
