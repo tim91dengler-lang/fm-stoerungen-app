@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -139,9 +139,12 @@ async def update_objekt(
         setattr(objekt, key, value)
 
     if new_links is not None:
-        # Komplett ersetzen — einfach für Slice 2; differenzieller Update kann später kommen
-        for existing in list(objekt.partner_links):
-            await db.delete(existing)
+        # Komplett ersetzen — bulk-delete via Core, damit der Session-Cache
+        # (Objekt.partner_links) nicht stale alte Links zurückliefert
+        await db.execute(
+            delete(ObjektPartner).where(ObjektPartner.objekt_id == objekt.id)
+        )
+        objekt.partner_links.clear()
         await db.flush()
         for link in new_links:
             db.add(
