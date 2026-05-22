@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
   Filter,
   Flame,
+  LayoutGrid,
   MapPin,
 } from 'lucide-react';
 import {
@@ -421,13 +422,22 @@ export function TicketsListePage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold text-zinc-100">Ticket-Pool</h1>
-        <p className="text-sm text-zinc-500">
-          {ticketsQuery.data
-            ? `${ticketsQuery.data.items.length} von ${ticketsQuery.data.total} Tickets`
-            : '—'}
-        </p>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-100">Ticket-Pool</h1>
+          <p className="text-sm text-zinc-500">
+            {ticketsQuery.data
+              ? `${ticketsQuery.data.items.length} von ${ticketsQuery.data.total} Tickets`
+              : '—'}
+          </p>
+        </div>
+        <Link
+          to="/kanban"
+          className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
+          title="Kanban-Ansicht"
+        >
+          <LayoutGrid className="h-3.5 w-3.5" /> Kanban
+        </Link>
       </div>
 
       <KpiCards items={kpis} />

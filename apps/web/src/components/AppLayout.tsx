@@ -3,12 +3,14 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   Activity,
-  Bell,
   Building2,
+  FolderKanban,
+  FileStack,
   LayoutDashboard,
   ListChecks,
   LogOut,
   Settings,
+  Smartphone,
   Tags,
   Ticket,
   Users,
@@ -16,6 +18,7 @@ import {
   MapPinned,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { NotificationsDropdown } from './NotificationsDropdown';
 
 interface NavItem {
   to: string;
@@ -34,6 +37,10 @@ const navGroups: NavGroup[] = [
     label: 'Betrieb',
     items: [
       { to: '/tickets', label: 'Ticket-Pool', icon: <Ticket className="h-4 w-4" /> },
+      { to: '/wartungen', label: 'Wartungen', icon: <ListChecks className="h-4 w-4" /> },
+      { to: '/projekte', label: 'Projekte', icon: <FolderKanban className="h-4 w-4" /> },
+      { to: '/dokumente', label: 'Dokumente', icon: <FileStack className="h-4 w-4" /> },
+      { to: '/mobile-demo', label: 'Mobile-Vorschau', icon: <Smartphone className="h-4 w-4" /> },
     ],
   },
   {
@@ -206,14 +213,7 @@ export function AppLayout() {
               <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
               System aktiv
             </div>
-            <button
-              type="button"
-              className="relative rounded-md p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              title="Benachrichtigungen (kommt)"
-              aria-label="Benachrichtigungen"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
+            <NotificationsDropdown />
             <button
               type="button"
               onClick={handleLogout}

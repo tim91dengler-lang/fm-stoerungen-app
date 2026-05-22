@@ -5,7 +5,11 @@ import { RouterProvider } from 'react-router-dom';
 
 import { router } from './router';
 import { AuthProvider } from './contexts/AuthContext';
+import { registerServiceWorker, setupInstallPrompt } from './lib/pwa';
 import './index.css';
+
+registerServiceWorker();
+setupInstallPrompt();
 
 const queryClient = new QueryClient({
   defaultOptions: {

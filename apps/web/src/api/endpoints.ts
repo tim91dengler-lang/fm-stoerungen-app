@@ -9,10 +9,21 @@ import type {
   AuswahllistenWertCreate,
   AuswahllistenWertRead,
   AuswahllistenWertUpdate,
+  DokumentLink,
+  DokumentRead,
+  DokumentTarget,
+  DokumentUpdate,
+  EinheitCreate,
+  EinheitRead,
+  EinheitUpdate,
   GespeicherteAnsichtCreate,
   GespeicherteAnsichtRead,
   GespeicherteAnsichtUpdate,
+  HausCreate,
+  HausRead,
+  HausUpdate,
   LoginResponse,
+  NotificationRead,
   ObjektCreate,
   ObjektRead,
   ObjektUpdate,
@@ -20,6 +31,16 @@ import type {
   PartnerCreate,
   PartnerRead,
   PartnerUpdate,
+  ProjektCreate,
+  ProjektRead,
+  ProjektStatus,
+  ProjektUpdate,
+  StockwerkCreate,
+  StockwerkRead,
+  StockwerkUpdate,
+  TickettypRead,
+  TickettypCreate,
+  TickettypUpdate,
   TicketCreate,
   TicketListFilters,
   TicketMessageCreate,
@@ -29,6 +50,7 @@ import type {
   TicketRead,
   TicketUpdate,
   UserRead,
+  UUID,
 } from './types';
 
 export const authApi = {
@@ -179,6 +201,160 @@ export const ansichtenApi = {
       .then((r) => r.data),
   remove: (id: string) =>
     api.delete<void>(`/ansichten/${id}`).then(() => undefined),
+};
+
+export const tickettypApi = {
+  list: () =>
+    api.get<TickettypRead[]>('/tickettypen').then((r) => r.data),
+  create: (payload: TickettypCreate) =>
+    api.post<TickettypRead>('/tickettypen', payload).then((r) => r.data),
+  update: (id: UUID, payload: TickettypUpdate) =>
+    api.patch<TickettypRead>(`/tickettypen/${id}`, payload).then((r) => r.data),
+  remove: (id: UUID) =>
+    api.delete<void>(`/tickettypen/${id}`).then(() => undefined),
+};
+
+export const projektApi = {
+  list: (
+    params: {
+      search?: string;
+      status?: ProjektStatus[];
+      include_deleted?: boolean;
+    } = {},
+  ) =>
+    api
+      .get<ProjektRead[]>('/projekte', { params })
+      .then((r) => r.data),
+  get: (id: UUID) =>
+    api.get<ProjektRead>(`/projekte/${id}`).then((r) => r.data),
+  create: (payload: ProjektCreate) =>
+    api.post<ProjektRead>('/projekte', payload).then((r) => r.data),
+  update: (id: UUID, payload: ProjektUpdate) =>
+    api.patch<ProjektRead>(`/projekte/${id}`, payload).then((r) => r.data),
+  remove: (id: UUID) =>
+    api.delete<void>(`/projekte/${id}`).then(() => undefined),
+};
+
+export const objektstrukturApi = {
+  listHaus: (objektId: UUID) =>
+    api
+      .get<HausRead[]>(`/objektstruktur/objekte/${objektId}/haus`)
+      .then((r) => r.data),
+  createHaus: (objektId: UUID, payload: HausCreate) =>
+    api
+      .post<HausRead>(`/objektstruktur/objekte/${objektId}/haus`, payload)
+      .then((r) => r.data),
+  updateHaus: (hausId: UUID, payload: HausUpdate) =>
+    api
+      .patch<HausRead>(`/objektstruktur/haus/${hausId}`, payload)
+      .then((r) => r.data),
+  removeHaus: (hausId: UUID) =>
+    api
+      .delete<void>(`/objektstruktur/haus/${hausId}`)
+      .then(() => undefined),
+  createStockwerk: (hausId: UUID, payload: StockwerkCreate) =>
+    api
+      .post<StockwerkRead>(`/objektstruktur/haus/${hausId}/stockwerke`, payload)
+      .then((r) => r.data),
+  updateStockwerk: (stockwerkId: UUID, payload: StockwerkUpdate) =>
+    api
+      .patch<StockwerkRead>(`/objektstruktur/stockwerke/${stockwerkId}`, payload)
+      .then((r) => r.data),
+  removeStockwerk: (stockwerkId: UUID) =>
+    api
+      .delete<void>(`/objektstruktur/stockwerke/${stockwerkId}`)
+      .then(() => undefined),
+  uploadGrundriss: (stockwerkId: UUID, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api
+      .post<StockwerkRead>(`/objektstruktur/stockwerke/${stockwerkId}/grundriss`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
+  fetchGrundrissBlob: (stockwerkId: UUID) =>
+    api
+      .get<Blob>(`/objektstruktur/stockwerke/${stockwerkId}/grundriss/file`, {
+        responseType: 'blob',
+      })
+      .then((r) => r.data),
+  createEinheit: (stockwerkId: UUID, payload: EinheitCreate) =>
+    api
+      .post<EinheitRead>(`/objektstruktur/stockwerke/${stockwerkId}/einheiten`, payload)
+      .then((r) => r.data),
+  updateEinheit: (einheitId: UUID, payload: EinheitUpdate) =>
+    api
+      .patch<EinheitRead>(`/objektstruktur/einheiten/${einheitId}`, payload)
+      .then((r) => r.data),
+  removeEinheit: (einheitId: UUID) =>
+    api
+      .delete<void>(`/objektstruktur/einheiten/${einheitId}`)
+      .then(() => undefined),
+};
+
+export const notificationApi = {
+  list: (limit = 50) =>
+    api
+      .get<NotificationRead[]>('/notifications', { params: { limit } })
+      .then((r) => r.data),
+  count: () =>
+    api
+      .get<{ unread: number }>('/notifications/count')
+      .then((r) => r.data),
+  markRead: (ids: UUID[]) =>
+    api
+      .post<{ status: string }>('/notifications/mark-read', { ids })
+      .then((r) => r.data),
+  markAllRead: () =>
+    api
+      .post<{ status: string }>('/notifications/mark-all-read')
+      .then((r) => r.data),
+};
+
+export const dokumentApi = {
+  list: (
+    params: {
+      search?: string;
+      target_type?: DokumentTarget;
+      target_id?: UUID;
+    } = {},
+  ) =>
+    api
+      .get<DokumentRead[]>('/dokumente', { params })
+      .then((r) => r.data),
+  upload: (
+    file: File,
+    opts: {
+      name?: string;
+      kategorie?: string;
+      beschreibung?: string;
+      links?: DokumentLink[];
+    } = {},
+  ) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (opts.name) fd.append('name', opts.name);
+    if (opts.kategorie) fd.append('kategorie', opts.kategorie);
+    if (opts.beschreibung) fd.append('beschreibung', opts.beschreibung);
+    if (opts.links && opts.links.length > 0)
+      fd.append('links_json', JSON.stringify(opts.links));
+    return api
+      .post<DokumentRead>('/dokumente', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
+  update: (id: UUID, payload: DokumentUpdate) =>
+    api
+      .patch<DokumentRead>(`/dokumente/${id}`, payload)
+      .then((r) => r.data),
+  remove: (id: UUID) =>
+    api.delete<void>(`/dokumente/${id}`).then(() => undefined),
+  fetchBlob: (id: UUID) =>
+    api
+      .get<Blob>(`/dokumente/${id}/file`, { responseType: 'blob' })
+      .then((r) => r.data),
 };
 
 export const adresseApi = {

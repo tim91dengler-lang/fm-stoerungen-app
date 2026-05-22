@@ -67,6 +67,36 @@ export type TicketStatusSlug =
 
 export type TicketPrioritaetSlug = 'niedrig' | 'mittel' | 'hoch' | 'kritisch';
 
+export interface HausRef {
+  id: UUID;
+  bezeichnung: string;
+}
+
+export interface StockwerkRef {
+  id: UUID;
+  bezeichnung: string;
+  has_grundriss: boolean;
+}
+
+export interface EinheitRef {
+  id: UUID;
+  bezeichnung: string;
+}
+
+export interface TickettypRef {
+  id: UUID;
+  key: string;
+  label: string;
+  icon: string | null;
+  farbe: string | null;
+}
+
+export interface ProjektRefMini {
+  id: UUID;
+  name: string;
+  status: string;
+}
+
 export interface TicketRead {
   id: UUID;
   mandant_id: UUID;
@@ -76,8 +106,24 @@ export interface TicketRead {
   status: AuswahlWertRef;
   prioritaet: AuswahlWertRef;
   kategorie: AuswahlWertRef | null;
+  quelle: AuswahlWertRef | null;
+  melder: string | null;
   objekt: ObjektRef | null;
+  haus: HausRef | null;
+  stockwerk: StockwerkRef | null;
+  einheit: EinheitRef | null;
+  pin_x: number | null;
+  pin_y: number | null;
   partner: PartnerRef | null;
+  tickettyp: TickettypRef | null;
+  projekt: ProjektRefMini | null;
+  faelligkeit_am: string | null;
+  wiederholung: string | null;
+  wartet_grund: AuswahlWertRef | null;
+  wartet_nachunternehmer: PartnerRef | null;
+  wartet_kontakt_name: string | null;
+  wartet_kontakt_telefon: string | null;
+  wartet_kontakt_email: string | null;
   eroeffnet_von: UserRef;
   zugewiesen_an: UserRef | null;
   eroeffnet_am: string;
@@ -101,9 +147,20 @@ export interface TicketCreate {
   status?: TicketStatusSlug | null;
   prioritaet?: TicketPrioritaetSlug;
   kategorie?: string | null;
+  quelle?: string | null;
+  melder?: string | null;
   objekt_id?: UUID | null;
+  haus_id?: UUID | null;
+  stockwerk_id?: UUID | null;
+  einheit_id?: UUID | null;
+  pin_x?: number | null;
+  pin_y?: number | null;
   partner_id?: UUID | null;
   zugewiesen_an_id?: UUID | null;
+  tickettyp_id?: UUID | null;
+  projekt_id?: UUID | null;
+  faelligkeit_am?: string | null;
+  wiederholung?: string | null;
 }
 
 export interface TicketUpdate {
@@ -112,9 +169,25 @@ export interface TicketUpdate {
   status?: TicketStatusSlug;
   prioritaet?: TicketPrioritaetSlug;
   kategorie?: string | null;
+  quelle?: string | null;
+  melder?: string | null;
   objekt_id?: UUID | null;
+  haus_id?: UUID | null;
+  stockwerk_id?: UUID | null;
+  einheit_id?: UUID | null;
+  pin_x?: number | null;
+  pin_y?: number | null;
   partner_id?: UUID | null;
   zugewiesen_an_id?: UUID | null;
+  tickettyp_id?: UUID | null;
+  projekt_id?: UUID | null;
+  faelligkeit_am?: string | null;
+  wiederholung?: string | null;
+  wartet_grund?: string | null;
+  wartet_nachunternehmer_id?: UUID | null;
+  wartet_kontakt_name?: string | null;
+  wartet_kontakt_telefon?: string | null;
+  wartet_kontakt_email?: string | null;
 }
 
 export interface TicketListFilters {
@@ -363,4 +436,206 @@ export interface TicketPhotoRead {
 export interface TicketPhotoUpdate {
   beschreibung?: string | null;
   annotations?: PhotoAnnotation[];
+}
+
+// ---------------------------------------------------------------- Objektstruktur (Haus/Stockwerk/Einheit)
+
+export type Ausrichtung = 'nord' | 'ost' | 'sued' | 'west';
+
+export interface PartnerMini {
+  id: UUID;
+  name: string;
+}
+
+export interface EinheitRead {
+  id: UUID;
+  stockwerk_id: UUID;
+  bezeichnung: string;
+  groesse_qm: number | null;
+  reihenfolge: number;
+  eigentuemer: PartnerMini | null;
+  mieter: PartnerMini[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EinheitWriteBase {
+  bezeichnung: string;
+  groesse_qm?: number | null;
+  eigentuemer_partner_id?: UUID | null;
+  reihenfolge?: number;
+  mieter_ids?: UUID[];
+}
+
+export type EinheitCreate = EinheitWriteBase;
+export type EinheitUpdate = Partial<EinheitWriteBase>;
+
+export interface StockwerkRead {
+  id: UUID;
+  haus_id: UUID;
+  bezeichnung: string;
+  ausrichtung: Ausrichtung | null;
+  reihenfolge: number;
+  has_grundriss: boolean;
+  grundriss_mime: string | null;
+  eigentuemer: PartnerMini | null;
+  mieter: PartnerMini[];
+  einheiten: EinheitRead[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockwerkWriteBase {
+  bezeichnung: string;
+  ausrichtung?: Ausrichtung | null;
+  eigentuemer_partner_id?: UUID | null;
+  reihenfolge?: number;
+  mieter_ids?: UUID[];
+}
+
+export type StockwerkCreate = StockwerkWriteBase;
+export type StockwerkUpdate = Partial<StockwerkWriteBase>;
+
+export interface HausRead {
+  id: UUID;
+  objekt_id: UUID;
+  bezeichnung: string;
+  notiz: string | null;
+  reihenfolge: number;
+  adresse: AdresseRead | null;
+  stockwerke: StockwerkRead[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HausWriteBase {
+  bezeichnung: string;
+  adresse_id?: UUID | null;
+  notiz?: string | null;
+  reihenfolge?: number;
+}
+
+export type HausCreate = HausWriteBase;
+export type HausUpdate = Partial<HausWriteBase>;
+
+// ---------------------------------------------------------------- Tickettypen
+
+export interface TickettypRead {
+  id: UUID;
+  mandant_id: UUID;
+  key: string;
+  label: string;
+  beschreibung: string | null;
+  icon: string | null;
+  farbe: string | null;
+  pflichtfelder: string[];
+  default_reminder_tage: number;
+  reihenfolge: number;
+  ist_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TickettypCreate {
+  key: string;
+  label: string;
+  beschreibung?: string | null;
+  icon?: string | null;
+  farbe?: string | null;
+  pflichtfelder?: string[];
+  default_reminder_tage?: number;
+  reihenfolge?: number;
+}
+
+export type TickettypUpdate = Partial<Omit<TickettypCreate, 'key'>>;
+
+// ---------------------------------------------------------------- Projekte
+
+export type ProjektStatus =
+  | 'geplant'
+  | 'laufend'
+  | 'abgeschlossen'
+  | 'storniert';
+
+export interface ProjektRead {
+  id: UUID;
+  mandant_id: UUID;
+  name: string;
+  beschreibung: string | null;
+  objekt_id: UUID | null;
+  verantwortlich_user_id: UUID | null;
+  verantwortlich: UserRef | null;
+  start_am: string | null;
+  ende_am: string | null;
+  status: ProjektStatus;
+  notizen: string | null;
+  ticket_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjektWriteBase {
+  name: string;
+  beschreibung?: string | null;
+  objekt_id?: UUID | null;
+  verantwortlich_user_id?: UUID | null;
+  start_am?: string | null;
+  ende_am?: string | null;
+  status?: ProjektStatus;
+  notizen?: string | null;
+}
+
+export type ProjektCreate = ProjektWriteBase;
+export type ProjektUpdate = Partial<ProjektWriteBase>;
+
+// ---------------------------------------------------------------- Notifications
+
+export type NotificationTyp =
+  | 'mention'
+  | 'zuweisung'
+  | 'status'
+  | 'chat'
+  | 'wartung_faellig';
+
+export interface NotificationRead {
+  id: UUID;
+  user_id: UUID;
+  ticket_id: UUID | null;
+  typ: NotificationTyp;
+  text: string;
+  ref_message_id: UUID | null;
+  ausloeser: UserRef | null;
+  gelesen: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------- Dokumente
+
+export type DokumentTarget = 'ticket' | 'projekt' | 'objekt' | 'partner';
+
+export interface DokumentLink {
+  target_type: DokumentTarget;
+  target_id: UUID;
+}
+
+export interface DokumentRead {
+  id: UUID;
+  name: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  kategorie: string | null;
+  beschreibung: string | null;
+  hochgeladen_von: UserRef | null;
+  links: DokumentLink[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DokumentUpdate {
+  name?: string;
+  kategorie?: string | null;
+  beschreibung?: string | null;
+  links?: DokumentLink[];
 }
