@@ -1,0 +1,111 @@
+"""Schemas für die vierstufige Objektstruktur (plan.md §5.2)."""
+
+from decimal import Decimal
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from fm_api.schemas.adresse import AdresseRead
+from fm_api.schemas.common import TimestampedRead
+
+AusrichtungLiteral = Literal["nord", "ost", "sued", "west"]
+
+
+class PartnerMini(BaseModel):
+    id: UUID
+    name: str
+
+
+# -------- Einheit ----------------------------------------------------------
+
+
+class EinheitCreate(BaseModel):
+    bezeichnung: str = Field(min_length=1, max_length=120)
+    groesse_qm: Decimal | None = None
+    eigentuemer_partner_id: UUID | None = None
+    reihenfolge: int = 0
+    mieter_ids: list[UUID] = Field(default_factory=list)
+
+
+class EinheitUpdate(BaseModel):
+    bezeichnung: str | None = Field(default=None, min_length=1, max_length=120)
+    groesse_qm: Decimal | None = None
+    eigentuemer_partner_id: UUID | None = None
+    reihenfolge: int | None = None
+    mieter_ids: list[UUID] | None = None
+
+
+class EinheitRead(TimestampedRead):
+    model_config = ConfigDict(from_attributes=True)
+
+    stockwerk_id: UUID
+    bezeichnung: str
+    groesse_qm: Decimal | None
+    reihenfolge: int
+    eigentuemer: PartnerMini | None = None
+    mieter: list[PartnerMini] = Field(default_factory=list)
+
+
+# -------- Stockwerk --------------------------------------------------------
+
+
+class StockwerkCreate(BaseModel):
+    bezeichnung: str = Field(min_length=1, max_length=120)
+    ausrichtung: AusrichtungLiteral | None = None
+    eigentuemer_partner_id: UUID | None = None
+    reihenfolge: int = 0
+    mieter_ids: list[UUID] = Field(
+        default_factory=list,
+        description="Fallback wenn das Stockwerk keine Einheiten hat",
+    )
+
+
+class StockwerkUpdate(BaseModel):
+    bezeichnung: str | None = Field(default=None, min_length=1, max_length=120)
+    ausrichtung: AusrichtungLiteral | None = None
+    eigentuemer_partner_id: UUID | None = None
+    reihenfolge: int | None = None
+    mieter_ids: list[UUID] | None = None
+
+
+class StockwerkRead(TimestampedRead):
+    model_config = ConfigDict(from_attributes=True)
+
+    haus_id: UUID
+    bezeichnung: str
+    ausrichtung: AusrichtungLiteral | None
+    reihenfolge: int
+    has_grundriss: bool
+    grundriss_mime: str | None
+    eigentuemer: PartnerMini | None = None
+    mieter: list[PartnerMini] = Field(default_factory=list)
+    einheiten: list[EinheitRead] = Field(default_factory=list)
+
+
+# -------- Haus -------------------------------------------------------------
+
+
+class HausCreate(BaseModel):
+    bezeichnung: str = Field(min_length=1, max_length=200)
+    adresse_id: UUID | None = None
+    notiz: str | None = None
+    reihenfolge: int = 0
+
+
+class HausUpdate(BaseModel):
+    bezeichnung: str | None = Field(default=None, min_length=1, max_length=200)
+    adresse_id: UUID | None = None
+    notiz: str | None = None
+    reihenfolge: int | None = None
+
+
+class HausRead(TimestampedRead):
+    model_config = ConfigDict(from_attributes=True)
+
+    objekt_id: UUID
+    bezeichnung: str
+    notiz: str | None
+    reihenfolge: int
+    adresse: AdresseRead | None = None
+    stockwerke: list[StockwerkRead] = Field(default_factory=list)

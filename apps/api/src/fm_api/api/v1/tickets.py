@@ -75,8 +75,19 @@ async def create_ticket(
             prioritaet_slug=payload.prioritaet,
             kategorie_slug=payload.kategorie,
             objekt_id=payload.objekt_id,
+            haus_id=payload.haus_id,
+            stockwerk_id=payload.stockwerk_id,
+            einheit_id=payload.einheit_id,
+            pin_x=float(payload.pin_x) if payload.pin_x is not None else None,
+            pin_y=float(payload.pin_y) if payload.pin_y is not None else None,
             partner_id=payload.partner_id,
             zugewiesen_an_id=payload.zugewiesen_an_id,
+            tickettyp_id=payload.tickettyp_id,
+            projekt_id=payload.projekt_id,
+            quelle_slug=payload.quelle,
+            melder=payload.melder,
+            faelligkeit_am=payload.faelligkeit_am,
+            wiederholung=payload.wiederholung,
         )
     except AssigneeNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -120,7 +131,13 @@ async def update_ticket(
 ) -> TicketRead:
     updates = payload.model_dump(exclude_unset=True)
     try:
-        ticket = await ticket_service.update_ticket(db, ticket_id, current.mandant_id, updates)
+        ticket = await ticket_service.update_ticket(
+            db,
+            ticket_id,
+            current.mandant_id,
+            updates,
+            actor_user_id=current.user_id,
+        )
     except TicketNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except AssigneeNotFoundError as exc:
