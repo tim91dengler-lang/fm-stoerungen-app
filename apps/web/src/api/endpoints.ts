@@ -22,6 +22,8 @@ import type {
   PartnerUpdate,
   TicketCreate,
   TicketListFilters,
+  TicketMessageCreate,
+  TicketMessageRead,
   TicketRead,
   TicketUpdate,
   UserRead,
@@ -107,6 +109,21 @@ export const objektApi = {
   update: (id: string, payload: ObjektUpdate) =>
     api.patch<ObjektRead>(`/objekte/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/objekte/${id}`).then(() => undefined),
+};
+
+export const chatApi = {
+  list: (ticketId: string) =>
+    api
+      .get<TicketMessageRead[]>(`/tickets/${ticketId}/messages`)
+      .then((r) => r.data),
+  create: (ticketId: string, payload: TicketMessageCreate) =>
+    api
+      .post<TicketMessageRead>(`/tickets/${ticketId}/messages`, payload)
+      .then((r) => r.data),
+  remove: (ticketId: string, messageId: string) =>
+    api
+      .delete<void>(`/tickets/${ticketId}/messages/${messageId}`)
+      .then(() => undefined),
 };
 
 export const ansichtenApi = {
