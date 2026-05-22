@@ -141,9 +141,7 @@ async def update_objekt(
     if new_links is not None:
         # Komplett ersetzen — bulk-delete via Core, damit der Session-Cache
         # (Objekt.partner_links) nicht stale alte Links zurückliefert
-        await db.execute(
-            delete(ObjektPartner).where(ObjektPartner.objekt_id == objekt.id)
-        )
+        await db.execute(delete(ObjektPartner).where(ObjektPartner.objekt_id == objekt.id))
         objekt.partner_links.clear()
         await db.flush()
         for link in new_links:
