@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
+  Filter,
   Flame,
+  MapPin,
 } from 'lucide-react';
 import {
   type ColumnDef,
@@ -32,6 +34,8 @@ import {
 } from '../lib/format';
 import { KpiCards, type KpiItem } from '../components/KpiCards';
 import { TicketDetailPanel } from '../components/TicketDetailPanel';
+import { InitialAvatar } from '../components/InitialAvatar';
+import { iconForKategorie } from '../lib/kategorieIcon';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import {
@@ -69,6 +73,33 @@ const GROUPABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'zugewiesen_an', label: 'nach Bearbeiter' },
 ];
 
+const PARTNER_TYP_LABEL: Record<string, string> = {
+  mieter: 'Mieter',
+  eigentuemer: 'Eigentümer',
+  auftraggeber: 'Auftraggeber',
+  nachunternehmer: 'Nachunternehmer',
+};
+
+const PARTNER_TYP_TONE: Record<string, string> = {
+  mieter: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  eigentuemer: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+  auftraggeber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  nachunternehmer: 'bg-zinc-700/40 text-zinc-300 border-zinc-700',
+};
+
+function PartnerTypPill({ typ }: { typ: string }) {
+  const label = PARTNER_TYP_LABEL[typ] ?? typ;
+  const tone =
+    PARTNER_TYP_TONE[typ] ?? 'bg-zinc-700/40 text-zinc-300 border-zinc-700';
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${tone}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 const STATUS_FILTER_OPTIONS: SelectOption[] = STATUS_SLUGS.map((s) => ({
   value: s,
   label: labelForStatusSlug(s),
@@ -100,15 +131,21 @@ function buildColumns(
       id: 'titel',
       accessorKey: 'titel',
       header: 'Titel',
-      cell: ({ row }) => (
-        <button
-          type="button"
-          onClick={() => onOpen(row.original.id)}
-          className="text-left font-medium text-emerald-300 hover:text-emerald-200 hover:underline"
-        >
-          {row.original.titel}
-        </button>
-      ),
+      cell: ({ row }) => {
+        const Icon = iconForKategorie(row.original.kategorie?.key);
+        return (
+          <button
+            type="button"
+            onClick={() => onOpen(row.original.id)}
+            className="flex max-w-[20rem] items-center gap-2 text-left"
+          >
+            <Icon className="h-4 w-4 shrink-0 text-zinc-500" />
+            <span className="truncate font-medium text-emerald-300 hover:text-emerald-200 hover:underline">
+              {row.original.titel}
+            </span>
+          </button>
+        );
+      },
       filterFn: 'includesString',
     },
     {
@@ -136,21 +173,54 @@ function buildColumns(
       id: 'objekt',
       accessorFn: (r) => r.objekt?.name ?? '',
       header: 'Objekt',
-      cell: ({ row }) => row.original.objekt?.name ?? '—',
+      cell: ({ row }) => {
+        const o = row.original.objekt;
+        if (!o) return <span className="text-zinc-600">—</span>;
+        return (
+          <div className="flex items-center gap-2 text-zinc-200">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            <span className="truncate">{o.name}</span>
+          </div>
+        );
+      },
       filterFn: 'includesString',
     },
     {
       id: 'partner',
       accessorFn: (r) => r.partner?.name ?? '',
-      header: 'Partner',
-      cell: ({ row }) => row.original.partner?.name ?? '—',
+      header: 'Geschäftspartner',
+      cell: ({ row }) => {
+        const p = row.original.partner;
+        if (!p) return <span className="text-zinc-600">—</span>;
+        const firstTyp = p.typen[0];
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="truncate text-zinc-200">{p.name}</span>
+            {firstTyp && <PartnerTypPill typ={firstTyp} />}
+          </div>
+        );
+      },
       filterFn: 'includesString',
     },
     {
       id: 'zugewiesen_an',
       accessorFn: (r) => r.zugewiesen_an?.full_name ?? '',
-      header: 'Zugewiesen an',
-      cell: ({ row }) => row.original.zugewiesen_an?.full_name ?? '—',
+      header: 'Bearbeiter',
+      cell: ({ row }) => {
+        const u = row.original.zugewiesen_an;
+        if (!u)
+          return (
+            <span className="font-medium text-amber-400/90">
+              Nicht zugewiesen
+            </span>
+          );
+        return (
+          <div className="flex items-center gap-2">
+            <InitialAvatar fullName={u.full_name} size="sm" />
+            <span className="text-zinc-200">{u.full_name}</span>
+          </div>
+        );
+      },
       filterFn: 'includesString',
     },
     {
@@ -185,9 +255,23 @@ export function TicketsListePage() {
   const [config, setConfig] = useState<TicketsViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showErfassen, setShowErfassen] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const openTicketId = searchParams.get('ticket');
+
+  // Filter-Panel beim Außerhalb-Klick schließen
+  useEffect(() => {
+    if (!showFilterPanel) return;
+    function handler(e: MouseEvent) {
+      if (!filterPanelRef.current?.contains(e.target as Node)) {
+        setShowFilterPanel(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showFilterPanel]);
 
   function openTicket(id: string) {
     searchParams.set('ticket', id);
@@ -336,43 +420,6 @@ export function TicketsListePage() {
 
       <KpiCards items={kpis} />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-        <span className="text-xs font-semibold uppercase text-zinc-500">
-          Status:
-        </span>
-        {STATUS_SLUGS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => toggleStatus(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-              config.statusFilter.includes(s)
-                ? 'bg-emerald-500 text-zinc-950'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-            }`}
-          >
-            {labelForStatusSlug(s)}
-          </button>
-        ))}
-        <span className="ml-3 text-xs font-semibold uppercase text-zinc-500">
-          Priorität:
-        </span>
-        {PRIO_SLUGS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => togglePrio(p)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-              config.prioFilter.includes(p)
-                ? 'bg-orange-500 text-zinc-950'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-            }`}
-          >
-            {labelForPrioSlug(p)}
-          </button>
-        ))}
-      </div>
-
       <PowerListenView<TicketRead>
         viewKey="tickets"
         columns={columns}
@@ -447,6 +494,93 @@ export function TicketsListePage() {
             }}
             activeId={activeViewId}
           />
+        }
+        searchPlaceholder="Suche in allen Feldern …"
+        showFooter
+        itemLabel={{ singular: 'Ticket', plural: 'Tickets' }}
+        filterButton={
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              type="button"
+              onClick={() => setShowFilterPanel((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs ${
+                config.statusFilter.length > 0 || config.prioFilter.length > 0
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                  : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              Filter
+              {(config.statusFilter.length > 0 ||
+                config.prioFilter.length > 0) && (
+                <span className="rounded bg-emerald-500/30 px-1 font-mono text-[10px]">
+                  {config.statusFilter.length + config.prioFilter.length}
+                </span>
+              )}
+            </button>
+            {showFilterPanel && (
+              <div className="absolute left-0 z-30 mt-1 w-72 rounded-md border border-zinc-800 bg-zinc-900 p-3 shadow-2xl">
+                <div>
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Status
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {STATUS_SLUGS.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => toggleStatus(s)}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          config.statusFilter.includes(s)
+                            ? 'bg-emerald-500 text-zinc-950'
+                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                        }`}
+                      >
+                        {labelForStatusSlug(s)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Priorität
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {PRIO_SLUGS.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => togglePrio(p)}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          config.prioFilter.includes(p)
+                            ? 'bg-orange-500 text-zinc-950'
+                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                        }`}
+                      >
+                        {labelForPrioSlug(p)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(config.statusFilter.length > 0 ||
+                  config.prioFilter.length > 0) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        statusFilter: [],
+                        prioFilter: [],
+                      }))
+                    }
+                    className="mt-3 w-full rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                  >
+                    Filter zurücksetzen
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         }
       />
 

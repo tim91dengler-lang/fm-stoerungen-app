@@ -28,6 +28,7 @@ class ObjektRef(BaseModel):
 class PartnerRef(BaseModel):
     id: UUID
     name: str
+    typen: list[str] = []
 
 
 def _normalize_slug(v: str | None) -> str | None:
@@ -124,7 +125,11 @@ class TicketRead(TimestampedRead):
                 else None
             ),
             objekt=ObjektRef(id=t.objekt.id, name=t.objekt.name) if t.objekt is not None else None,
-            partner=PartnerRef(id=t.partner.id, name=t.partner.name)
+            partner=PartnerRef(
+                id=t.partner.id,
+                name=t.partner.name,
+                typen=[ty.value for ty in t.partner.typen],
+            )
             if t.partner is not None
             else None,
             eroeffnet_von=UserRef(id=t.eroeffnet_von.id, full_name=t.eroeffnet_von.full_name),

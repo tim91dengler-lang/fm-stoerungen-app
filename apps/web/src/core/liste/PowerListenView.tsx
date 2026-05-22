@@ -15,7 +15,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, Columns3, Layers, Search } from 'lucide-react';
 
 export interface PowerListenViewProps<TData> {
   /** Eindeutiger View-Key (z. B. 'tickets', 'adressen') — wird für gespeicherte Ansichten verwendet. */
@@ -59,6 +59,14 @@ export interface PowerListenViewProps<TData> {
   onGroupingChange?: (state: GroupingState) => void;
   /** Welche Spalten dürfen als Gruppe genutzt werden (default: alle leaf-Columns außer __select__). */
   groupableColumns?: { id: string; label: string }[];
+  /** Placeholder für das globale Suchfeld. */
+  searchPlaceholder?: string;
+  /** Slot für ein zusätzliches Filter-Panel (z. B. „Filter (3)"-Button mit Dropdown). */
+  filterButton?: ReactNode;
+  /** Footer-Text unter der Tabelle (z. B. „5 Tickets · sortiert nach Erstellt ↓"). */
+  showFooter?: boolean;
+  /** Singular/Plural-Bezeichnung für die Footer-Anzeige. */
+  itemLabel?: { singular: string; plural: string };
 }
 
 export function PowerListenView<TData>({
@@ -86,6 +94,10 @@ export function PowerListenView<TData>({
   grouping = [],
   onGroupingChange,
   groupableColumns,
+  searchPlaceholder = 'Suche …',
+  filterButton,
+  showFooter = false,
+  itemLabel,
 }: PowerListenViewProps<TData>) {
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
@@ -236,19 +248,24 @@ export function PowerListenView<TData>({
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <div className="flex items-center gap-2">{toolbarLeft}</div>
-        <input
-          type="search"
-          placeholder="Suche …"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="min-w-[14rem] flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-        />
+        <div className="relative min-w-[18rem] max-w-md flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+          <input
+            type="search"
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full rounded-md border border-zinc-700 bg-zinc-950 py-1.5 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+          />
+        </div>
+        {filterButton}
         <div className="relative" ref={columnPickerRef}>
           <button
             type="button"
             onClick={() => setShowColumnPicker((v) => !v)}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
+            className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
           >
+            <Columns3 className="h-3.5 w-3.5" />
             Spalten ({visibleLeafColumns.filter((c) => c.id !== '__select__').length})
           </button>
           {showColumnPicker && (
@@ -508,7 +525,51 @@ export function PowerListenView<TData>({
             })}
           </tbody>
         </table>
+        {showFooter && (
+          <FooterRow
+            count={table.getRowModel().rows.filter((r) => !r.getIsGrouped()).length}
+            sorting={sorting}
+            allColumns={table.getAllLeafColumns()}
+            itemLabel={itemLabel}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+function FooterRow<TData>({
+  count,
+  sorting,
+  allColumns,
+  itemLabel,
+}: {
+  count: number;
+  sorting: SortingState;
+  allColumns: ReturnType<
+    ReturnType<typeof useReactTable<TData>>['getAllLeafColumns']
+  >;
+  itemLabel?: { singular: string; plural: string };
+}) {
+  const label = itemLabel ?? { singular: 'Eintrag', plural: 'Einträge' };
+  const noun = count === 1 ? label.singular : label.plural;
+  const sortPart =
+    sorting.length === 0
+      ? ''
+      : ` · sortiert nach ${sorting
+          .map((s) => {
+            const col = allColumns.find((c) => c.id === s.id);
+            const headerStr =
+              typeof col?.columnDef.header === 'string'
+                ? col.columnDef.header
+                : s.id;
+            return `${headerStr} ${s.desc ? '↓' : '↑'}`;
+          })
+          .join(', ')}`;
+  return (
+    <div className="border-t border-zinc-800 bg-zinc-900/50 px-3 py-2 text-xs text-zinc-500">
+      {count} {noun}
+      {sortPart}
     </div>
   );
 }

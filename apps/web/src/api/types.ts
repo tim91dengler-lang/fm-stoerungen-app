@@ -52,6 +52,7 @@ export interface ObjektRef {
 export interface PartnerRef {
   id: UUID;
   name: string;
+  typen: string[];
 }
 
 // Bekannte System-Slugs (in Migration als ist_system=TRUE geseedet).
