@@ -290,7 +290,10 @@ async def create_ticket(
     )
     db.add(ticket)
     await db.flush()
-    # Reload via get_ticket damit alle Relationships (auch neue) verfügbar sind
+    # Trigger `set_ticket_nummer` (BEFORE INSERT) hat die nummer überschrieben —
+    # ohne explizites refresh hätte SQLAlchemy noch den Python-Wert (0) gecached.
+    # `db.refresh()` re-fetched aus der DB, dann liefert get_ticket sauber.
+    await db.refresh(ticket, ["nummer"])
     return await get_ticket(db, ticket.id, mandant_id)
 
 
@@ -425,6 +428,9 @@ async def update_ticket(
                     )
 
     await db.flush()
+    # Identity-Map invalidieren, sonst liefert get_ticket die alte Relationship-Cache
+    # (status_wert, prioritaet_wert, …) zurück trotz änderten *_id.
+    db.expire(ticket)
     ticket_reloaded = await get_ticket(db, ticket.id, mandant_id)
 
     if fire_zuweisung_notif:
