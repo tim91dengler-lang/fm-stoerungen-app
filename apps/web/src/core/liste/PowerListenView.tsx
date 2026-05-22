@@ -2,15 +2,20 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
+  getGroupedRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type GroupingState,
+  type Row,
   type RowSelectionState,
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
+import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
 
 export interface PowerListenViewProps<TData> {
   /** Eindeutiger View-Key (z. B. 'tickets', 'adressen') — wird für gespeicherte Ansichten verwendet. */
@@ -49,6 +54,11 @@ export interface PowerListenViewProps<TData> {
   onRowSelectionChange?: (state: RowSelectionState) => void;
   /** Bulk-Aktionen, gerendert wenn min. 1 Row selected ist. Bekommt die ausgewählten Rows. */
   bulkActions?: (selectedRows: TData[]) => ReactNode;
+  /** Gruppierung (mehrstufig). Wenn leer = keine Gruppierung. */
+  grouping?: GroupingState;
+  onGroupingChange?: (state: GroupingState) => void;
+  /** Welche Spalten dürfen als Gruppe genutzt werden (default: alle leaf-Columns außer __select__). */
+  groupableColumns?: { id: string; label: string }[];
 }
 
 export function PowerListenView<TData>({
@@ -73,10 +83,15 @@ export function PowerListenView<TData>({
   rowSelection,
   onRowSelectionChange,
   bulkActions,
+  grouping = [],
+  onGroupingChange,
+  groupableColumns,
 }: PowerListenViewProps<TData>) {
   const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [draggingCol, setDraggingCol] = useState<string | null>(null);
   const columnPickerRef = useRef<HTMLDivElement>(null);
+  const groupPickerRef = useRef<HTMLDivElement>(null);
 
   // Bei enableRowSelection eine Spezial-Spalte für Checkbox vorne dranhängen
   const allColumns = useMemo<ColumnDef<TData>[]>(() => {
@@ -117,6 +132,16 @@ export function PowerListenView<TData>({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showColumnPicker]);
+  useEffect(() => {
+    if (!showGroupPicker) return;
+    function handler(e: MouseEvent) {
+      if (!groupPickerRef.current?.contains(e.target as Node)) {
+        setShowGroupPicker(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showGroupPicker]);
 
   const table = useReactTable<TData>({
     data,
@@ -127,11 +152,14 @@ export function PowerListenView<TData>({
       columnFilters,
       columnOrder: columnOrder.length > 0 ? columnOrder : undefined,
       rowSelection: rowSelection ?? {},
+      grouping,
     },
     enableMultiSort: true,
     enableSortingRemoval: true, // 3. Klick auf Header → Sortierung entfernen
     isMultiSortEvent: (e) => (e as React.MouseEvent).shiftKey,
     enableRowSelection,
+    enableGrouping: true,
+    autoResetExpanded: false,
     getRowId: getRowId ? (row) => getRowId(row) : undefined,
     onSortingChange: (updater) =>
       onSortingChange(typeof updater === 'function' ? updater(sorting) : updater),
@@ -153,9 +181,17 @@ export function PowerListenView<TData>({
         typeof updater === 'function' ? updater(rowSelection ?? {}) : updater,
       );
     },
+    onGroupingChange: (updater) => {
+      if (!onGroupingChange) return;
+      onGroupingChange(
+        typeof updater === 'function' ? updater(grouping) : updater,
+      );
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getGroupedRowModel: getGroupedRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
@@ -238,6 +274,78 @@ export function PowerListenView<TData>({
             </div>
           )}
         </div>
+        {onGroupingChange && groupableColumns && groupableColumns.length > 0 && (
+          <div className="relative" ref={groupPickerRef}>
+            <button
+              type="button"
+              onClick={() => setShowGroupPicker((v) => !v)}
+              className={`flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs ${
+                grouping.length > 0
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                  : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+              title="Gruppieren nach …"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              {grouping.length === 0
+                ? 'Gruppieren'
+                : `Gruppiert: ${
+                    groupableColumns.find((g) => g.id === grouping[0])?.label ??
+                    grouping[0]
+                  }${grouping.length > 1 ? ` +${grouping.length - 1}` : ''}`}
+            </button>
+            {showGroupPicker && (
+              <div className="absolute right-0 z-30 mt-1 w-56 rounded-md border border-zinc-800 bg-zinc-900 p-1 shadow-2xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onGroupingChange([]);
+                    setShowGroupPicker(false);
+                  }}
+                  className={`block w-full rounded px-2 py-1.5 text-left text-sm ${
+                    grouping.length === 0
+                      ? 'bg-zinc-800 text-emerald-300'
+                      : 'text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  Keine Gruppierung
+                </button>
+                <div className="my-1 border-t border-zinc-800" />
+                {groupableColumns.map((g) => {
+                  const idx = grouping.indexOf(g.id);
+                  const active = idx >= 0;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => {
+                        if (active) {
+                          onGroupingChange(
+                            grouping.filter((x) => x !== g.id),
+                          );
+                        } else {
+                          onGroupingChange([...grouping, g.id]);
+                        }
+                      }}
+                      className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${
+                        active
+                          ? 'bg-emerald-500/10 text-emerald-300'
+                          : 'text-zinc-300 hover:bg-zinc-800'
+                      }`}
+                    >
+                      <span>{g.label}</span>
+                      {active && (
+                        <span className="font-mono text-[10px] text-emerald-300">
+                          {idx + 1}.
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         {sorting.length > 0 && (
           <button
             type="button"
@@ -361,7 +469,7 @@ export function PowerListenView<TData>({
               </tr>
             ))}
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {table.getRowModel().rows.length === 0 && (
               <tr>
                 <td
@@ -372,23 +480,81 @@ export function PowerListenView<TData>({
                 </td>
               </tr>
             )}
-            {table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                className={`border-b border-zinc-800/60 last:border-b-0 hover:bg-zinc-800/40 ${
-                  row.getIsSelected() ? 'bg-emerald-500/5' : ''
-                }`}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3 py-2 align-top">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {table.getRowModel().rows.map((row) => {
+              if (row.getIsGrouped()) {
+                return (
+                  <GroupRow
+                    key={row.id}
+                    row={row}
+                    colSpan={visibleLeafColumns.length}
+                    groupableColumns={groupableColumns}
+                  />
+                );
+              }
+              return (
+                <tr
+                  key={row.id}
+                  className={`border-b border-zinc-800/60 last:border-b-0 hover:bg-zinc-800/40 ${
+                    row.getIsSelected() ? 'bg-emerald-500/5' : ''
+                  }`}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-3 py-2 align-top">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+function GroupRow<TData>({
+  row,
+  colSpan,
+  groupableColumns,
+}: {
+  row: Row<TData>;
+  colSpan: number;
+  groupableColumns?: { id: string; label: string }[];
+}) {
+  const value = row.groupingValue;
+  const colId = row.groupingColumnId;
+  const colLabel =
+    groupableColumns?.find((g) => g.id === colId)?.label ?? colId;
+  const valueText =
+    value === '' || value === null || value === undefined
+      ? '— (leer)'
+      : String(value);
+  return (
+    <tr className="border-y border-zinc-800 bg-zinc-900/70">
+      <td
+        colSpan={colSpan}
+        className="px-3 py-2"
+      >
+        <button
+          type="button"
+          onClick={row.getToggleExpandedHandler()}
+          className="flex w-full items-center gap-2 text-left text-sm text-zinc-200 hover:text-zinc-50"
+        >
+          {row.getIsExpanded() ? (
+            <ChevronDown className="h-4 w-4 text-zinc-400" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-zinc-400" />
+          )}
+          <span className="text-[10px] uppercase tracking-wider text-zinc-500">
+            {colLabel}:
+          </span>
+          <span className="font-medium">{valueText}</span>
+          <span className="ml-auto rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-zinc-400">
+            {row.subRows.length}
+          </span>
+        </button>
+      </td>
+    </tr>
   );
 }
