@@ -76,7 +76,8 @@ async def _get_auswahlwert_id(db: Any, mandant_id: UUID, liste_key: str, wert_ke
     ).scalar_one()
     for w in liste.werte:
         if w.key == wert_key:
-            return w.id
+            wert_uuid: UUID = w.id
+            return wert_uuid
     raise RuntimeError(f"Auswahlwert {liste_key}/{wert_key} fehlt")
 
 
@@ -301,13 +302,13 @@ async def main() -> int:
         ]
         projekte: dict[str, Projekt] = {}
         for name, beschr, obj, verant, start, ende, status in proj_data:
-            p = (
+            proj: Projekt | None = (
                 await db.execute(
                     select(Projekt).where(Projekt.mandant_id == m_id, Projekt.name == name)
                 )
             ).scalar_one_or_none()
-            if p is None:
-                p = Projekt(
+            if proj is None:
+                proj = Projekt(
                     mandant_id=m_id,
                     name=name,
                     beschreibung=beschr,
@@ -317,10 +318,10 @@ async def main() -> int:
                     ende_am=ende,
                     status=status,
                 )
-                db.add(p)
+                db.add(proj)
                 await db.flush()
                 print(f"[mockup-seed] projekt {name}")
-            projekte[name] = p
+            projekte[name] = proj
 
         # ---- Auswahlwert-IDs laden -----------------------------------------
         async def aw(key: str, wert: str) -> UUID:
