@@ -58,9 +58,21 @@ const DEFAULT_CONFIG: TicketsViewConfig = {
   statusFilter: ['neu', 'pruefung', 'bearbeitung', 'wartet'],
   prioFilter: [],
   sorting: [{ id: 'eroeffnet_am', desc: true }],
-  visibility: { kategorie: false, objekt: false, partner: false },
+  // Mockup-Layout: Nr., Titel (mit Kategorie-Icon), Objekt, Partner, Prio, Status,
+  // Bearbeiter, Erstellt. Kategorie ist als eigene Spalte default ausgeblendet,
+  // weil sie als Icon vor dem Titel sichtbar ist.
+  visibility: { kategorie: false },
   columnFilters: [],
-  columnOrder: [],
+  columnOrder: [
+    'nummer',
+    'titel',
+    'objekt',
+    'partner',
+    'prioritaet',
+    'status',
+    'zugewiesen_an',
+    'eroeffnet_am',
+  ],
   grouping: [],
 };
 
