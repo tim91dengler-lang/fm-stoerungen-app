@@ -198,32 +198,32 @@ export function PowerListenView<TData>({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <div className="flex items-center gap-2">{toolbarLeft}</div>
         <input
           type="search"
           placeholder="Suche …"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="min-w-[14rem] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="min-w-[14rem] flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
         />
         <div className="relative" ref={columnPickerRef}>
           <button
             type="button"
             onClick={() => setShowColumnPicker((v) => !v)}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
           >
             Spalten ({visibleLeafColumns.filter((c) => c.id !== '__select__').length})
           </button>
           {showColumnPicker && (
-            <div className="absolute right-0 z-30 mt-1 w-56 rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+            <div className="absolute right-0 z-30 mt-1 w-56 rounded-md border border-zinc-800 bg-zinc-900 p-2 shadow-2xl">
               {table
                 .getAllLeafColumns()
                 .filter((col) => col.id !== '__select__')
                 .map((col) => (
                   <label
                     key={col.id}
-                    className="flex items-center gap-2 px-2 py-1 text-sm hover:bg-slate-50"
+                    className="flex items-center gap-2 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
                   >
                     <input
                       type="checkbox"
@@ -242,7 +242,7 @@ export function PowerListenView<TData>({
           <button
             type="button"
             onClick={() => onSortingChange([])}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+            className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
             title="Sortierung zurücksetzen"
           >
             Sort zurück
@@ -252,14 +252,14 @@ export function PowerListenView<TData>({
           <button
             type="button"
             onClick={() => onColumnFiltersChange([])}
-            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+            className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20"
           >
             Spalten-Filter zurücksetzen
           </button>
         )}
         <div className="ml-auto flex items-center gap-2">
           {count && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-zinc-500">
               {count.filtered === count.total
                 ? `${count.total} Treffer`
                 : `${count.filtered} von ${count.total} Treffer`}
@@ -270,7 +270,7 @@ export function PowerListenView<TData>({
       </div>
 
       {enableRowSelection && selectedRows.length > 0 && (
-        <div className="mb-3 flex items-center justify-between rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
+        <div className="mb-3 flex items-center justify-between rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
           <span>
             <strong>{selectedRows.length}</strong> ausgewählt
             <button
@@ -287,9 +287,9 @@ export function PowerListenView<TData>({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+      <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+        <table className="min-w-full divide-y divide-zinc-800 text-sm">
+          <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-500">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -322,7 +322,7 @@ export function PowerListenView<TData>({
                               : undefined
                           }
                           className={`flex items-center gap-1 ${
-                            canSort ? 'cursor-pointer hover:text-slate-900' : ''
+                            canSort ? 'cursor-pointer hover:text-zinc-100' : ''
                           }`}
                           title={
                             canSort
@@ -337,7 +337,7 @@ export function PowerListenView<TData>({
                           {sortDir === 'asc' && <span aria-hidden>▲</span>}
                           {sortDir === 'desc' && <span aria-hidden>▼</span>}
                           {sorting.length > 1 && sortIdx >= 0 && (
-                            <sup className="ml-0.5 text-[10px] text-slate-500">
+                            <sup className="ml-0.5 text-[10px] text-zinc-400">
                               {sortIdx + 1}
                             </sup>
                           )}
@@ -366,7 +366,7 @@ export function PowerListenView<TData>({
               <tr>
                 <td
                   colSpan={visibleLeafColumns.length}
-                  className="px-3 py-8 text-center text-slate-500"
+                  className="px-3 py-8 text-center text-zinc-500"
                 >
                   Keine Treffer.
                 </td>
@@ -375,8 +375,8 @@ export function PowerListenView<TData>({
             {table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
-                className={`hover:bg-slate-50 ${
-                  row.getIsSelected() ? 'bg-brand-50/40' : ''
+                className={`border-b border-zinc-800/60 last:border-b-0 hover:bg-zinc-800/40 ${
+                  row.getIsSelected() ? 'bg-emerald-500/5' : ''
                 }`}
               >
                 {row.getVisibleCells().map((cell) => (

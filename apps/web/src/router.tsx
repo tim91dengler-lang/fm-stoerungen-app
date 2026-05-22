@@ -3,7 +3,9 @@ import { AppLayout } from './components/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdressenPage } from './pages/AdressenPage';
 import { AuswahllistenPage } from './pages/AuswahllistenPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { MeineTicketsPage } from './pages/MeineTicketsPage';
 import { ObjektePage } from './pages/ObjektePage';
 import { PartnerPage } from './pages/PartnerPage';
 import { TicketsListePage } from './pages/TicketsListePage';
@@ -21,7 +23,9 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { path: '/', element: <Navigate to="/tickets" replace /> },
+          { path: '/', element: <Navigate to="/dashboard" replace /> },
+          { path: '/dashboard', element: <DashboardPage /> },
+          { path: '/meine-tickets', element: <MeineTicketsPage /> },
           { path: '/tickets', element: <TicketsListePage /> },
           { path: '/tickets/:id', element: <TicketDetailPage /> },
           { path: '/stammdaten/adressen', element: <AdressenPage /> },

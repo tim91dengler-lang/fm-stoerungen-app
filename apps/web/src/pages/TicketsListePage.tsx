@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Flame,
+} from 'lucide-react';
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -19,10 +25,11 @@ import { TicketErfassenModal } from './TicketErfassenModal';
 import {
   PRIO_SLUGS,
   STATUS_SLUGS,
-  formatDateTime,
+  formatRelativeDateTime,
   labelForPrioSlug,
   labelForStatusSlug,
 } from '../lib/format';
+import { KpiCards, type KpiItem } from '../components/KpiCards';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import {
@@ -64,7 +71,7 @@ const columns: ColumnDef<TicketRead>[] = [
     accessorKey: 'nummer',
     header: 'Nr.',
     cell: ({ row }) => (
-      <span className="font-mono text-xs text-slate-500">
+      <span className="font-mono text-xs text-zinc-500">
         #{row.original.nummer}
       </span>
     ),
@@ -76,7 +83,7 @@ const columns: ColumnDef<TicketRead>[] = [
     cell: ({ row }) => (
       <Link
         to={`/tickets/${row.original.id}`}
-        className="font-medium text-brand-700 hover:underline"
+        className="font-medium text-emerald-300 hover:text-emerald-200 hover:underline"
       >
         {row.original.titel}
       </Link>
@@ -129,7 +136,11 @@ const columns: ColumnDef<TicketRead>[] = [
     id: 'eroeffnet_am',
     accessorKey: 'eroeffnet_am',
     header: 'Eröffnet am',
-    cell: ({ row }) => formatDateTime(row.original.eroeffnet_am),
+    cell: ({ row }) => (
+      <span className="text-zinc-400">
+        {formatRelativeDateTime(row.original.eroeffnet_am)}
+      </span>
+    ),
   },
 ];
 
@@ -153,8 +164,18 @@ export function TicketsListePage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showErfassen, setShowErfassen] = useState(false);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const qc = useQueryClient();
+
+  // Sidebar-Button „+ Neues Ticket" navigiert auf /tickets?new=1
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowErfassen(true);
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const filters = useMemo(
     () => ({
@@ -170,6 +191,60 @@ export function TicketsListePage() {
     queryKey: ['tickets', filters],
     queryFn: () => ticketApi.list(filters),
   });
+
+  // Separate Abfrage für KPI-Zahlen (alle Tickets, unabhängig von Filter)
+  const kpiQuery = useQuery({
+    queryKey: ['tickets-kpi'],
+    queryFn: () => ticketApi.list({ limit: 500 }),
+    staleTime: 30_000,
+  });
+
+  const kpis: KpiItem[] = useMemo(() => {
+    const all = kpiQuery.data?.items ?? [];
+    const offen = all.filter((t) => t.status.key !== 'erledigt').length;
+    const neu = all.filter(
+      (t) => t.status.key === 'neu' && !t.zugewiesen_an,
+    ).length;
+    const kritisch = all.filter(
+      (t) => t.prioritaet.key === 'kritisch' && t.status.key !== 'erledigt',
+    ).length;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const heuteErledigt = all.filter(
+      (t) =>
+        t.erledigt_am !== null && new Date(t.erledigt_am) >= startOfToday,
+    ).length;
+    return [
+      {
+        label: 'Offen',
+        wert: offen,
+        sub: 'alle Status außer erledigt',
+        icon: Activity,
+        accent: 'emerald',
+      },
+      {
+        label: 'Neu',
+        wert: neu,
+        sub: 'noch nicht zugewiesen',
+        icon: AlertTriangle,
+        accent: 'amber',
+      },
+      {
+        label: 'Kritisch',
+        wert: kritisch,
+        sub: 'Priorität P1',
+        icon: Flame,
+        accent: 'red',
+      },
+      {
+        label: 'Heute erledigt',
+        wert: heuteErledigt,
+        sub: 'Tagesleistung',
+        icon: CheckCircle2,
+        accent: 'zinc',
+      },
+    ];
+  }, [kpiQuery.data]);
 
   const bulkErledigt = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -215,27 +290,20 @@ export function TicketsListePage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Tickets</h1>
-          <p className="text-sm text-slate-500">
-            {ticketsQuery.data
-              ? `${ticketsQuery.data.total} Tickets im System`
-              : '—'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowErfassen(true)}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
-        >
-          Neues Ticket
-        </button>
+    <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">
+      <div className="mb-4">
+        <h1 className="text-2xl font-semibold text-zinc-100">Ticket-Pool</h1>
+        <p className="text-sm text-zinc-500">
+          {ticketsQuery.data
+            ? `${ticketsQuery.data.items.length} von ${ticketsQuery.data.total} Tickets`
+            : '—'}
+        </p>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
-        <span className="text-xs font-semibold uppercase text-slate-500">
+      <KpiCards items={kpis} />
+
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+        <span className="text-xs font-semibold uppercase text-zinc-500">
           Status:
         </span>
         {STATUS_SLUGS.map((s) => (
@@ -245,14 +313,14 @@ export function TicketsListePage() {
             onClick={() => toggleStatus(s)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition ${
               config.statusFilter.includes(s)
-                ? 'bg-brand-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-emerald-500 text-zinc-950'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
             }`}
           >
             {labelForStatusSlug(s)}
           </button>
         ))}
-        <span className="ml-3 text-xs font-semibold uppercase text-slate-500">
+        <span className="ml-3 text-xs font-semibold uppercase text-zinc-500">
           Priorität:
         </span>
         {PRIO_SLUGS.map((p) => (
@@ -262,8 +330,8 @@ export function TicketsListePage() {
             onClick={() => togglePrio(p)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition ${
               config.prioFilter.includes(p)
-                ? 'bg-orange-600 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-orange-500 text-zinc-950'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
             }`}
           >
             {labelForPrioSlug(p)}
@@ -302,7 +370,7 @@ export function TicketsListePage() {
               type="button"
               onClick={() => bulkErledigt.mutate(selected.map((t) => t.id))}
               disabled={bulkErledigt.isPending}
-              className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:bg-slate-400"
+              className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
             >
               Auf „erledigt&quot; setzen
             </button>
@@ -316,7 +384,7 @@ export function TicketsListePage() {
                 }
               }}
               disabled={bulkDelete.isPending}
-              className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/100/10 disabled:opacity-50"
             >
               Löschen
             </button>

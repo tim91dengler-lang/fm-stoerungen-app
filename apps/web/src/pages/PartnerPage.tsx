@@ -135,30 +135,30 @@ export function PartnerPage() {
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
+          <h1 className="text-2xl font-semibold text-zinc-100">
             Geschäftspartner
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-zinc-500">
             {listQuery.data ? `${listQuery.data.total} Partner` : '—'}
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
           Neuer Partner
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="search"
             placeholder="Suche in Name, Ansprechpartner, E-Mail …"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="min-w-[16rem] flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+            className="min-w-[16rem] flex-1 rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
           />
           <div className="flex flex-wrap gap-1">
             {PARTNER_TYPEN.map((t) => (
@@ -168,8 +168,8 @@ export function PartnerPage() {
                 onClick={() => toggleTypFilter(t)}
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   typenFilter.includes(t)
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-emerald-500 text-zinc-950'
+                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-800'
                 }`}
               >
                 {TYP_LABEL[t]}
@@ -180,19 +180,19 @@ export function PartnerPage() {
       </div>
 
       {listQuery.isLoading && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Lade Partner …
         </div>
       )}
       {listQuery.data && listQuery.data.items.length === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Keine Partner gefunden.
         </div>
       )}
       {listQuery.data && listQuery.data.items.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+          <table className="min-w-full divide-y divide-zinc-800 text-sm">
+            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
               <tr>
                 <th className="px-4 py-2 font-medium">Name</th>
                 <th className="px-4 py-2 font-medium">Typen</th>
@@ -201,10 +201,10 @@ export function PartnerPage() {
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-zinc-800/60">
               {listQuery.data.items.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 font-medium text-slate-800">
+                <tr key={p.id} className="hover:bg-zinc-900/50">
+                  <td className="px-4 py-2 font-medium text-zinc-200">
                     {p.name}
                   </td>
                   <td className="px-4 py-2">
@@ -212,17 +212,17 @@ export function PartnerPage() {
                       {p.typen.map((t) => (
                         <span
                           key={t}
-                          className="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700"
+                          className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300"
                         >
                           {TYP_LABEL[t]}
                         </span>
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-slate-700">
+                  <td className="px-4 py-2 text-zinc-300">
                     {p.ansprechpartner ?? '—'}
                   </td>
-                  <td className="px-4 py-2 text-xs text-slate-600">
+                  <td className="px-4 py-2 text-xs text-zinc-400">
                     <div>{p.email ?? '—'}</div>
                     <div>{p.telefon ?? '—'}</div>
                   </td>
@@ -230,7 +230,7 @@ export function PartnerPage() {
                     <button
                       type="button"
                       onClick={() => openEdit(p)}
-                      className="mr-2 text-xs font-medium text-brand-700 hover:underline"
+                      className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
                     >
                       Bearbeiten
                     </button>
@@ -240,7 +240,7 @@ export function PartnerPage() {
                         if (confirm(`Partner "${p.name}" löschen?`))
                           deleteMut.mutate(p.id);
                       }}
-                      className="text-xs font-medium text-red-700 hover:underline"
+                      className="text-xs font-medium text-red-400 hover:underline"
                     >
                       Löschen
                     </button>
@@ -256,11 +256,11 @@ export function PartnerPage() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
           onClick={closeModal}
         >
           <div
-            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+            className="w-full max-w-lg rounded-xl bg-zinc-900 p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -270,7 +270,7 @@ export function PartnerPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800"
               >
                 ×
               </button>
@@ -278,19 +278,19 @@ export function PartnerPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Name *
                 </label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Typen
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -312,7 +312,7 @@ export function PartnerPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-xs font-medium text-zinc-300">
                     Ansprechpartner
                   </label>
                   <input
@@ -321,11 +321,11 @@ export function PartnerPage() {
                     onChange={(e) =>
                       setForm({ ...form, ansprechpartner: e.target.value })
                     }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">
+                  <label className="mb-1 block text-xs font-medium text-zinc-300">
                     Telefon
                   </label>
                   <input
@@ -334,25 +334,25 @@ export function PartnerPage() {
                     onChange={(e) =>
                       setForm({ ...form, telefon: e.target.value })
                     }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   E-Mail
                 </label>
                 <input
                   type="email"
                   value={form.email ?? ''}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Adresse (optional)
                 </label>
                 <select
@@ -360,7 +360,7 @@ export function PartnerPage() {
                   onChange={(e) =>
                     setForm({ ...form, adresse_id: e.target.value || null })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 >
                   <option value="">— Keine —</option>
                   {adressenQuery.data?.items.map((a) => (
@@ -373,14 +373,14 @@ export function PartnerPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Notiz
                 </label>
                 <textarea
                   rows={2}
                   value={form.notiz ?? ''}
                   onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -389,7 +389,7 @@ export function PartnerPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
               >
                 Abbrechen
               </button>
@@ -397,7 +397,7 @@ export function PartnerPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isPending || !form.name}
-                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:bg-slate-400"
+                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
               >
                 {isPending ? 'Speichere …' : 'Speichern'}
               </button>

@@ -32,25 +32,25 @@ export function UsersListePage() {
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Benutzer</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-zinc-100">Benutzer</h1>
+          <p className="text-sm text-zinc-500">
             {data ? `${data.total} Treffer` : '—'}
           </p>
         </div>
       </div>
 
-      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <input
           type="search"
           placeholder="Suche in Name und E-Mail …"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
         />
       </div>
 
       {isLoading && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Lade …
         </div>
       )}
@@ -61,15 +61,15 @@ export function UsersListePage() {
       )}
 
       {data && data.items.length === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Keine Benutzer gefunden.
         </div>
       )}
 
       {data && data.items.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+          <table className="min-w-full divide-y divide-zinc-800 text-sm">
+            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
               <tr>
                 <th className="px-4 py-2 font-medium">Name</th>
                 <th className="px-4 py-2 font-medium">E-Mail</th>
@@ -78,14 +78,14 @@ export function UsersListePage() {
                 <th className="px-4 py-2 font-medium">Angelegt</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-zinc-800/60">
               {data.items.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 font-medium text-slate-900">
+                <tr key={u.id} className="hover:bg-zinc-900/50">
+                  <td className="px-4 py-2 font-medium text-zinc-100">
                     {u.full_name}
                   </td>
-                  <td className="px-4 py-2 text-slate-700">{u.email}</td>
-                  <td className="px-4 py-2 text-slate-700">
+                  <td className="px-4 py-2 text-zinc-300">{u.email}</td>
+                  <td className="px-4 py-2 text-zinc-300">
                     {u.roles.map((r) => r.name).join(', ') || '—'}
                   </td>
                   <td className="px-4 py-2">
@@ -94,12 +94,12 @@ export function UsersListePage() {
                         aktiv
                       </span>
                     ) : (
-                      <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                      <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-medium text-zinc-400">
                         inaktiv
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2 text-slate-600">
+                  <td className="px-4 py-2 text-zinc-400">
                     {formatDateTime(u.created_at)}
                   </td>
                 </tr>

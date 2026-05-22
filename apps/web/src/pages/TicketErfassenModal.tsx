@@ -95,19 +95,19 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl"
+        className="w-full max-w-xl rounded-xl bg-zinc-900 p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Neues Ticket</h2>
+          <h2 className="text-lg font-semibold text-zinc-100">Neues Ticket</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+            className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800"
             aria-label="Schließen"
           >
             ×
@@ -119,14 +119,14 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
           className="space-y-4"
         >
           <div>
-            <label htmlFor="titel" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="titel" className="block text-sm font-medium text-zinc-300">
               Titel
             </label>
             <input
               id="titel"
               {...register('titel')}
               autoFocus
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
             />
             {errors.titel && (
               <p className="mt-1 text-xs text-red-600">{errors.titel.message}</p>
@@ -136,7 +136,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
           <div>
             <label
               htmlFor="beschreibung"
-              className="block text-sm font-medium text-slate-700"
+              className="block text-sm font-medium text-zinc-300"
             >
               Beschreibung
             </label>
@@ -144,7 +144,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
               id="beschreibung"
               rows={4}
               {...register('beschreibung')}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
             />
           </div>
 
@@ -152,14 +152,14 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
             <div>
               <label
                 htmlFor="prioritaet"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-zinc-300"
               >
                 Priorität
               </label>
               <select
                 id="prioritaet"
                 {...register('prioritaet')}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="mt-1 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
               >
                 <option value="niedrig">Niedrig</option>
                 <option value="mittel">Mittel</option>
@@ -170,7 +170,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
             <div>
               <label
                 htmlFor="kategorie"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-zinc-300"
               >
                 Kategorie
               </label>
@@ -179,7 +179,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
                 {...register('kategorie', {
                   setValueAs: (v) => (v === '' ? null : v),
                 })}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="mt-1 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
               >
                 <option value="">— (keine) —</option>
                 {kategorienListe?.werte.map((w) => (
@@ -195,7 +195,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
             <div>
               <label
                 htmlFor="objekt_id"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-zinc-300"
               >
                 Objekt
               </label>
@@ -204,7 +204,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
                 {...register('objekt_id', {
                   setValueAs: (v) => (v === '' ? null : v),
                 })}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="mt-1 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
               >
                 <option value="">— (keins) —</option>
                 {objekte?.items.map((o) => (
@@ -217,7 +217,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
             <div>
               <label
                 htmlFor="partner_id"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-zinc-300"
               >
                 Partner (Auftraggeber/Mieter)
               </label>
@@ -226,7 +226,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
                 {...register('partner_id', {
                   setValueAs: (v) => (v === '' ? null : v),
                 })}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="mt-1 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
               >
                 <option value="">— (keiner) —</option>
                 {partnerListe?.items.map((p) => (
@@ -241,7 +241,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
           <div>
             <label
               htmlFor="zugewiesen_an_id"
-              className="block text-sm font-medium text-slate-700"
+              className="block text-sm font-medium text-zinc-300"
             >
               Zugewiesen an
             </label>
@@ -250,7 +250,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
               {...register('zugewiesen_an_id', {
                 setValueAs: (v) => (v === '' ? null : v),
               })}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 w-full rounded-md border border-zinc-700 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
             >
               <option value="">— (offen) —</option>
               {users?.items.map((u) => (
@@ -271,14 +271,14 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900/50"
             >
               Abbrechen
             </button>
             <button
               type="submit"
               disabled={isSubmitting || create.isPending}
-              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:bg-slate-400"
+              className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 shadow-sm hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
             >
               {isSubmitting || create.isPending ? 'Wird angelegt …' : 'Anlegen'}
             </button>

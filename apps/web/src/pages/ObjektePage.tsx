@@ -126,44 +126,44 @@ export function ObjektePage() {
     <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Objekte</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-2xl font-semibold text-zinc-100">Objekte</h1>
+          <p className="text-sm text-zinc-500">
             {listQuery.data ? `${listQuery.data.total} Objekte` : '—'}
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
           Neues Objekt
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <input
           type="search"
           placeholder="Suche in Objekt-Name …"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
         />
       </div>
 
       {listQuery.isLoading && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Lade Objekte …
         </div>
       )}
       {listQuery.data && listQuery.data.items.length === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
           Keine Objekte gefunden.
         </div>
       )}
       {listQuery.data && listQuery.data.items.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+          <table className="min-w-full divide-y divide-zinc-800 text-sm">
+            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
               <tr>
                 <th className="px-4 py-2 font-medium">Name</th>
                 <th className="px-4 py-2 font-medium">Adresse</th>
@@ -171,16 +171,16 @@ export function ObjektePage() {
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-zinc-800/60">
               {listQuery.data.items.map((o) => (
-                <tr key={o.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 font-medium text-slate-800">{o.name}</td>
-                  <td className="px-4 py-2 text-slate-600">
+                <tr key={o.id} className="hover:bg-zinc-900/50">
+                  <td className="px-4 py-2 font-medium text-zinc-200">{o.name}</td>
+                  <td className="px-4 py-2 text-zinc-400">
                     {o.adresse
                       ? `${o.adresse.strasse}${o.adresse.hausnummer ? ' ' + o.adresse.hausnummer : ''}, ${o.adresse.plz} ${o.adresse.ort}`
                       : '—'}
                   </td>
-                  <td className="px-4 py-2 text-xs text-slate-600">
+                  <td className="px-4 py-2 text-xs text-zinc-400">
                     {o.partner_links.length === 0
                       ? '—'
                       : o.partner_links
@@ -194,7 +194,7 @@ export function ObjektePage() {
                     <button
                       type="button"
                       onClick={() => openEdit(o)}
-                      className="mr-2 text-xs font-medium text-brand-700 hover:underline"
+                      className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
                     >
                       Bearbeiten
                     </button>
@@ -204,7 +204,7 @@ export function ObjektePage() {
                         if (confirm(`Objekt "${o.name}" löschen?`))
                           deleteMut.mutate(o.id);
                       }}
-                      className="text-xs font-medium text-red-700 hover:underline"
+                      className="text-xs font-medium text-red-400 hover:underline"
                     >
                       Löschen
                     </button>
@@ -220,11 +220,11 @@ export function ObjektePage() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
           onClick={closeModal}
         >
           <div
-            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+            className="w-full max-w-lg rounded-xl bg-zinc-900 p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -234,7 +234,7 @@ export function ObjektePage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800"
               >
                 ×
               </button>
@@ -242,19 +242,19 @@ export function ObjektePage() {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Name *
                 </label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Adresse
                 </label>
                 <select
@@ -262,7 +262,7 @@ export function ObjektePage() {
                   onChange={(e) =>
                     setForm({ ...form, adresse_id: e.target.value || null })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 >
                   <option value="">— Keine —</option>
                   {adressenQuery.data?.items.map((a) => (
@@ -275,23 +275,23 @@ export function ObjektePage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">
+                <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Notiz
                 </label>
                 <textarea
                   rows={2}
                   value={form.notiz ?? ''}
                   onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
-              <div className="space-y-2 rounded-md border border-slate-200 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="space-y-2 rounded-md border border-zinc-800 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                   Partner-Zuordnungen
                 </div>
                 {(form.partner_links ?? []).length === 0 && (
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-zinc-500">
                     Noch keine Partner zugeordnet.
                   </div>
                 )}
@@ -303,18 +303,18 @@ export function ObjektePage() {
                     return (
                       <li
                         key={`${l.partner_id}-${l.rolle}-${idx}`}
-                        className="flex items-center justify-between rounded bg-slate-50 px-2 py-1 text-sm"
+                        className="flex items-center justify-between rounded bg-zinc-900/50 px-2 py-1 text-sm"
                       >
                         <span>
                           {p?.name ?? l.partner_id} —{' '}
-                          <span className="text-xs text-slate-600">
+                          <span className="text-xs text-zinc-400">
                             {TYP_LABEL[l.rolle]}
                           </span>
                         </span>
                         <button
                           type="button"
                           onClick={() => removeLink(idx)}
-                          className="text-xs text-red-700 hover:underline"
+                          className="text-xs text-red-400 hover:underline"
                         >
                           entfernen
                         </button>
@@ -337,7 +337,7 @@ export function ObjektePage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
               >
                 Abbrechen
               </button>
@@ -345,7 +345,7 @@ export function ObjektePage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isPending || !form.name}
-                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:bg-slate-400"
+                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
               >
                 {isPending ? 'Speichere …' : 'Speichern'}
               </button>
@@ -372,7 +372,7 @@ function PartnerLinkAdder({
       <select
         value={partnerId}
         onChange={(e) => setPartnerId(e.target.value)}
-        className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+        className="rounded-md border border-zinc-700 px-2 py-1 text-sm"
       >
         <option value="">— Partner wählen —</option>
         {partnerOptions.map((p) => (
@@ -384,7 +384,7 @@ function PartnerLinkAdder({
       <select
         value={rolle}
         onChange={(e) => setRolle(e.target.value as PartnerTyp)}
-        className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+        className="rounded-md border border-zinc-700 px-2 py-1 text-sm"
       >
         {PARTNER_TYPEN.map((t) => (
           <option key={t} value={t}>
@@ -399,7 +399,7 @@ function PartnerLinkAdder({
           setPartnerId('');
         }}
         disabled={!partnerId}
-        className="rounded-md bg-slate-700 px-3 py-1 text-sm text-white hover:bg-slate-800 disabled:bg-slate-300"
+        className="rounded-md bg-slate-700 px-3 py-1 text-sm text-zinc-950 hover:bg-slate-800 disabled:bg-slate-300"
       >
         + zuordnen
       </button>
