@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
@@ -31,6 +31,7 @@ import {
   labelForStatusSlug,
 } from '../lib/format';
 import { KpiCards, type KpiItem } from '../components/KpiCards';
+import { TicketDetailPanel } from '../components/TicketDetailPanel';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import {
@@ -77,84 +78,93 @@ const PRIO_FILTER_OPTIONS: SelectOption[] = PRIO_SLUGS.map((p) => ({
   label: labelForPrioSlug(p),
 }));
 
-const columns: ColumnDef<TicketRead>[] = [
-  {
-    id: 'nummer',
-    accessorKey: 'nummer',
-    header: 'Nr.',
-    cell: ({ row }) => (
-      <span className="font-mono text-xs text-zinc-500">
-        #{row.original.nummer}
-      </span>
-    ),
-  },
-  {
-    id: 'titel',
-    accessorKey: 'titel',
-    header: 'Titel',
-    cell: ({ row }) => (
-      <Link
-        to={`/tickets/${row.original.id}`}
-        className="font-medium text-emerald-300 hover:text-emerald-200 hover:underline"
-      >
-        {row.original.titel}
-      </Link>
-    ),
-    filterFn: 'includesString',
-  },
-  {
-    id: 'status',
-    accessorFn: (r) => r.status.key,
-    header: 'Status',
-    cell: ({ row }) => <StatusBadge status={row.original.status} />,
-    filterFn: 'arrIncludesSome',
-  },
-  {
-    id: 'prioritaet',
-    accessorFn: (r) => r.prioritaet.key,
-    header: 'Priorität',
-    cell: ({ row }) => <PrioBadge prioritaet={row.original.prioritaet} />,
-    filterFn: 'arrIncludesSome',
-  },
-  {
-    id: 'kategorie',
-    accessorFn: (r) => r.kategorie?.label ?? '',
-    header: 'Kategorie',
-    cell: ({ row }) => row.original.kategorie?.label ?? '—',
-    filterFn: 'includesString',
-  },
-  {
-    id: 'objekt',
-    accessorFn: (r) => r.objekt?.name ?? '',
-    header: 'Objekt',
-    cell: ({ row }) => row.original.objekt?.name ?? '—',
-    filterFn: 'includesString',
-  },
-  {
-    id: 'partner',
-    accessorFn: (r) => r.partner?.name ?? '',
-    header: 'Partner',
-    cell: ({ row }) => row.original.partner?.name ?? '—',
-    filterFn: 'includesString',
-  },
-  {
-    id: 'zugewiesen_an',
-    accessorFn: (r) => r.zugewiesen_an?.full_name ?? '',
-    header: 'Zugewiesen an',
-    cell: ({ row }) => row.original.zugewiesen_an?.full_name ?? '—',
-    filterFn: 'includesString',
-  },
-  {
-    id: 'eroeffnet_am',
-    accessorKey: 'eroeffnet_am',
-    header: 'Eröffnet am',
-    cell: ({ row }) => (
-      <span className="text-zinc-400">
-        {formatRelativeDateTime(row.original.eroeffnet_am)}
-      </span>
-    ),
-  },
-];
+function buildColumns(
+  onOpen: (ticketId: string) => void,
+): ColumnDef<TicketRead>[] {
+  return [
+    {
+      id: 'nummer',
+      accessorKey: 'nummer',
+      header: 'Nr.',
+      cell: ({ row }) => (
+        <button
+          type="button"
+          onClick={() => onOpen(row.original.id)}
+          className="font-mono text-xs text-zinc-500 hover:text-zinc-300"
+        >
+          #{row.original.nummer}
+        </button>
+      ),
+    },
+    {
+      id: 'titel',
+      accessorKey: 'titel',
+      header: 'Titel',
+      cell: ({ row }) => (
+        <button
+          type="button"
+          onClick={() => onOpen(row.original.id)}
+          className="text-left font-medium text-emerald-300 hover:text-emerald-200 hover:underline"
+        >
+          {row.original.titel}
+        </button>
+      ),
+      filterFn: 'includesString',
+    },
+    {
+      id: 'status',
+      accessorFn: (r) => r.status.key,
+      header: 'Status',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      filterFn: 'arrIncludesSome',
+    },
+    {
+      id: 'prioritaet',
+      accessorFn: (r) => r.prioritaet.key,
+      header: 'Priorität',
+      cell: ({ row }) => <PrioBadge prioritaet={row.original.prioritaet} />,
+      filterFn: 'arrIncludesSome',
+    },
+    {
+      id: 'kategorie',
+      accessorFn: (r) => r.kategorie?.label ?? '',
+      header: 'Kategorie',
+      cell: ({ row }) => row.original.kategorie?.label ?? '—',
+      filterFn: 'includesString',
+    },
+    {
+      id: 'objekt',
+      accessorFn: (r) => r.objekt?.name ?? '',
+      header: 'Objekt',
+      cell: ({ row }) => row.original.objekt?.name ?? '—',
+      filterFn: 'includesString',
+    },
+    {
+      id: 'partner',
+      accessorFn: (r) => r.partner?.name ?? '',
+      header: 'Partner',
+      cell: ({ row }) => row.original.partner?.name ?? '—',
+      filterFn: 'includesString',
+    },
+    {
+      id: 'zugewiesen_an',
+      accessorFn: (r) => r.zugewiesen_an?.full_name ?? '',
+      header: 'Zugewiesen an',
+      cell: ({ row }) => row.original.zugewiesen_an?.full_name ?? '—',
+      filterFn: 'includesString',
+    },
+    {
+      id: 'eroeffnet_am',
+      accessorKey: 'eroeffnet_am',
+      header: 'Eröffnet am',
+      cell: ({ row }) => (
+        <span className="text-zinc-400">
+          {formatRelativeDateTime(row.original.eroeffnet_am)}
+        </span>
+      ),
+    },
+  ];
+}
 
 const filterRenderers = {
   titel: TextFilter,
@@ -177,6 +187,18 @@ export function TicketsListePage() {
   const [showErfassen, setShowErfassen] = useState(false);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [searchParams, setSearchParams] = useSearchParams();
+  const openTicketId = searchParams.get('ticket');
+
+  function openTicket(id: string) {
+    searchParams.set('ticket', id);
+    setSearchParams(searchParams);
+  }
+  function closeTicket() {
+    searchParams.delete('ticket');
+    setSearchParams(searchParams);
+  }
+
+  const columns = useMemo(() => buildColumns(openTicket), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const qc = useQueryClient();
 
@@ -401,7 +423,7 @@ export function TicketsListePage() {
                 }
               }}
               disabled={bulkDelete.isPending}
-              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/100/10 disabled:opacity-50"
+              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
             >
               Löschen
             </button>
@@ -437,6 +459,8 @@ export function TicketsListePage() {
           }}
         />
       )}
+
+      <TicketDetailPanel ticketId={openTicketId} onClose={closeTicket} />
     </div>
   );
 }
