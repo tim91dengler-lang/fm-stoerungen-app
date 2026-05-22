@@ -62,6 +62,18 @@ class ProjektRefMini(BaseModel):
     status: str
 
 
+class AnlageRef(BaseModel):
+    id: UUID
+    bezeichnung: str
+    icon_name: str | None = None
+
+
+class FehlercodeRef(BaseModel):
+    id: UUID
+    code: str
+    titel: str
+
+
 def _normalize_slug(v: str | None) -> str | None:
     if v is None:
         return None
@@ -86,6 +98,8 @@ class TicketCreate(BaseModel):
     zugewiesen_an_id: UUID | None = None
     tickettyp_id: UUID | None = None
     projekt_id: UUID | None = None
+    anlage_id: UUID | None = None
+    fehlercode_id: UUID | None = None
     faelligkeit_am: date | None = None
     wiederholung: str | None = Field(default=None, max_length=32)
 
@@ -113,6 +127,8 @@ class TicketUpdate(BaseModel):
     zugewiesen_an_id: UUID | None = None
     tickettyp_id: UUID | None = None
     projekt_id: UUID | None = None
+    anlage_id: UUID | None = None
+    fehlercode_id: UUID | None = None
     faelligkeit_am: date | None = None
     wiederholung: str | None = Field(default=None, max_length=32)
     wartet_grund: str | None = Field(default=None, max_length=64)
@@ -146,6 +162,8 @@ class TicketRead(TimestampedRead):
     partner: PartnerRef | None = None
     tickettyp: TickettypRef | None = None
     projekt: ProjektRefMini | None = None
+    anlage: AnlageRef | None = None
+    fehlercode: FehlercodeRef | None = None
     faelligkeit_am: date | None = None
     wiederholung: str | None = None
     wartet_grund: AuswahlWertRef | None = None
@@ -239,6 +257,18 @@ class TicketRead(TimestampedRead):
             else None,
             projekt=ProjektRefMini(id=t.projekt.id, name=t.projekt.name, status=t.projekt.status)
             if t.projekt
+            else None,
+            anlage=AnlageRef(
+                id=t.anlage.id,
+                bezeichnung=t.anlage.bezeichnung,
+                icon_name=t.anlage.icon_name,
+            )
+            if t.anlage
+            else None,
+            fehlercode=FehlercodeRef(
+                id=t.fehlercode.id, code=t.fehlercode.code, titel=t.fehlercode.titel
+            )
+            if t.fehlercode
             else None,
             faelligkeit_am=t.faelligkeit_am,
             wiederholung=t.wiederholung,

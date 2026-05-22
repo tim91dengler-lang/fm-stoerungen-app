@@ -11,6 +11,7 @@ class AuswahllistenWertCreate(BaseModel):
     label: str = Field(min_length=1, max_length=200)
     reihenfolge: int = 0
     farbe: str | None = Field(default=None, max_length=32)
+    icon_name: str | None = Field(default=None, max_length=64)
     ist_aktiv: bool = True
     meta: dict[str, Any] | None = None
 
@@ -19,6 +20,7 @@ class AuswahllistenWertUpdate(BaseModel):
     label: str | None = Field(default=None, min_length=1, max_length=200)
     reihenfolge: int | None = None
     farbe: str | None = Field(default=None, max_length=32)
+    icon_name: str | None = Field(default=None, max_length=64)
     ist_aktiv: bool | None = None
     meta: dict[str, Any] | None = None
 
@@ -29,6 +31,7 @@ class AuswahllistenWertRead(TimestampedRead):
     label: str
     reihenfolge: int
     farbe: str | None
+    icon_name: str | None
     ist_aktiv: bool
     ist_system: bool
     meta: dict[str, Any] | None

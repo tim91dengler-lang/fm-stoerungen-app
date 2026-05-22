@@ -2,10 +2,12 @@ from fastapi import APIRouter
 
 from fm_api.api.v1 import (
     adressen,
+    anlagen,
     ansichten,
     auswahllisten,
     auth,
     dokumente,
+    fehlercodes,
     health,
     notifications,
     objekte,
@@ -44,3 +46,5 @@ api_router.include_router(tickettypen.router, prefix="/tickettypen", tags=["tick
 api_router.include_router(projekte.router, prefix="/projekte", tags=["projekte"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(dokumente.router, prefix="/dokumente", tags=["dokumente"])
+api_router.include_router(anlagen.router, prefix="/anlagen", tags=["anlagen"])
+api_router.include_router(fehlercodes.router, prefix="/fehlercodes", tags=["fehlercodes"])

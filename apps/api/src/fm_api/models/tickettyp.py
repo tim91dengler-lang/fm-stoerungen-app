@@ -30,6 +30,8 @@ class Tickettyp(UuidPkMixin, TimestampMixin, Base):
     beschreibung: Mapped[str | None] = mapped_column(Text, nullable=True)
     icon: Mapped[str | None] = mapped_column(String(64), nullable=True)
     farbe: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Legacy-Spalte aus Migration 0006 — wird ab 0009 von `felder` (tickettyp_feld)
+    # abgelöst. Bleibt für Backwards-Compat erhalten, neue Logik nutzt `felder`.
     pflichtfelder: Mapped[list[Any]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
@@ -42,3 +44,47 @@ class Tickettyp(UuidPkMixin, TimestampMixin, Base):
     )
 
     mandant: Mapped["Mandant"] = relationship(lazy="raise")
+    felder: Mapped[list["TickettypFeld"]] = relationship(
+        back_populates="tickettyp",
+        cascade="all, delete-orphan",
+        order_by="TickettypFeld.reihenfolge",
+        lazy="raise",
+    )
+
+
+class TickettypFeld(UuidPkMixin, TimestampMixin, Base):
+    """Sichtbar/Pflicht/Reihenfolge pro System-Feld je Vorlage.
+
+    Custom-Felder sind in der Spec angelegt (`ist_system_feld=false`), in
+    Slice 1 aber bewusst nicht im Frontend ausgespielt (Entscheidung Tim
+    2026-05-22 — kommt später).
+    """
+
+    __tablename__ = "tickettyp_feld"
+    __table_args__ = (
+        UniqueConstraint("tickettyp_id", "feld_key", name="uq_tickettyp_feld_tickettyp_feld_key"),
+    )
+
+    tickettyp_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("tickettypen.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    feld_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    ist_system_feld: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sichtbar: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    pflicht: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    nur_admin_sichtbar: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+    tickettyp: Mapped["Tickettyp"] = relationship(back_populates="felder", lazy="raise")

@@ -188,6 +188,7 @@ async def add_wert(
     label: str,
     reihenfolge: int = 0,
     farbe: str | None = None,
+    icon_name: str | None = None,
     ist_aktiv: bool = True,
     meta: dict[str, Any] | None = None,
 ) -> AuswahllistenWert:
@@ -200,6 +201,7 @@ async def add_wert(
         label=label,
         reihenfolge=reihenfolge,
         farbe=farbe,
+        icon_name=icon_name,
         ist_aktiv=ist_aktiv,
         ist_system=False,
         meta=meta,
@@ -243,6 +245,8 @@ async def update_wert(
         wert.reihenfolge = updates["reihenfolge"]
     if "farbe" in updates:
         wert.farbe = updates["farbe"]
+    if "icon_name" in updates:
+        wert.icon_name = updates["icon_name"]
     if "ist_aktiv" in updates and updates["ist_aktiv"] is not None:
         wert.ist_aktiv = updates["ist_aktiv"]
     if "meta" in updates:

@@ -6,6 +6,32 @@ from pydantic import BaseModel, ConfigDict, Field
 from fm_api.schemas.common import TimestampedRead
 
 
+class TickettypFeldRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    feld_key: str
+    label: str
+    ist_system_feld: bool
+    sichtbar: bool
+    pflicht: bool
+    nur_admin_sichtbar: bool
+    reihenfolge: int
+
+
+class TickettypFeldUpdate(BaseModel):
+    """Bulk-Update der Felder einer Vorlage. Felder werden anhand `feld_key`
+    identifiziert; unbekannte Keys werden vom Backend ignoriert (keine neuen
+    System-Felder per API)."""
+
+    feld_key: str = Field(min_length=1, max_length=64)
+    sichtbar: bool | None = None
+    pflicht: bool | None = None
+    nur_admin_sichtbar: bool | None = None
+    reihenfolge: int | None = None
+    label: str | None = Field(default=None, min_length=1, max_length=120)
+
+
 class TickettypBase(BaseModel):
     key: str = Field(min_length=1, max_length=64)
     label: str = Field(min_length=1, max_length=120)
@@ -36,6 +62,7 @@ class TickettypRead(TimestampedRead, TickettypBase):
 
     mandant_id: UUID
     ist_system: bool
+    felder: list[TickettypFeldRead] = Field(default_factory=list)
 
 
 class TickettypMini(BaseModel):

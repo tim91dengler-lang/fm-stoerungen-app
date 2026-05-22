@@ -12,7 +12,9 @@ from fm_api.db.base import Base
 from fm_api.models.mixins import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 if TYPE_CHECKING:
+    from fm_api.models.anlage import Anlage
     from fm_api.models.auswahlliste import AuswahllistenWert
+    from fm_api.models.fehlercode import Fehlercode
     from fm_api.models.mandant import Mandant
     from fm_api.models.objekt import Objekt
     from fm_api.models.objektstruktur import Haus, ObjektStockwerk, StockwerkEinheit
@@ -142,6 +144,18 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     wartet_kontakt_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     faelligkeit_am: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     wiederholung: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    anlage_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("anlagen.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    fehlercode_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("fehlercodes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     eroeffnet_von_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -190,3 +204,5 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     wartet_nachunternehmer: Mapped["GeschaeftsPartner | None"] = relationship(
         foreign_keys=[wartet_nachunternehmer_id], lazy="raise"
     )
+    anlage: Mapped["Anlage | None"] = relationship(lazy="raise")
+    fehlercode: Mapped["Fehlercode | None"] = relationship(lazy="raise")
