@@ -163,8 +163,8 @@ async def update_photo(
     if annotations is not None:
         photo.annotations = annotations
     await db.flush()
-    await db.refresh(photo, ["uploaded_by"])
-    return photo
+    # Reload via get_photo, damit alle Relations + updated_at frisch geladen sind
+    return await get_photo(db, photo_id, ticket_id, mandant_id)
 
 
 async def soft_delete_photo(
