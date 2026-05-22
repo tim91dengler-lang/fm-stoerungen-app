@@ -10,6 +10,7 @@ import {
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  type GroupingState,
   type RowSelectionState,
   type SortingState,
   type VisibilityState,
@@ -45,6 +46,7 @@ interface TicketsViewConfig {
   visibility: VisibilityState;
   columnFilters: ColumnFiltersState;
   columnOrder: string[];
+  grouping: GroupingState;
 }
 
 const DEFAULT_CONFIG: TicketsViewConfig = {
@@ -54,7 +56,17 @@ const DEFAULT_CONFIG: TicketsViewConfig = {
   visibility: { kategorie: false, objekt: false, partner: false },
   columnFilters: [],
   columnOrder: [],
+  grouping: [],
 };
+
+const GROUPABLE_COLUMNS: { id: string; label: string }[] = [
+  { id: 'status', label: 'nach Status' },
+  { id: 'prioritaet', label: 'nach Priorität' },
+  { id: 'kategorie', label: 'nach Kategorie' },
+  { id: 'objekt', label: 'nach Objekt' },
+  { id: 'partner', label: 'nach Geschäftspartner' },
+  { id: 'zugewiesen_an', label: 'nach Bearbeiter' },
+];
 
 const STATUS_FILTER_OPTIONS: SelectOption[] = STATUS_SLUGS.map((s) => ({
   value: s,
@@ -359,6 +371,11 @@ export function TicketsListePage() {
         onColumnOrderChange={(o) =>
           setConfig((prev) => ({ ...prev, columnOrder: o }))
         }
+        grouping={config.grouping}
+        onGroupingChange={(g) =>
+          setConfig((prev) => ({ ...prev, grouping: g }))
+        }
+        groupableColumns={GROUPABLE_COLUMNS}
         filterRenderers={filterRenderers}
         enableRowSelection
         getRowId={(t) => t.id}
