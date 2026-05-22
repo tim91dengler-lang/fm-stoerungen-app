@@ -429,8 +429,11 @@ async def update_ticket(
 
     await db.flush()
     # Identity-Map invalidieren, sonst liefert get_ticket die alte Relationship-Cache
-    # (status_wert, prioritaet_wert, …) zurück trotz änderten *_id.
-    db.expire(ticket)
+    # (status_wert, prioritaet_wert, …) zurück trotz änderter *_id.
+    # `expunge` (statt `expire`) entfernt das Ticket-Objekt komplett aus der Session,
+    # damit get_ticket alles frisch + eager (selectinload) lädt — wichtig im
+    # async-Context, weil expire-Lazy-Loading sonst MissingGreenlet wirft.
+    db.expunge(ticket)
     ticket_reloaded = await get_ticket(db, ticket.id, mandant_id)
 
     if fire_zuweisung_notif:
