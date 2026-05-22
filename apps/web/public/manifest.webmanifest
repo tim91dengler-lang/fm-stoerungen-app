@@ -1,0 +1,37 @@
+{
+  "name": "FM-Störungen",
+  "short_name": "FM-Stör",
+  "description": "Ticketsystem für Facility-Management-Betrieb",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#10b981",
+  "lang": "de",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Neues Ticket",
+      "short_name": "Neu",
+      "url": "/tickets?new=1"
+    },
+    {
+      "name": "Meine Tickets",
+      "url": "/meine-tickets"
+    }
+  ]
+}

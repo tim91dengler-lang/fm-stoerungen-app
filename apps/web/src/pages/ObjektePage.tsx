@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adresseApi, objektApi, partnerApi } from '../api/endpoints';
 import type { ObjektCreate, ObjektRead, PartnerTyp } from '../api/types';
@@ -174,7 +175,11 @@ export function ObjektePage() {
             <tbody className="divide-y divide-zinc-800/60">
               {listQuery.data.items.map((o) => (
                 <tr key={o.id} className="hover:bg-zinc-900/50">
-                  <td className="px-4 py-2 font-medium text-zinc-200">{o.name}</td>
+                  <td className="px-4 py-2 font-medium text-zinc-200">
+                    <Link to={`/stammdaten/objekte/${o.id}`} className="hover:text-emerald-300">
+                      {o.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2 text-zinc-400">
                     {o.adresse
                       ? `${o.adresse.strasse}${o.adresse.hausnummer ? ' ' + o.adresse.hausnummer : ''}, ${o.adresse.plz} ${o.adresse.ort}`

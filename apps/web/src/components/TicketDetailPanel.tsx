@@ -1,16 +1,27 @@
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   Calendar,
   ChevronRight,
   Clock,
+  FolderKanban,
+  Mail,
   MapPin,
+  Phone,
   Trash2,
   User,
   Users2,
+  Wrench,
   X,
 } from 'lucide-react';
-import { ticketApi, userApi } from '../api/endpoints';
+import {
+  auswahllistenApi,
+  partnerApi,
+  ticketApi,
+  userApi,
+} from '../api/endpoints';
 import type {
   TicketPrioritaetSlug,
   TicketRead,
@@ -48,6 +59,24 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     staleTime: 60_000,
     enabled: !!ticketId,
   });
+
+  const auswahllistenQuery = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
+    staleTime: 60_000,
+    enabled: !!ticketId,
+  });
+
+  const partnerListeQuery = useQuery({
+    queryKey: ['partner-nachunternehmer'],
+    queryFn: () => partnerApi.list({ typ: ['nachunternehmer'], limit: 500 }),
+    staleTime: 60_000,
+    enabled: !!ticketId,
+  });
+
+  const wartetGruendeListe = auswahllistenQuery.data?.find(
+    (l) => l.key === 'wartet_grund',
+  );
 
   const update = useMutation({
     mutationFn: (payload: TicketUpdate) =>
@@ -124,11 +153,52 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
           )}
           {t && (
             <div className="space-y-4 px-5 py-4">
+              {/* Tickettyp-Pill */}
+              {t.tickettyp && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${tickettypClass(t.tickettyp.farbe)}`}
+                  >
+                    <Wrench className="h-3 w-3" /> {t.tickettyp.label}
+                  </span>
+                  {t.projekt && (
+                    <Link
+                      to={`/projekte/${t.projekt.id}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20"
+                    >
+                      <FolderKanban className="h-3 w-3" /> {t.projekt.name}
+                    </Link>
+                  )}
+                </div>
+              )}
+
               <h1 className="text-xl font-semibold text-zinc-100">{t.titel}</h1>
               <p className="text-xs text-zinc-500">
-                Erfasst: {formatRelativeDateTime(t.eroeffnet_am)} · Melder:{' '}
+                Erfasst: {formatRelativeDateTime(t.eroeffnet_am)} · von{' '}
                 <span className="text-zinc-300">{t.eroeffnet_von.full_name}</span>
+                {t.quelle && (
+                  <>
+                    {' '}
+                    · Quelle: <span className="text-zinc-300">{t.quelle.label}</span>
+                  </>
+                )}
+                {t.melder && (
+                  <>
+                    {' '}
+                    · Melder: <span className="text-zinc-300">{t.melder}</span>
+                  </>
+                )}
               </p>
+
+              {/* Wartet-Sub-Bar */}
+              {t.status.key === 'wartet' && (
+                <WartetSubBar
+                  ticket={t}
+                  wartetGruende={wartetGruendeListe?.werte ?? []}
+                  nachunternehmer={partnerListeQuery.data?.items ?? []}
+                  onSave={(payload) => update.mutate(payload)}
+                />
+              )}
 
               {/* Status / Priorität / Kategorie */}
               <div className="grid gap-3 sm:grid-cols-3">
@@ -164,9 +234,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                     { value: '', label: '— (keine) —' },
                     ...(t.kategorie ? [{ value: t.kategorie.key, label: t.kategorie.label }] : []),
                   ]}
-                  // Die volle Kategorie-Liste kommt aus der Auswahlliste; hier
-                  // zeigen wir den aktuellen Wert als Pre-fill an. Erweiterung
-                  // erfolgt im Erfassungs-Modal.
                   disabled
                 />
               </div>
@@ -176,14 +243,25 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 <div className="space-y-2 text-sm">
                   <RowItem
                     icon={<MapPin className="h-4 w-4" />}
-                    label="Objekt"
-                    value={t.objekt?.name ?? '—'}
+                    label="Ort"
+                    value={
+                      [t.objekt?.name, t.haus?.bezeichnung, t.stockwerk?.bezeichnung, t.einheit?.bezeichnung]
+                        .filter(Boolean)
+                        .join(' › ') || '—'
+                    }
                   />
                   <RowItem
                     icon={<Users2 className="h-4 w-4" />}
                     label="Partner"
                     value={t.partner?.name ?? '—'}
                   />
+                  {t.faelligkeit_am && (
+                    <RowItem
+                      icon={<Calendar className="h-4 w-4" />}
+                      label="Fällig am"
+                      value={t.faelligkeit_am}
+                    />
+                  )}
                 </div>
               </Accordion>
 
@@ -266,6 +344,136 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
           </div>
         )}
       </aside>
+    </div>
+  );
+}
+
+function tickettypClass(farbe: string | null): string {
+  switch (farbe) {
+    case 'emerald':
+      return 'bg-emerald-500/15 text-emerald-300';
+    case 'blue':
+      return 'bg-sky-500/15 text-sky-300';
+    case 'amber':
+      return 'bg-amber-500/15 text-amber-300';
+    default:
+      return 'bg-zinc-700/50 text-zinc-300';
+  }
+}
+
+interface WartetSubBarProps {
+  ticket: TicketRead;
+  wartetGruende: { id: string; key: string; label: string; farbe: string | null }[];
+  nachunternehmer: { id: string; name: string }[];
+  onSave: (payload: TicketUpdate) => void;
+}
+
+function WartetSubBar({ ticket, wartetGruende, nachunternehmer, onSave }: WartetSubBarProps) {
+  const grund = ticket.wartet_grund;
+  const showKontakt = grund?.key === 'mieter' || grund?.key === 'extern';
+  const showNachunternehmer = grund?.key === 'material' || grund?.key === 'extern';
+
+  return (
+    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-300">
+        <AlertTriangle className="h-3.5 w-3.5" /> Wartet auf …
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="block text-[10px] text-zinc-400">Grund</label>
+          <select
+            value={grund?.key ?? ''}
+            onChange={(e) => onSave({ wartet_grund: e.target.value || null })}
+            className="mt-0.5 w-full rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+          >
+            <option value="">— (keiner) —</option>
+            {wartetGruende.map((w) => (
+              <option key={w.id} value={w.key}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {showNachunternehmer && (
+          <div>
+            <label className="block text-[10px] text-zinc-400">Nachunternehmer</label>
+            <select
+              value={ticket.wartet_nachunternehmer?.id ?? ''}
+              onChange={(e) => onSave({ wartet_nachunternehmer_id: e.target.value || null })}
+              className="mt-0.5 w-full rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+            >
+              <option value="">— (keiner) —</option>
+              {nachunternehmer.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {showKontakt && (
+          <>
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] text-zinc-400">Kontakt-Name</label>
+              <input
+                type="text"
+                defaultValue={ticket.wartet_kontakt_name ?? ''}
+                onBlur={(e) =>
+                  e.target.value !== (ticket.wartet_kontakt_name ?? '') &&
+                  onSave({ wartet_kontakt_name: e.target.value || null })
+                }
+                className="mt-0.5 w-full rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-400">Telefon</label>
+              <div className="mt-0.5 flex gap-1">
+                <input
+                  type="text"
+                  defaultValue={ticket.wartet_kontakt_telefon ?? ''}
+                  onBlur={(e) =>
+                    e.target.value !== (ticket.wartet_kontakt_telefon ?? '') &&
+                    onSave({ wartet_kontakt_telefon: e.target.value || null })
+                  }
+                  className="flex-1 rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                />
+                {ticket.wartet_kontakt_telefon && (
+                  <a
+                    href={`tel:${ticket.wartet_kontakt_telefon}`}
+                    className="rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-amber-300 hover:bg-zinc-800"
+                    title="Anrufen"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] text-zinc-400">E-Mail</label>
+              <div className="mt-0.5 flex gap-1">
+                <input
+                  type="email"
+                  defaultValue={ticket.wartet_kontakt_email ?? ''}
+                  onBlur={(e) =>
+                    e.target.value !== (ticket.wartet_kontakt_email ?? '') &&
+                    onSave({ wartet_kontakt_email: e.target.value || null })
+                  }
+                  className="flex-1 rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
+                />
+                {ticket.wartet_kontakt_email && (
+                  <a
+                    href={`mailto:${ticket.wartet_kontakt_email}?subject=${encodeURIComponent(`Ticket #${ticket.nummer}: ${ticket.titel}`)}`}
+                    className="rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-amber-300 hover:bg-zinc-800"
+                    title="E-Mail schreiben"
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
