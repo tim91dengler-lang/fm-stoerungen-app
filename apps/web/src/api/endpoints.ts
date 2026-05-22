@@ -10,7 +10,13 @@ import type {
   AuswahllistenWertRead,
   AuswahllistenWertUpdate,
   LoginResponse,
+  ObjektCreate,
+  ObjektRead,
+  ObjektUpdate,
   PaginatedResponse,
+  PartnerCreate,
+  PartnerRead,
+  PartnerUpdate,
   TicketCreate,
   TicketListFilters,
   TicketRead,
@@ -65,6 +71,39 @@ export const auswahllistenApi = {
       .then((r) => r.data),
   removeWert: (wertId: string) =>
     api.delete<void>(`/auswahllisten/werte/${wertId}`).then(() => undefined),
+};
+
+export const partnerApi = {
+  list: (
+    params: {
+      search?: string;
+      typ?: string[];
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) =>
+    api
+      .get<PaginatedResponse<PartnerRead>>('/partner', { params })
+      .then((r) => r.data),
+  get: (id: string) => api.get<PartnerRead>(`/partner/${id}`).then((r) => r.data),
+  create: (payload: PartnerCreate) =>
+    api.post<PartnerRead>('/partner', payload).then((r) => r.data),
+  update: (id: string, payload: PartnerUpdate) =>
+    api.patch<PartnerRead>(`/partner/${id}`, payload).then((r) => r.data),
+  remove: (id: string) => api.delete<void>(`/partner/${id}`).then(() => undefined),
+};
+
+export const objektApi = {
+  list: (params: { search?: string; limit?: number; offset?: number } = {}) =>
+    api
+      .get<PaginatedResponse<ObjektRead>>('/objekte', { params })
+      .then((r) => r.data),
+  get: (id: string) => api.get<ObjektRead>(`/objekte/${id}`).then((r) => r.data),
+  create: (payload: ObjektCreate) =>
+    api.post<ObjektRead>('/objekte', payload).then((r) => r.data),
+  update: (id: string, payload: ObjektUpdate) =>
+    api.patch<ObjektRead>(`/objekte/${id}`, payload).then((r) => r.data),
+  remove: (id: string) => api.delete<void>(`/objekte/${id}`).then(() => undefined),
 };
 
 export const adresseApi = {

@@ -221,3 +221,67 @@ export interface AdresseSuggestion {
   longitude: number | null;
   label: string;
 }
+
+// ---------------------------------------------------------------- Partner
+
+export type PartnerTyp = 'mieter' | 'eigentuemer' | 'auftraggeber' | 'nachunternehmer';
+
+export interface PartnerRead {
+  id: UUID;
+  mandant_id: UUID;
+  name: string;
+  ansprechpartner: string | null;
+  email: string | null;
+  telefon: string | null;
+  adresse_id: UUID | null;
+  adresse: AdresseRead | null;
+  notiz: string | null;
+  typen: PartnerTyp[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PartnerWriteBase {
+  name: string;
+  ansprechpartner?: string | null;
+  email?: string | null;
+  telefon?: string | null;
+  adresse_id?: UUID | null;
+  notiz?: string | null;
+  typen: PartnerTyp[];
+}
+
+export type PartnerCreate = PartnerWriteBase;
+export type PartnerUpdate = Partial<PartnerWriteBase>;
+
+// ---------------------------------------------------------------- Objekte
+
+export interface ObjektPartnerLink {
+  partner_id: UUID;
+  rolle: PartnerTyp;
+}
+
+export interface ObjektPartnerLinkRead extends ObjektPartnerLink {
+  partner_name: string;
+}
+
+export interface ObjektRead {
+  id: UUID;
+  mandant_id: UUID;
+  name: string;
+  adresse_id: UUID | null;
+  adresse: AdresseRead | null;
+  notiz: string | null;
+  partner_links: ObjektPartnerLinkRead[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ObjektCreate {
+  name: string;
+  adresse_id?: UUID | null;
+  notiz?: string | null;
+  partner_links?: ObjektPartnerLink[];
+}
+
+export type ObjektUpdate = Partial<ObjektCreate>;

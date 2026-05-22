@@ -17,6 +17,8 @@ const navGroups: NavGroup[] = [
     label: 'Stammdaten',
     items: [
       { to: '/stammdaten/adressen', label: 'Adressen' },
+      { to: '/stammdaten/objekte', label: 'Objekte' },
+      { to: '/stammdaten/partner', label: 'Partner' },
       { to: '/stammdaten/auswahllisten', label: 'Auswahllisten' },
     ],
   },

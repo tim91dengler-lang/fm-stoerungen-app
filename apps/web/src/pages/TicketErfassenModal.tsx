@@ -2,12 +2,23 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ticketApi, userApi } from '../api/endpoints';
+import {
+  auswahllistenApi,
+  objektApi,
+  partnerApi,
+  ticketApi,
+  userApi,
+} from '../api/endpoints';
 
 const schema = z.object({
   titel: z.string().min(1, 'Titel fehlt').max(200),
   beschreibung: z.string().max(10_000).optional().default(''),
-  prioritaet: z.enum(['niedrig', 'mittel', 'hoch', 'kritisch']).default('mittel'),
+  prioritaet: z
+    .enum(['niedrig', 'mittel', 'hoch', 'kritisch'])
+    .default('mittel'),
+  kategorie: z.string().optional().nullable(),
+  objekt_id: z.string().uuid().optional().nullable(),
+  partner_id: z.string().uuid().optional().nullable(),
   zugewiesen_an_id: z.string().uuid().optional().nullable(),
 });
 
@@ -25,6 +36,28 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
     staleTime: 60_000,
   });
 
+  const { data: objekte } = useQuery({
+    queryKey: ['objekte-for-ticket'],
+    queryFn: () => objektApi.list({ limit: 500 }),
+    staleTime: 60_000,
+  });
+
+  const { data: partnerListe } = useQuery({
+    queryKey: ['partner-for-ticket'],
+    queryFn: () => partnerApi.list({ limit: 500 }),
+    staleTime: 60_000,
+  });
+
+  const { data: auswahllisten } = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
+    staleTime: 60_000,
+  });
+
+  const kategorienListe = auswahllisten?.find(
+    (l) => l.key === 'ticket_kategorie',
+  );
+
   const {
     register,
     handleSubmit,
@@ -36,6 +69,9 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
       titel: '',
       beschreibung: '',
       prioritaet: 'mittel',
+      kategorie: null,
+      objekt_id: null,
+      partner_id: null,
       zugewiesen_an_id: null,
     },
   });
@@ -46,12 +82,13 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
         titel: data.titel,
         beschreibung: data.beschreibung,
         prioritaet: data.prioritaet,
+        kategorie: data.kategorie || null,
+        objekt_id: data.objekt_id || null,
+        partner_id: data.partner_id || null,
         zugewiesen_an_id: data.zugewiesen_an_id || null,
       }),
     onSuccess: () => onCreated(),
-    onError: () => {
-      setError('root', { message: 'Anlegen fehlgeschlagen.' });
-    },
+    onError: () => setError('root', { message: 'Anlegen fehlgeschlagen.' }),
   });
 
   return (
@@ -62,7 +99,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+        className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -132,26 +169,96 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
             </div>
             <div>
               <label
-                htmlFor="zugewiesen_an_id"
+                htmlFor="kategorie"
                 className="block text-sm font-medium text-slate-700"
               >
-                Zugewiesen an
+                Kategorie
               </label>
               <select
-                id="zugewiesen_an_id"
-                {...register('zugewiesen_an_id', {
+                id="kategorie"
+                {...register('kategorie', {
                   setValueAs: (v) => (v === '' ? null : v),
                 })}
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
-                <option value="">— (offen)</option>
-                {users?.items.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name}
+                <option value="">— (keine) —</option>
+                {kategorienListe?.werte.map((w) => (
+                  <option key={w.id} value={w.key}>
+                    {w.label}
                   </option>
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="objekt_id"
+                className="block text-sm font-medium text-slate-700"
+              >
+                Objekt
+              </label>
+              <select
+                id="objekt_id"
+                {...register('objekt_id', {
+                  setValueAs: (v) => (v === '' ? null : v),
+                })}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              >
+                <option value="">— (keins) —</option>
+                {objekte?.items.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="partner_id"
+                className="block text-sm font-medium text-slate-700"
+              >
+                Partner (Auftraggeber/Mieter)
+              </label>
+              <select
+                id="partner_id"
+                {...register('partner_id', {
+                  setValueAs: (v) => (v === '' ? null : v),
+                })}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              >
+                <option value="">— (keiner) —</option>
+                {partnerListe?.items.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="zugewiesen_an_id"
+              className="block text-sm font-medium text-slate-700"
+            >
+              Zugewiesen an
+            </label>
+            <select
+              id="zugewiesen_an_id"
+              {...register('zugewiesen_an_id', {
+                setValueAs: (v) => (v === '' ? null : v),
+              })}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              <option value="">— (offen) —</option>
+              {users?.items.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.full_name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {errors.root && (
