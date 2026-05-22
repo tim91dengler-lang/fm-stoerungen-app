@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -139,19 +139,24 @@ async def update_objekt(
         setattr(objekt, key, value)
 
     if new_links is not None:
-        # Komplett ersetzen — bulk-delete via Core, damit der Session-Cache
-        # (Objekt.partner_links) nicht stale alte Links zurückliefert
+        # Komplett ersetzen: erst Links via Core bulk-deleten, dann Session-Expire,
+        # dann neue Links via INSERT (auch Core, vermeidet Cascade-/Cache-Konflikte).
         await db.execute(delete(ObjektPartner).where(ObjektPartner.objekt_id == objekt.id))
-        objekt.partner_links.clear()
         await db.flush()
-        for link in new_links:
-            db.add(
-                ObjektPartner(
-                    objekt_id=objekt.id,
-                    partner_id=link["partner_id"],
-                    rolle=PartnerTyp(link["rolle"]),
-                )
+        if new_links:
+            await db.execute(
+                insert(ObjektPartner),
+                [
+                    {
+                        "objekt_id": objekt.id,
+                        "partner_id": link["partner_id"],
+                        "rolle": PartnerTyp(link["rolle"]).value,
+                    }
+                    for link in new_links
+                ],
             )
+        # Session-Cache verwerfen, sonst liefert relationship-Load alte Werte
+        db.expunge(objekt)
 
     await db.flush()
     # Reload für komplette Relationship-Tiefe (s. create_objekt)
