@@ -36,6 +36,14 @@ class Settings(BaseSettings):
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
+    # File-Storage für Ticket-Fotos. Default = lokales Container-Volume.
+    # In Prod/Staging via Docker volume gemountet (z. B. uploads_data:/var/uploads).
+    upload_dir: str = Field(default="/var/uploads/fm")
+    upload_max_bytes: int = 10 * 1024 * 1024  # 10 MB per photo
+    upload_allowed_mime: list[str] = Field(
+        default_factory=lambda: ["image/jpeg", "image/png", "image/webp", "image/heic"]
+    )
+
     @field_validator("jwt_secret")
     @classmethod
     def jwt_secret_in_prod_must_not_be_default(cls, v: str, info: ValidationInfo) -> str:

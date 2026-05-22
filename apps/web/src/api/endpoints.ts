@@ -24,6 +24,8 @@ import type {
   TicketListFilters,
   TicketMessageCreate,
   TicketMessageRead,
+  TicketPhotoRead,
+  TicketPhotoUpdate,
   TicketRead,
   TicketUpdate,
   UserRead,
@@ -109,6 +111,40 @@ export const objektApi = {
   update: (id: string, payload: ObjektUpdate) =>
     api.patch<ObjektRead>(`/objekte/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/objekte/${id}`).then(() => undefined),
+};
+
+export const photoApi = {
+  list: (ticketId: string) =>
+    api
+      .get<TicketPhotoRead[]>(`/tickets/${ticketId}/photos`)
+      .then((r) => r.data),
+  upload: (ticketId: string, file: File, beschreibung?: string) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (beschreibung) fd.append('beschreibung', beschreibung);
+    return api
+      .post<TicketPhotoRead>(`/tickets/${ticketId}/photos`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
+  update: (ticketId: string, photoId: string, payload: TicketPhotoUpdate) =>
+    api
+      .patch<TicketPhotoRead>(
+        `/tickets/${ticketId}/photos/${photoId}`,
+        payload,
+      )
+      .then((r) => r.data),
+  remove: (ticketId: string, photoId: string) =>
+    api
+      .delete<void>(`/tickets/${ticketId}/photos/${photoId}`)
+      .then(() => undefined),
+  fetchBlob: (ticketId: string, photoId: string) =>
+    api
+      .get<Blob>(`/tickets/${ticketId}/photos/${photoId}/file`, {
+        responseType: 'blob',
+      })
+      .then((r) => r.data),
 };
 
 export const chatApi = {

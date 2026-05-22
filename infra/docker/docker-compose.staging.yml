@@ -40,6 +40,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       CORS_ALLOW_ORIGINS: '["https://staging.${DOMAIN}"]'
       LOG_LEVEL: INFO
+      UPLOAD_DIR: /var/uploads/fm
+    volumes:
+      - uploads_staging:/var/uploads/fm
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,3 +83,4 @@ volumes:
   pg_data_staging:
   caddy_data_staging:
   caddy_config_staging:
+  uploads_staging:

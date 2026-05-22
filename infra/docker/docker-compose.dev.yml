@@ -43,10 +43,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/fm_stoerungen
       JWT_SECRET: dev-only-secret-min-32-chars-not-for-prod
       CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
+      UPLOAD_DIR: /var/uploads/fm
     volumes:
       - ../../apps/api/src:/app/src:ro
       - ../../apps/api/alembic:/app/alembic:ro
       - ../../apps/api/alembic.ini:/app/alembic.ini:ro
+      - uploads_dev:/var/uploads/fm
     ports:
       - "8000:8000"
     depends_on:
@@ -55,3 +57,4 @@ services:
 
 volumes:
   pg_data_dev:
+  uploads_dev:

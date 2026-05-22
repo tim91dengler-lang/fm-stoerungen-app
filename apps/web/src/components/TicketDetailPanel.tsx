@@ -19,6 +19,7 @@ import type {
 } from '../api/types';
 import { PrioBadge } from './StatusBadge';
 import { ChatPanel } from './ChatPanel';
+import { PhotoGallery } from './PhotoGallery';
 import {
   PRIO_SLUGS,
   STATUS_SLUGS,
@@ -217,8 +218,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 </select>
               </Accordion>
 
-              {/* Slot für Fotogalerie — wird in B4 gefüllt */}
-              <div id="ticket-fotos-slot" />
+              <PhotoGallery ticketId={t.id} />
 
               <ChatPanel ticketId={t.id} />
 

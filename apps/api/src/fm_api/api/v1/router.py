@@ -9,6 +9,7 @@ from fm_api.api.v1 import (
     objekte,
     partner,
     ticket_messages,
+    ticket_photos,
     tickets,
     users,
 )
@@ -21,6 +22,11 @@ api_router.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
 api_router.include_router(
     ticket_messages.router,
     prefix="/tickets/{ticket_id}/messages",
+    tags=["tickets"],
+)
+api_router.include_router(
+    ticket_photos.router,
+    prefix="/tickets/{ticket_id}/photos",
     tags=["tickets"],
 )
 api_router.include_router(auswahllisten.router, prefix="/auswahllisten", tags=["auswahllisten"])

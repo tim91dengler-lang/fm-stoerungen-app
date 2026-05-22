@@ -328,3 +328,38 @@ export interface TicketMessageCreate {
   text: string;
   mentions?: UUID[];
 }
+
+// ---------------------------------------------------------------- Fotos / Annotations
+
+export interface PhotoAnnotation {
+  type: 'stempel' | 'kreis';
+  /** Bei 'stempel': defekt | pruefen | ok */
+  kind?: 'defekt' | 'pruefen' | 'ok';
+  /** Bei 'kreis': red | yellow | green */
+  color?: 'red' | 'yellow' | 'green';
+  /** Position relativ zum Bild, 0..1 */
+  x: number;
+  y: number;
+  /** Bei 'kreis': Radius relativ zur Bildhöhe, 0..1 */
+  r?: number;
+  /** Optionaler Text-Tag */
+  label?: string;
+}
+
+export interface TicketPhotoRead {
+  id: UUID;
+  ticket_id: UUID;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  beschreibung: string | null;
+  annotations: PhotoAnnotation[];
+  uploaded_by: UserRef | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketPhotoUpdate {
+  beschreibung?: string | null;
+  annotations?: PhotoAnnotation[];
+}
