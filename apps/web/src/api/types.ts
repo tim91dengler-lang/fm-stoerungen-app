@@ -311,3 +311,20 @@ export interface GespeicherteAnsichtUpdate {
   config?: Record<string, unknown>;
   ist_default?: boolean;
 }
+
+// ---------------------------------------------------------------- Chat / TicketMessages
+
+export interface TicketMessageRead {
+  id: UUID;
+  ticket_id: UUID;
+  text: string;
+  mentions: UUID[];
+  autor: UserRef | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketMessageCreate {
+  text: string;
+  mentions?: UUID[];
+}
