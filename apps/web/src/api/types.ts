@@ -285,3 +285,29 @@ export interface ObjektCreate {
 }
 
 export type ObjektUpdate = Partial<ObjektCreate>;
+
+// ---------------------------------------------------------------- Gespeicherte Ansichten
+
+export interface GespeicherteAnsichtRead {
+  id: UUID;
+  user_id: UUID;
+  view_key: string;
+  name: string;
+  config: Record<string, unknown>;
+  ist_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GespeicherteAnsichtCreate {
+  view_key: string;
+  name: string;
+  config: Record<string, unknown>;
+  ist_default?: boolean;
+}
+
+export interface GespeicherteAnsichtUpdate {
+  name?: string;
+  config?: Record<string, unknown>;
+  ist_default?: boolean;
+}
