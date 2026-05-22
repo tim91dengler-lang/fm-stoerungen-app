@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  type RowSelectionState,
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
@@ -24,6 +25,11 @@ import {
 } from '../lib/format';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
+import {
+  SelectFilter,
+  TextFilter,
+  type SelectOption,
+} from '../core/liste/columnFilters';
 
 interface TicketsViewConfig {
   statusFilter: TicketStatusSlug[];
@@ -31,6 +37,7 @@ interface TicketsViewConfig {
   sorting: SortingState;
   visibility: VisibilityState;
   columnFilters: ColumnFiltersState;
+  columnOrder: string[];
 }
 
 const DEFAULT_CONFIG: TicketsViewConfig = {
@@ -39,7 +46,17 @@ const DEFAULT_CONFIG: TicketsViewConfig = {
   sorting: [{ id: 'eroeffnet_am', desc: true }],
   visibility: { kategorie: false, objekt: false, partner: false },
   columnFilters: [],
+  columnOrder: [],
 };
+
+const STATUS_FILTER_OPTIONS: SelectOption[] = STATUS_SLUGS.map((s) => ({
+  value: s,
+  label: labelForStatusSlug(s),
+}));
+const PRIO_FILTER_OPTIONS: SelectOption[] = PRIO_SLUGS.map((p) => ({
+  value: p,
+  label: labelForPrioSlug(p),
+}));
 
 const columns: ColumnDef<TicketRead>[] = [
   {
@@ -64,42 +81,49 @@ const columns: ColumnDef<TicketRead>[] = [
         {row.original.titel}
       </Link>
     ),
+    filterFn: 'includesString',
   },
   {
     id: 'status',
     accessorFn: (r) => r.status.key,
     header: 'Status',
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    filterFn: 'arrIncludesSome',
   },
   {
     id: 'prioritaet',
     accessorFn: (r) => r.prioritaet.key,
     header: 'Priorität',
     cell: ({ row }) => <PrioBadge prioritaet={row.original.prioritaet} />,
+    filterFn: 'arrIncludesSome',
   },
   {
     id: 'kategorie',
     accessorFn: (r) => r.kategorie?.label ?? '',
     header: 'Kategorie',
     cell: ({ row }) => row.original.kategorie?.label ?? '—',
+    filterFn: 'includesString',
   },
   {
     id: 'objekt',
     accessorFn: (r) => r.objekt?.name ?? '',
     header: 'Objekt',
     cell: ({ row }) => row.original.objekt?.name ?? '—',
+    filterFn: 'includesString',
   },
   {
     id: 'partner',
     accessorFn: (r) => r.partner?.name ?? '',
     header: 'Partner',
     cell: ({ row }) => row.original.partner?.name ?? '—',
+    filterFn: 'includesString',
   },
   {
     id: 'zugewiesen_an',
     accessorFn: (r) => r.zugewiesen_an?.full_name ?? '',
     header: 'Zugewiesen an',
     cell: ({ row }) => row.original.zugewiesen_an?.full_name ?? '—',
+    filterFn: 'includesString',
   },
   {
     id: 'eroeffnet_am',
@@ -109,11 +133,28 @@ const columns: ColumnDef<TicketRead>[] = [
   },
 ];
 
+const filterRenderers = {
+  titel: TextFilter,
+  status: (props: { value: unknown; onChange: (v: unknown) => void }) => (
+    <SelectFilter {...props} options={STATUS_FILTER_OPTIONS} />
+  ),
+  prioritaet: (props: { value: unknown; onChange: (v: unknown) => void }) => (
+    <SelectFilter {...props} options={PRIO_FILTER_OPTIONS} />
+  ),
+  kategorie: TextFilter,
+  objekt: TextFilter,
+  partner: TextFilter,
+  zugewiesen_an: TextFilter,
+};
+
 export function TicketsListePage() {
   const [search, setSearch] = useState('');
   const [config, setConfig] = useState<TicketsViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showErfassen, setShowErfassen] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  const qc = useQueryClient();
 
   const filters = useMemo(
     () => ({
@@ -128,6 +169,28 @@ export function TicketsListePage() {
   const ticketsQuery = useQuery({
     queryKey: ['tickets', filters],
     queryFn: () => ticketApi.list(filters),
+  });
+
+  const bulkErledigt = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(
+        ids.map((id) => ticketApi.update(id, { status: 'erledigt' })),
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      setRowSelection({});
+    },
+  });
+
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => ticketApi.remove(id)));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      setRowSelection({});
+    },
   });
 
   function toggleStatus(s: TicketStatusSlug) {
@@ -219,13 +282,46 @@ export function TicketsListePage() {
           setConfig((prev) => ({ ...prev, visibility: v }))
         }
         sorting={config.sorting}
-        onSortingChange={(s) =>
-          setConfig((prev) => ({ ...prev, sorting: s }))
-        }
+        onSortingChange={(s) => setConfig((prev) => ({ ...prev, sorting: s }))}
         columnFilters={config.columnFilters}
         onColumnFiltersChange={(f) =>
           setConfig((prev) => ({ ...prev, columnFilters: f }))
         }
+        columnOrder={config.columnOrder}
+        onColumnOrderChange={(o) =>
+          setConfig((prev) => ({ ...prev, columnOrder: o }))
+        }
+        filterRenderers={filterRenderers}
+        enableRowSelection
+        getRowId={(t) => t.id}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        bulkActions={(selected) => (
+          <>
+            <button
+              type="button"
+              onClick={() => bulkErledigt.mutate(selected.map((t) => t.id))}
+              disabled={bulkErledigt.isPending}
+              className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:bg-slate-400"
+            >
+              Auf „erledigt&quot; setzen
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  confirm(`${selected.length} Tickets wirklich löschen?`)
+                ) {
+                  bulkDelete.mutate(selected.map((t) => t.id));
+                }
+              }}
+              disabled={bulkDelete.isPending}
+              className="rounded-md border border-red-300 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              Löschen
+            </button>
+          </>
+        )}
         count={
           ticketsQuery.data
             ? {
