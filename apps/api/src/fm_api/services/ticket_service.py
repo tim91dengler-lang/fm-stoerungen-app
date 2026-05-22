@@ -67,7 +67,15 @@ _TICKET_LOAD_OPTIONS = (
     selectinload(Ticket.prioritaet_wert),
     selectinload(Ticket.kategorie_wert),
     selectinload(Ticket.objekt),
+    selectinload(Ticket.haus),
+    selectinload(Ticket.stockwerk),
+    selectinload(Ticket.einheit),
     selectinload(Ticket.partner),
+    selectinload(Ticket.tickettyp),
+    selectinload(Ticket.projekt),
+    selectinload(Ticket.quelle_wert),
+    selectinload(Ticket.wartet_grund_wert),
+    selectinload(Ticket.wartet_nachunternehmer),
 )
 
 
@@ -203,8 +211,19 @@ async def create_ticket(
     prioritaet_slug: str = "mittel",
     kategorie_slug: str | None = None,
     objekt_id: UUID | None = None,
+    haus_id: UUID | None = None,
+    stockwerk_id: UUID | None = None,
+    einheit_id: UUID | None = None,
+    pin_x: float | None = None,
+    pin_y: float | None = None,
     partner_id: UUID | None = None,
     zugewiesen_an_id: UUID | None = None,
+    tickettyp_id: UUID | None = None,
+    projekt_id: UUID | None = None,
+    quelle_slug: str | None = None,
+    melder: str | None = None,
+    faelligkeit_am: Any | None = None,
+    wiederholung: str | None = None,
 ) -> Ticket:
     now = datetime.now(UTC)
 
@@ -236,6 +255,12 @@ async def create_ticket(
     zugewiesen_am = now if zugewiesen_an_id is not None else None
     erledigt_am = now if status_wert.key == TicketStatusSlug.ERLEDIGT.value else None
 
+    quelle_wert = (
+        await _resolve_slug(db, mandant_id, "eingangskanal", quelle_slug)
+        if quelle_slug is not None
+        else None
+    )
+
     ticket = Ticket(
         mandant_id=mandant_id,
         nummer=0,  # filled by Postgres trigger set_ticket_nummer()
@@ -245,31 +270,28 @@ async def create_ticket(
         prioritaet_id=prioritaet_wert.id,
         kategorie_id=kategorie_wert.id if kategorie_wert is not None else None,
         objekt_id=objekt_id,
+        haus_id=haus_id,
+        stockwerk_id=stockwerk_id,
+        einheit_id=einheit_id,
+        pin_x=pin_x,
+        pin_y=pin_y,
         partner_id=partner_id,
+        tickettyp_id=tickettyp_id,
+        projekt_id=projekt_id,
+        quelle_id=quelle_wert.id if quelle_wert else None,
+        melder=melder,
         eroeffnet_von_id=eroeffnet_von_id,
         zugewiesen_an_id=zugewiesen_an_id,
         eroeffnet_am=now,
         zugewiesen_am=zugewiesen_am,
         erledigt_am=erledigt_am,
+        faelligkeit_am=faelligkeit_am,
+        wiederholung=wiederholung,
     )
     db.add(ticket)
     await db.flush()
-    # Refresh nummer (Trigger set_ticket_nummer überschreibt 0) und Relationships
-    # für die anschließende Serialisierung.
-    await db.refresh(
-        ticket,
-        [
-            "nummer",
-            "eroeffnet_von",
-            "zugewiesen_an",
-            "status_wert",
-            "prioritaet_wert",
-            "kategorie_wert",
-            "objekt",
-            "partner",
-        ],
-    )
-    return ticket
+    # Reload via get_ticket damit alle Relationships (auch neue) verfügbar sind
+    return await get_ticket(db, ticket.id, mandant_id)
 
 
 async def update_ticket(
@@ -277,14 +299,36 @@ async def update_ticket(
     ticket_id: UUID,
     mandant_id: UUID,
     updates: dict[str, Any],
+    *,
+    actor_user_id: UUID | None = None,
 ) -> Ticket:
+    from fm_api.services import notification_service as _notif
+
     ticket = await get_ticket(db, ticket_id, mandant_id)
     now = datetime.now(UTC)
+    old_assignee_id = ticket.zugewiesen_an_id
+    old_status_slug = ticket.status_wert.key
 
-    if "titel" in updates:
-        ticket.titel = updates["titel"]
-    if "beschreibung" in updates:
-        ticket.beschreibung = updates["beschreibung"]
+    # Direkte String-/UUID-Felder
+    for direct in (
+        "titel",
+        "beschreibung",
+        "melder",
+        "wartet_kontakt_name",
+        "wartet_kontakt_telefon",
+        "wartet_kontakt_email",
+        "wiederholung",
+        "faelligkeit_am",
+        "pin_x",
+        "pin_y",
+        "haus_id",
+        "stockwerk_id",
+        "einheit_id",
+        "tickettyp_id",
+        "projekt_id",
+    ):
+        if direct in updates:
+            setattr(ticket, direct, updates[direct])
 
     if "prioritaet" in updates and updates["prioritaet"] is not None:
         prio_wert = await _resolve_slug(db, mandant_id, LISTE_KEY_PRIORITAET, updates["prioritaet"])
@@ -299,6 +343,23 @@ async def update_ticket(
             )
             ticket.kategorie_id = kat_wert.id
 
+    if "quelle" in updates:
+        if updates["quelle"] is None:
+            ticket.quelle_id = None
+        else:
+            q_wert = await _resolve_slug(db, mandant_id, "eingangskanal", updates["quelle"])
+            ticket.quelle_id = q_wert.id
+
+    if "wartet_grund" in updates:
+        if updates["wartet_grund"] is None:
+            ticket.wartet_grund_id = None
+        else:
+            w_wert = await _resolve_slug(db, mandant_id, "wartet_grund", updates["wartet_grund"])
+            ticket.wartet_grund_id = w_wert.id
+
+    if "wartet_nachunternehmer_id" in updates:
+        ticket.wartet_nachunternehmer_id = updates["wartet_nachunternehmer_id"]
+
     if "objekt_id" in updates:
         new_objekt = updates["objekt_id"]
         if new_objekt is not None:
@@ -311,6 +372,7 @@ async def update_ticket(
             await _validate_partner(db, new_partner, mandant_id)
         ticket.partner_id = new_partner
 
+    fire_zuweisung_notif: tuple[UUID, str] | None = None
     if "zugewiesen_an_id" in updates:
         new_assignee = updates["zugewiesen_an_id"]
         if new_assignee is not None:
@@ -324,7 +386,15 @@ async def update_ticket(
                     db, mandant_id, LISTE_KEY_STATUS, TicketStatusSlug.BEARBEITUNG.value
                 )
                 ticket.status_id = bearbeitung_wert.id
+        # Notification senden wenn neuer Bearbeiter ungleich altem + ungleich Aktor
+        if (
+            new_assignee is not None
+            and new_assignee != old_assignee_id
+            and new_assignee != actor_user_id
+        ):
+            fire_zuweisung_notif = (new_assignee, ticket.titel)
 
+    fire_status_notif: tuple[UUID, str] | None = None
     if "status" in updates and updates["status"] is not None:
         new_status_slug = updates["status"]
         current_status_slug = ticket.status_wert.key
@@ -336,22 +406,51 @@ async def update_ticket(
         ticket.status_id = new_status_wert.id
         if new_status_wert.key == TicketStatusSlug.ERLEDIGT.value and ticket.erledigt_am is None:
             ticket.erledigt_am = now
+        # Status-Notification an Bearbeiter + Erfasser (sofern nicht Aktor selbst)
+        if old_status_slug != new_status_slug:
+            for recipient in {ticket.zugewiesen_an_id, ticket.eroeffnet_von_id}:
+                if recipient is None or recipient == actor_user_id:
+                    continue
+                if fire_status_notif is None:
+                    fire_status_notif = (recipient, new_status_slug)
+                else:
+                    await _notif.fire(
+                        db,
+                        mandant_id=mandant_id,
+                        user_id=recipient,
+                        typ="status",
+                        text=f"Status auf '{new_status_slug}' geändert: {ticket.titel}",
+                        ticket_id=ticket.id,
+                        ausloeser_user_id=actor_user_id,
+                    )
 
     await db.flush()
-    await db.refresh(
-        ticket,
-        [
-            "updated_at",
-            "eroeffnet_von",
-            "zugewiesen_an",
-            "status_wert",
-            "prioritaet_wert",
-            "kategorie_wert",
-            "objekt",
-            "partner",
-        ],
-    )
-    return ticket
+    ticket_reloaded = await get_ticket(db, ticket.id, mandant_id)
+
+    if fire_zuweisung_notif:
+        recipient, titel = fire_zuweisung_notif
+        await _notif.fire(
+            db,
+            mandant_id=mandant_id,
+            user_id=recipient,
+            typ="zuweisung",
+            text=f"Ticket zugewiesen: {titel}",
+            ticket_id=ticket.id,
+            ausloeser_user_id=actor_user_id,
+        )
+    if fire_status_notif:
+        recipient, slug = fire_status_notif
+        await _notif.fire(
+            db,
+            mandant_id=mandant_id,
+            user_id=recipient,
+            typ="status",
+            text=f"Status auf '{slug}' geändert: {ticket_reloaded.titel}",
+            ticket_id=ticket.id,
+            ausloeser_user_id=actor_user_id,
+        )
+
+    return ticket_reloaded
 
 
 async def soft_delete_ticket(db: AsyncSession, ticket_id: UUID, mandant_id: UUID) -> None:

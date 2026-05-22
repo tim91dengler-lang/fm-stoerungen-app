@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,7 +15,10 @@ if TYPE_CHECKING:
     from fm_api.models.auswahlliste import AuswahllistenWert
     from fm_api.models.mandant import Mandant
     from fm_api.models.objekt import Objekt
+    from fm_api.models.objektstruktur import Haus, ObjektStockwerk, StockwerkEinheit
     from fm_api.models.partner import GeschaeftsPartner
+    from fm_api.models.projekt import Projekt
+    from fm_api.models.tickettyp import Tickettyp
     from fm_api.models.user import User
 
 
@@ -79,12 +83,65 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
         index=True,
     )
+    haus_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("haus.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    stockwerk_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("objekt_stockwerk.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    einheit_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("stockwerk_einheit.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    pin_x: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    pin_y: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     partner_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("geschaeftspartner.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
+    tickettyp_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("tickettypen.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    projekt_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("projekte.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    quelle_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auswahllisten_werte.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    melder: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    wartet_grund_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auswahllisten_werte.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    wartet_nachunternehmer_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("geschaeftspartner.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    wartet_kontakt_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    wartet_kontakt_telefon: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    wartet_kontakt_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    faelligkeit_am: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    wiederholung: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     eroeffnet_von_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -116,4 +173,20 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         foreign_keys=[kategorie_id], lazy="raise"
     )
     objekt: Mapped["Objekt | None"] = relationship(lazy="raise")
-    partner: Mapped["GeschaeftsPartner | None"] = relationship(lazy="raise")
+    haus: Mapped["Haus | None"] = relationship(lazy="raise")
+    stockwerk: Mapped["ObjektStockwerk | None"] = relationship(lazy="raise")
+    einheit: Mapped["StockwerkEinheit | None"] = relationship(lazy="raise")
+    partner: Mapped["GeschaeftsPartner | None"] = relationship(
+        foreign_keys=[partner_id], lazy="raise"
+    )
+    tickettyp: Mapped["Tickettyp | None"] = relationship(lazy="raise")
+    projekt: Mapped["Projekt | None"] = relationship(lazy="raise")
+    quelle_wert: Mapped["AuswahllistenWert | None"] = relationship(
+        foreign_keys=[quelle_id], lazy="raise"
+    )
+    wartet_grund_wert: Mapped["AuswahllistenWert | None"] = relationship(
+        foreign_keys=[wartet_grund_id], lazy="raise"
+    )
+    wartet_nachunternehmer: Mapped["GeschaeftsPartner | None"] = relationship(
+        foreign_keys=[wartet_nachunternehmer_id], lazy="raise"
+    )

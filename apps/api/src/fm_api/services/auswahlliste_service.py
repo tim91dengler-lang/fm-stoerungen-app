@@ -314,6 +314,29 @@ SYSTEM_AUSWAHLLISTEN_SEED: dict[str, dict[str, Any]] = {
             ("allgemein", "Allgemein", 5, "slate", False),
         ],
     },
+    "wartet_grund": {
+        "label": "Wartet-auf-Sub-Status",
+        "beschreibung": "Sub-Status wenn Ticket auf etwas wartet",
+        "ist_system": True,
+        "werte": [
+            ("material", "Wartet auf Material", 0, "orange", True),
+            ("mieter", "Wartet auf Mieter", 1, "amber", True),
+            ("freigabe", "Wartet auf Freigabe", 2, "sky", True),
+            ("extern", "Wartet auf Externen", 3, "red", True),
+        ],
+    },
+    "eingangskanal": {
+        "label": "Eingangskanal",
+        "beschreibung": "Quelle der Ticket-Erfassung",
+        "ist_system": True,
+        "werte": [
+            ("manuell", "Manuell", 0, "slate", True),
+            ("telefon", "Telefon", 1, "blue", True),
+            ("web", "Web-Formular", 2, "emerald", True),
+            ("mieter", "Mieter-Portal", 3, "violet", True),
+            ("ebo", "EBO / GLT", 4, "orange", True),
+        ],
+    },
 }
 
 

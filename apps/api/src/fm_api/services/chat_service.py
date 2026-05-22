@@ -53,6 +53,8 @@ async def create_message(
     text: str,
     mentions: list[str],
 ) -> TicketMessage:
+    from fm_api.services import notification_service as _notif
+
     await _assert_ticket(db, ticket_id, mandant_id)
     message = TicketMessage(
         ticket_id=ticket_id,
@@ -63,6 +65,43 @@ async def create_message(
     db.add(message)
     await db.flush()
     await db.refresh(message, ["autor"])
+
+    # Notifications für jeden erwähnten User
+    for mention_id in mentions:
+        try:
+            uid = UUID(mention_id)
+        except (TypeError, ValueError):
+            continue
+        if uid == autor_user_id:
+            continue
+        await _notif.fire(
+            db,
+            mandant_id=mandant_id,
+            user_id=uid,
+            typ="mention",
+            text=text[:200],
+            ticket_id=ticket_id,
+            ref_message_id=message.id,
+            ausloeser_user_id=autor_user_id,
+        )
+
+    # Notification an den zugewiesenen Bearbeiter (sofern nicht Autor selbst
+    # und nicht bereits als Mention adressiert)
+    ticket_owner_stmt = select(Ticket.zugewiesen_an_id).where(Ticket.id == ticket_id)
+    owner_id = (await db.execute(ticket_owner_stmt)).scalar_one_or_none()
+    mention_set = {str(m) for m in mentions if m}
+    if owner_id is not None and owner_id != autor_user_id and str(owner_id) not in mention_set:
+        await _notif.fire(
+            db,
+            mandant_id=mandant_id,
+            user_id=owner_id,
+            typ="chat",
+            text=text[:200],
+            ticket_id=ticket_id,
+            ref_message_id=message.id,
+            ausloeser_user_id=autor_user_id,
+        )
+
     return message
 
 
