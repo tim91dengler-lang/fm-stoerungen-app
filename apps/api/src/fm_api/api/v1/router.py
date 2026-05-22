@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from fm_api.api.v1 import (
     adressen,
+    ansichten,
     auswahllisten,
     auth,
     health,
@@ -20,3 +21,4 @@ api_router.include_router(auswahllisten.router, prefix="/auswahllisten", tags=["
 api_router.include_router(adressen.router, prefix="/adressen", tags=["adressen"])
 api_router.include_router(objekte.router, prefix="/objekte", tags=["objekte"])
 api_router.include_router(partner.router, prefix="/partner", tags=["partner"])
+api_router.include_router(ansichten.router, prefix="/ansichten", tags=["ansichten"])

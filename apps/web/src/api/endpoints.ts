@@ -9,6 +9,9 @@ import type {
   AuswahllistenWertCreate,
   AuswahllistenWertRead,
   AuswahllistenWertUpdate,
+  GespeicherteAnsichtCreate,
+  GespeicherteAnsichtRead,
+  GespeicherteAnsichtUpdate,
   LoginResponse,
   ObjektCreate,
   ObjektRead,
@@ -104,6 +107,25 @@ export const objektApi = {
   update: (id: string, payload: ObjektUpdate) =>
     api.patch<ObjektRead>(`/objekte/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/objekte/${id}`).then(() => undefined),
+};
+
+export const ansichtenApi = {
+  list: (viewKey?: string) =>
+    api
+      .get<GespeicherteAnsichtRead[]>('/ansichten', {
+        params: viewKey ? { view_key: viewKey } : undefined,
+      })
+      .then((r) => r.data),
+  create: (payload: GespeicherteAnsichtCreate) =>
+    api
+      .post<GespeicherteAnsichtRead>('/ansichten', payload)
+      .then((r) => r.data),
+  update: (id: string, payload: GespeicherteAnsichtUpdate) =>
+    api
+      .patch<GespeicherteAnsichtRead>(`/ansichten/${id}`, payload)
+      .then((r) => r.data),
+  remove: (id: string) =>
+    api.delete<void>(`/ansichten/${id}`).then(() => undefined),
 };
 
 export const adresseApi = {
