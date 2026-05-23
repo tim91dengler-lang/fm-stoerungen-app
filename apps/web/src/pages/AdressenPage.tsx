@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { adresseApi } from '../api/endpoints';
 import type {
   AdresseCreate,
@@ -7,6 +9,21 @@ import type {
   AdresseSuggestion,
 } from '../api/types';
 import { AdressSuggestCombobox } from '../components/AdressSuggestCombobox';
+import { PowerListenView } from '../core/liste/PowerListenView';
+import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
+import { TextFilter } from '../core/liste/columnFilters';
+
+interface ViewConfig {
+  sorting: SortingState;
+  visibility: VisibilityState;
+  columnOrder: string[];
+}
+
+const DEFAULT_CONFIG: ViewConfig = {
+  sorting: [{ id: 'strasse', desc: false }],
+  visibility: {},
+  columnOrder: ['strasse', 'plz_ort', 'land', 'geocode', '__actions__'],
+};
 
 const EMPTY_FORM: AdresseCreate = {
   strasse: '',
@@ -24,6 +41,8 @@ export function AdressenPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AdresseCreate>(EMPTY_FORM);
   const [suggestQuery, setSuggestQuery] = useState('');
+  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -108,11 +127,97 @@ export function AdressenPage() {
 
   const isPending = createMut.isPending || updateMut.isPending;
 
+  const columns = useMemo<ColumnDef<AdresseRead>[]>(
+    () => [
+      {
+        id: 'strasse',
+        accessorFn: (row) => `${row.strasse} ${row.hausnummer ?? ''}`.trim(),
+        header: 'Straße',
+        cell: (ctx) => {
+          const a = ctx.row.original;
+          return (
+            <span
+              className="cursor-pointer font-medium text-zinc-100 hover:text-emerald-300"
+              onClick={() => openEdit(a)}
+            >
+              {a.strasse}
+              {a.hausnummer ? ` ${a.hausnummer}` : ''}
+              {a.adresszusatz && (
+                <span className="ml-1 text-xs text-zinc-500">({a.adresszusatz})</span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'plz_ort',
+        accessorFn: (row) => `${row.plz} ${row.ort}`,
+        header: 'PLZ / Ort',
+        cell: (ctx) => `${ctx.row.original.plz} ${ctx.row.original.ort}`,
+      },
+      {
+        id: 'land',
+        accessorKey: 'land',
+        header: 'Land',
+        cell: (ctx) => (
+          <span className="font-mono text-xs uppercase">{ctx.row.original.land}</span>
+        ),
+      },
+      {
+        id: 'geocode',
+        accessorFn: (row) => (row.latitude && row.longitude ? 'ja' : 'nein'),
+        header: 'Geocode',
+        cell: (ctx) => {
+          const a = ctx.row.original;
+          return a.latitude && a.longitude ? (
+            <span className="text-xs text-zinc-400">
+              {a.latitude.toFixed(4)}, {a.longitude.toFixed(4)}
+            </span>
+          ) : (
+            <span className="text-zinc-500">—</span>
+          );
+        },
+      },
+      {
+        id: '__actions__',
+        header: '',
+        enableSorting: false,
+        enableColumnFilter: false,
+        cell: (ctx) => (
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => openEdit(ctx.row.original)}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              title="Bearbeiten"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Adresse "${ctx.row.original.strasse}" löschen?`))
+                  deleteMut.mutate(ctx.row.original.id);
+              }}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+              title="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // openEdit + deleteMut are stable enough; columns rebuild on every render is fine
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="space-y-4 px-4 py-6 lg:px-8">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-100">Adressen</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">Adressen</h1>
           <p className="text-sm text-zinc-500">
             {listQuery.data ? `${listQuery.data.total} Adressen` : '—'}
           </p>
@@ -120,91 +225,50 @@ export function AdressenPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
+          className="flex items-center gap-2 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
-          Neue Adresse
+          <Plus className="h-4 w-4" /> Neue Adresse
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-        <input
-          type="search"
-          placeholder="Suche in Straße, PLZ, Ort …"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-        />
-      </div>
-
-      {listQuery.isLoading && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Lade Adressen …
-        </div>
-      )}
-      {listQuery.data && listQuery.data.items.length === 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Keine Adressen gefunden.
-        </div>
-      )}
-      {listQuery.data && listQuery.data.items.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
-          <table className="min-w-full divide-y divide-zinc-800 text-sm">
-            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
-              <tr>
-                <th className="px-4 py-2 font-medium">Straße</th>
-                <th className="px-4 py-2 font-medium">PLZ / Ort</th>
-                <th className="px-4 py-2 font-medium">Land</th>
-                <th className="px-4 py-2 font-medium">Geocode</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {listQuery.data.items.map((a) => (
-                <tr key={a.id} className="hover:bg-zinc-900/50">
-                  <td className="px-4 py-2">
-                    {a.strasse}
-                    {a.hausnummer ? ` ${a.hausnummer}` : ''}
-                    {a.adresszusatz ? (
-                      <span className="ml-1 text-xs text-zinc-500">
-                        ({a.adresszusatz})
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-2">
-                    {a.plz} {a.ort}
-                  </td>
-                  <td className="px-4 py-2 font-mono text-xs uppercase">{a.land}</td>
-                  <td className="px-4 py-2 text-xs text-zinc-500">
-                    {a.latitude && a.longitude
-                      ? `${a.latitude.toFixed(4)}, ${a.longitude.toFixed(4)}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(a)}
-                      className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
-                    >
-                      Bearbeiten
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Adresse "${a.strasse}" löschen?`)) {
-                          deleteMut.mutate(a.id);
-                        }
-                      }}
-                      className="text-xs font-medium text-red-400 hover:underline"
-                    >
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <PowerListenView<AdresseRead>
+        viewKey="adressen"
+        columns={columns}
+        data={listQuery.data?.items ?? []}
+        search={search}
+        onSearchChange={setSearch}
+        visibility={config.visibility}
+        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
+        sorting={config.sorting}
+        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
+        columnFilters={[]}
+        onColumnFiltersChange={() => {}}
+        columnOrder={config.columnOrder}
+        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        filterRenderers={{
+          strasse: TextFilter,
+          plz_ort: TextFilter,
+          land: TextFilter,
+        }}
+        count={{
+          filtered: listQuery.data?.items.length ?? 0,
+          total: listQuery.data?.total ?? 0,
+        }}
+        toolbarLeft={
+          <SavedViewsMenu
+            viewKey="adressen"
+            currentConfig={config as unknown as Record<string, unknown>}
+            onApply={(c) => {
+              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
+              setActiveViewId(null);
+            }}
+            activeId={activeViewId}
+          />
+        }
+        searchPlaceholder="Suche in Straße, PLZ, Ort …"
+        showFooter
+        itemLabel={{ singular: 'Adresse', plural: 'Adressen' }}
+      />
 
       {showModal && (
         <div

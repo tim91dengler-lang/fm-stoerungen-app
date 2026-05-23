@@ -1,8 +1,25 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { adresseApi, objektApi, partnerApi } from '../api/endpoints';
 import type { ObjektCreate, ObjektRead, PartnerTyp } from '../api/types';
+import { PowerListenView } from '../core/liste/PowerListenView';
+import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
+import { TextFilter } from '../core/liste/columnFilters';
+
+interface ViewConfig {
+  sorting: SortingState;
+  visibility: VisibilityState;
+  columnOrder: string[];
+}
+
+const DEFAULT_CONFIG: ViewConfig = {
+  sorting: [{ id: 'name', desc: false }],
+  visibility: {},
+  columnOrder: ['name', 'adresse', 'partner', '__actions__'],
+};
 
 const PARTNER_TYPEN: PartnerTyp[] = [
   'mieter',
@@ -30,6 +47,8 @@ export function ObjektePage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ObjektCreate>(EMPTY_FORM);
+  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   const qc = useQueryClient();
 
@@ -123,11 +142,92 @@ export function ObjektePage() {
 
   const isPending = createMut.isPending || updateMut.isPending;
 
+  const columns = useMemo<ColumnDef<ObjektRead>[]>(
+    () => [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: 'Name',
+        cell: (ctx) => (
+          <Link
+            to={`/stammdaten/objekte/${ctx.row.original.id}`}
+            className="font-medium text-zinc-100 hover:text-emerald-300"
+          >
+            {ctx.row.original.name}
+          </Link>
+        ),
+      },
+      {
+        id: 'adresse',
+        accessorFn: (row) =>
+          row.adresse
+            ? `${row.adresse.strasse} ${row.adresse.hausnummer ?? ''} ${row.adresse.plz} ${row.adresse.ort}`
+            : '',
+        header: 'Adresse',
+        cell: (ctx) => {
+          const a = ctx.row.original.adresse;
+          if (!a) return <span className="text-zinc-500">—</span>;
+          return (
+            <span className="text-zinc-400">
+              {a.strasse}
+              {a.hausnummer ? ` ${a.hausnummer}` : ''}, {a.plz} {a.ort}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'partner',
+        accessorFn: (row) => row.partner_links.map((l) => l.partner_name).join(' '),
+        header: 'Partner',
+        cell: (ctx) => {
+          const links = ctx.row.original.partner_links;
+          if (links.length === 0) return <span className="text-zinc-500">—</span>;
+          return (
+            <span className="text-xs text-zinc-400">
+              {links.map((l) => `${l.partner_name} (${TYP_LABEL[l.rolle]})`).join(', ')}
+            </span>
+          );
+        },
+      },
+      {
+        id: '__actions__',
+        header: '',
+        enableSorting: false,
+        enableColumnFilter: false,
+        cell: (ctx) => (
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => openEdit(ctx.row.original)}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              title="Bearbeiten"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Objekt "${ctx.row.original.name}" löschen?`))
+                  deleteMut.mutate(ctx.row.original.id);
+              }}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+              title="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="space-y-4 px-4 py-6 lg:px-8">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-100">Objekte</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">Objekte</h1>
           <p className="text-sm text-zinc-500">
             {listQuery.data ? `${listQuery.data.total} Objekte` : '—'}
           </p>
@@ -135,91 +235,50 @@ export function ObjektePage() {
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
+          className="flex items-center gap-2 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
-          Neues Objekt
+          <Plus className="h-4 w-4" /> Neues Objekt
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-        <input
-          type="search"
-          placeholder="Suche in Objekt-Name …"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
-        />
-      </div>
-
-      {listQuery.isLoading && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Lade Objekte …
-        </div>
-      )}
-      {listQuery.data && listQuery.data.items.length === 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Keine Objekte gefunden.
-        </div>
-      )}
-      {listQuery.data && listQuery.data.items.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
-          <table className="min-w-full divide-y divide-zinc-800 text-sm">
-            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
-              <tr>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Adresse</th>
-                <th className="px-4 py-2 font-medium">Partner</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {listQuery.data.items.map((o) => (
-                <tr key={o.id} className="hover:bg-zinc-900/50">
-                  <td className="px-4 py-2 font-medium text-zinc-200">
-                    <Link to={`/stammdaten/objekte/${o.id}`} className="hover:text-emerald-300">
-                      {o.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2 text-zinc-400">
-                    {o.adresse
-                      ? `${o.adresse.strasse}${o.adresse.hausnummer ? ' ' + o.adresse.hausnummer : ''}, ${o.adresse.plz} ${o.adresse.ort}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-2 text-xs text-zinc-400">
-                    {o.partner_links.length === 0
-                      ? '—'
-                      : o.partner_links
-                          .map(
-                            (l) =>
-                              `${l.partner_name} (${TYP_LABEL[l.rolle]})`,
-                          )
-                          .join(', ')}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(o)}
-                      className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
-                    >
-                      Bearbeiten
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Objekt "${o.name}" löschen?`))
-                          deleteMut.mutate(o.id);
-                      }}
-                      className="text-xs font-medium text-red-400 hover:underline"
-                    >
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <PowerListenView<ObjektRead>
+        viewKey="objekte"
+        columns={columns}
+        data={listQuery.data?.items ?? []}
+        search={search}
+        onSearchChange={setSearch}
+        visibility={config.visibility}
+        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
+        sorting={config.sorting}
+        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
+        columnFilters={[]}
+        onColumnFiltersChange={() => {}}
+        columnOrder={config.columnOrder}
+        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        filterRenderers={{
+          name: TextFilter,
+          adresse: TextFilter,
+          partner: TextFilter,
+        }}
+        count={{
+          filtered: listQuery.data?.items.length ?? 0,
+          total: listQuery.data?.total ?? 0,
+        }}
+        toolbarLeft={
+          <SavedViewsMenu
+            viewKey="objekte"
+            currentConfig={config as unknown as Record<string, unknown>}
+            onApply={(c) => {
+              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
+              setActiveViewId(null);
+            }}
+            activeId={activeViewId}
+          />
+        }
+        searchPlaceholder="Suche in Objekten …"
+        showFooter
+        itemLabel={{ singular: 'Objekt', plural: 'Objekte' }}
+      />
 
       {showModal && (
         <div
