@@ -17,6 +17,16 @@ import {
 } from '@tanstack/react-table';
 import { ChevronDown, ChevronRight, Columns3, Layers, Search } from 'lucide-react';
 
+// Stabile Row-Model-Factories — bei TanStack-Table v8 MÜSSEN diese eine
+// stabile Reference haben. `getCoreRowModel()` inline aufrufen erzeugt
+// bei jedem Render eine neue Factory → internal table-state-update →
+// endloser Re-Render-Loop, der den Mainthread blockiert.
+const stableCoreRowModel = getCoreRowModel();
+const stableSortedRowModel = getSortedRowModel();
+const stableFilteredRowModel = getFilteredRowModel();
+const stableGroupedRowModel = getGroupedRowModel();
+const stableExpandedRowModel = getExpandedRowModel();
+
 export interface PowerListenViewProps<TData> {
   /** Eindeutiger View-Key (z. B. 'tickets', 'adressen') — wird für gespeicherte Ansichten verwendet. */
   viewKey: string;
@@ -155,33 +165,57 @@ export function PowerListenView<TData>({
     return () => document.removeEventListener('mousedown', handler);
   }, [showGroupPicker]);
 
+  // Stabile Default-Konstanten — sonst erzeugt jedes Render einer dieser
+  // Inline-Werte (z. B. `rowSelection ?? {}`) ein neues Object, was
+  // useReactTable als state-change interpretiert → endlose Re-Renders.
+  const stableEmptyRowSelection = useMemo<RowSelectionState>(() => ({}), []);
+  const stableEmptyColumnFilters = useMemo<ColumnFiltersState>(() => [], []);
+
+  // WICHTIG: Grouping nur aktivieren, wenn der Aufrufer auch
+  // `onGroupingChange` mitgibt. TanStack-Table v8.21 hat einen Bug, bei
+  // dem `state.grouping = []` + `getGroupedRowModel` einen internen
+  // setState-Loop in der `expanded`-State-Verwaltung triggert → 2000+
+  // Re-Renders pro Mount und Total-Block des Mainthreads.
+  const groupingEnabled = onGroupingChange !== undefined;
+
   const table = useReactTable<TData>({
     data,
     columns: allColumns,
     state: {
       sorting,
       columnVisibility: visibility,
-      columnFilters,
+      columnFilters: columnFilters ?? stableEmptyColumnFilters,
       columnOrder: columnOrder.length > 0 ? columnOrder : undefined,
-      rowSelection: rowSelection ?? {},
-      grouping,
+      rowSelection: rowSelection ?? stableEmptyRowSelection,
+      ...(groupingEnabled && grouping ? { grouping } : {}),
     },
     enableMultiSort: true,
-    enableSortingRemoval: true, // 3. Klick auf Header → Sortierung entfernen
+    enableSortingRemoval: true,
     isMultiSortEvent: (e) => (e as React.MouseEvent).shiftKey,
     enableRowSelection,
-    enableGrouping: true,
+    enableGrouping: groupingEnabled,
     autoResetExpanded: false,
     getRowId: getRowId ? (row) => getRowId(row) : undefined,
+    getCoreRowModel: stableCoreRowModel,
+    getSortedRowModel: stableSortedRowModel,
+    getFilteredRowModel: stableFilteredRowModel,
+    getExpandedRowModel: stableExpandedRowModel,
+    ...(groupingEnabled
+      ? { getGroupedRowModel: stableGroupedRowModel }
+      : {}),
     onSortingChange: (updater) =>
-      onSortingChange(typeof updater === 'function' ? updater(sorting) : updater),
+      onSortingChange(
+        typeof updater === 'function' ? updater(sorting) : updater,
+      ),
     onColumnVisibilityChange: (updater) =>
       onVisibilityChange(
         typeof updater === 'function' ? updater(visibility) : updater,
       ),
     onColumnFiltersChange: (updater) =>
       onColumnFiltersChange(
-        typeof updater === 'function' ? updater(columnFilters) : updater,
+        typeof updater === 'function'
+          ? updater(columnFilters ?? stableEmptyColumnFilters)
+          : updater,
       ),
     onColumnOrderChange: (updater) =>
       onColumnOrderChange(
@@ -190,24 +224,28 @@ export function PowerListenView<TData>({
     onRowSelectionChange: (updater) => {
       if (!onRowSelectionChange) return;
       onRowSelectionChange(
-        typeof updater === 'function' ? updater(rowSelection ?? {}) : updater,
+        typeof updater === 'function'
+          ? updater(rowSelection ?? stableEmptyRowSelection)
+          : updater,
       );
     },
-    onGroupingChange: (updater) => {
-      if (!onGroupingChange) return;
-      onGroupingChange(
-        typeof updater === 'function' ? updater(grouping) : updater,
-      );
-    },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getGroupedRowModel: getGroupedRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
+    ...(groupingEnabled && onGroupingChange
+      ? {
+          onGroupingChange: (updater: unknown) => {
+            onGroupingChange(
+              typeof updater === 'function'
+                ? (updater as (g: GroupingState) => GroupingState)(
+                    grouping ?? [],
+                  )
+                : (updater as GroupingState),
+            );
+          },
+        }
+      : {}),
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
-  const hasColumnFilters = columnFilters.length > 0;
+  const hasColumnFilters = (columnFilters ?? []).length > 0;
   const selectedRows = enableRowSelection
     ? table.getSelectedRowModel().rows.map((r) => r.original)
     : [];
@@ -422,10 +460,10 @@ export function PowerListenView<TData>({
                   const canSort = header.column.getCanSort();
                   const sortIdx = sorting.findIndex((s) => s.id === colId);
                   const sortDir = header.column.getIsSorted();
-                  // Drag-Reorder temporär deaktiviert (Tim 2026-05-23) —
-                  // Verdacht dass draggable-Header in Chromium den Maus-Event-Loop blockiert.
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  const isDraggable = false;
+                  // Drag-Reorder ist nur für sortable/reorderable Spalten aktiv.
+                  // Der frühere Mainthread-Freeze kam NICHT vom HTML5-draggable,
+                  // sondern vom TanStack-Table-Grouping-Loop (jetzt gefixt).
+                  const isDraggable = colId !== '__select__';
                   return (
                     <th
                       key={header.id}

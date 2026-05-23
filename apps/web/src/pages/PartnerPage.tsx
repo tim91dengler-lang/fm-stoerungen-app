@@ -1,11 +1,28 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { adresseApi, partnerApi } from '../api/endpoints';
 import type {
   PartnerCreate,
   PartnerRead,
   PartnerTyp,
 } from '../api/types';
+import { PowerListenView } from '../core/liste/PowerListenView';
+import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
+import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+
+interface ViewConfig {
+  sorting: SortingState;
+  visibility: VisibilityState;
+  columnOrder: string[];
+}
+
+const DEFAULT_CONFIG: ViewConfig = {
+  sorting: [{ id: 'name', desc: false }],
+  visibility: {},
+  columnOrder: ['name', 'typen', 'ansprechpartner', 'kontakt', '__actions__'],
+};
 
 const PARTNER_TYPEN: PartnerTyp[] = [
   'mieter',
@@ -37,6 +54,8 @@ export function PartnerPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PartnerCreate>(EMPTY_FORM);
+  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -131,13 +150,97 @@ export function PartnerPage() {
 
   const isPending = createMut.isPending || updateMut.isPending;
 
+  const columns = useMemo<ColumnDef<PartnerRead>[]>(
+    () => [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: 'Name',
+        cell: (ctx) => (
+          <span
+            className="cursor-pointer font-medium text-zinc-100 hover:text-emerald-300"
+            onClick={() => openEdit(ctx.row.original)}
+          >
+            {ctx.row.original.name}
+          </span>
+        ),
+      },
+      {
+        id: 'typen',
+        accessorFn: (row) => row.typen.join(' '),
+        header: 'Typen',
+        cell: (ctx) => (
+          <div className="flex flex-wrap gap-1">
+            {ctx.row.original.typen.map((t) => (
+              <span
+                key={t}
+                className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300"
+              >
+                {TYP_LABEL[t]}
+              </span>
+            ))}
+          </div>
+        ),
+      },
+      {
+        id: 'ansprechpartner',
+        accessorKey: 'ansprechpartner',
+        header: 'Ansprechpartner',
+        cell: (ctx) => ctx.row.original.ansprechpartner ?? <span className="text-zinc-500">—</span>,
+      },
+      {
+        id: 'kontakt',
+        accessorFn: (row) => `${row.email ?? ''} ${row.telefon ?? ''}`.trim(),
+        header: 'Kontakt',
+        cell: (ctx) => {
+          const p = ctx.row.original;
+          return (
+            <div className="text-xs text-zinc-400">
+              <div>{p.email ?? '—'}</div>
+              <div>{p.telefon ?? '—'}</div>
+            </div>
+          );
+        },
+      },
+      {
+        id: '__actions__',
+        header: '',
+        enableSorting: false,
+        enableColumnFilter: false,
+        cell: (ctx) => (
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => openEdit(ctx.row.original)}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              title="Bearbeiten"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Partner "${ctx.row.original.name}" löschen?`))
+                  deleteMut.mutate(ctx.row.original.id);
+              }}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+              title="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="space-y-4 px-4 py-6 lg:px-8">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-100">
-            Geschäftspartner
-          </h1>
+          <h1 className="text-xl font-semibold text-zinc-100">Geschäftspartner</h1>
           <p className="text-sm text-zinc-500">
             {listQuery.data ? `${listQuery.data.total} Partner` : '—'}
           </p>
@@ -145,112 +248,74 @@ export function PartnerPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
+          className="flex items-center gap-2 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
-          Neuer Partner
+          <Plus className="h-4 w-4" /> Neuer Partner
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="search"
-            placeholder="Suche in Name, Ansprechpartner, E-Mail …"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="min-w-[16rem] flex-1 rounded-md border border-zinc-700 px-3 py-1.5 text-sm bg-zinc-950 text-zinc-100"
-          />
-          <div className="flex flex-wrap gap-1">
-            {PARTNER_TYPEN.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => toggleTypFilter(t)}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  typenFilter.includes(t)
-                    ? 'bg-emerald-500 text-zinc-950'
-                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-800'
-                }`}
-              >
-                {TYP_LABEL[t]}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-1">
+        {PARTNER_TYPEN.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => toggleTypFilter(t)}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              typenFilter.includes(t)
+                ? 'bg-emerald-500 text-zinc-950'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+            }`}
+          >
+            {TYP_LABEL[t]}
+          </button>
+        ))}
       </div>
 
-      {listQuery.isLoading && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Lade Partner …
-        </div>
-      )}
-      {listQuery.data && listQuery.data.items.length === 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Keine Partner gefunden.
-        </div>
-      )}
-      {listQuery.data && listQuery.data.items.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
-          <table className="min-w-full divide-y divide-zinc-800 text-sm">
-            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
-              <tr>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Typen</th>
-                <th className="px-4 py-2 font-medium">Ansprechpartner</th>
-                <th className="px-4 py-2 font-medium">Kontakt</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {listQuery.data.items.map((p) => (
-                <tr key={p.id} className="hover:bg-zinc-900/50">
-                  <td className="px-4 py-2 font-medium text-zinc-200">
-                    {p.name}
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {p.typen.map((t) => (
-                        <span
-                          key={t}
-                          className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300"
-                        >
-                          {TYP_LABEL[t]}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-zinc-300">
-                    {p.ansprechpartner ?? '—'}
-                  </td>
-                  <td className="px-4 py-2 text-xs text-zinc-400">
-                    <div>{p.email ?? '—'}</div>
-                    <div>{p.telefon ?? '—'}</div>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(p)}
-                      className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
-                    >
-                      Bearbeiten
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Partner "${p.name}" löschen?`))
-                          deleteMut.mutate(p.id);
-                      }}
-                      className="text-xs font-medium text-red-400 hover:underline"
-                    >
-                      Löschen
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <PowerListenView<PartnerRead>
+        viewKey="partner"
+        columns={columns}
+        data={listQuery.data?.items ?? []}
+        search={search}
+        onSearchChange={setSearch}
+        visibility={config.visibility}
+        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
+        sorting={config.sorting}
+        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
+        columnFilters={[]}
+        onColumnFiltersChange={() => {}}
+        columnOrder={config.columnOrder}
+        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        filterRenderers={{
+          name: TextFilter,
+          ansprechpartner: TextFilter,
+          kontakt: TextFilter,
+          typen: (props) => (
+            <SelectFilter
+              {...props}
+              options={PARTNER_TYPEN.map((t) => ({ value: t, label: TYP_LABEL[t] }))}
+            />
+          ),
+        }}
+        count={{
+          filtered: listQuery.data?.items.length ?? 0,
+          total: listQuery.data?.total ?? 0,
+        }}
+        toolbarLeft={
+          <SavedViewsMenu
+            viewKey="partner"
+            currentConfig={config as unknown as Record<string, unknown>}
+            onApply={(c) => {
+              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
+              setActiveViewId(null);
+            }}
+            activeId={activeViewId}
+          />
+        }
+        searchPlaceholder="Suche in Name, Ansprechpartner, E-Mail …"
+        showFooter
+        itemLabel={{ singular: 'Partner', plural: 'Partner' }}
+      />
+
 
       {showModal && (
         <div
@@ -285,7 +350,7 @@ export function PartnerPage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
@@ -321,7 +386,7 @@ export function PartnerPage() {
                     onChange={(e) =>
                       setForm({ ...form, ansprechpartner: e.target.value })
                     }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
@@ -334,7 +399,7 @@ export function PartnerPage() {
                     onChange={(e) =>
                       setForm({ ...form, telefon: e.target.value })
                     }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
               </div>
@@ -347,7 +412,7 @@ export function PartnerPage() {
                   type="email"
                   value={form.email ?? ''}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
@@ -360,7 +425,7 @@ export function PartnerPage() {
                   onChange={(e) =>
                     setForm({ ...form, adresse_id: e.target.value || null })
                   }
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 >
                   <option value="">— Keine —</option>
                   {adressenQuery.data?.items.map((a) => (
@@ -380,7 +445,7 @@ export function PartnerPage() {
                   rows={2}
                   value={form.notiz ?? ''}
                   onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -389,7 +454,7 @@ export function PartnerPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm bg-zinc-950 text-zinc-100"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
               >
                 Abbrechen
               </button>
