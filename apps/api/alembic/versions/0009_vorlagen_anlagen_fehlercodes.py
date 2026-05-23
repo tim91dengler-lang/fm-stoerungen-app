@@ -178,14 +178,15 @@ def upgrade() -> None:
         FOR EACH ROW EXECUTE FUNCTION audit_trigger();
     """)
 
-    # System-Felder seeden für die 3 existierenden Tickettypen
+    # System-Felder seeden für die 3 existierenden Tickettypen.
+    # rows_sql + tt_key sind aus der hartkodierten SYSTEM_FELDER_SPEC oben —
+    # kein User-Input. `noqa: S608` deshalb erlaubt.
     for tt_key, felder in SYSTEM_FELDER_SPEC.items():
         rows_sql = ",\n              ".join(
             f"('{k}', '{lbl}', {str(s).lower()}, {str(p).lower()}, {r})"
             for k, lbl, s, p, r in felder
         )
-        op.execute(
-            f"""
+        sql = f"""
             INSERT INTO tickettyp_feld
                 (tickettyp_id, feld_key, label, sichtbar, pflicht, reihenfolge)
             SELECT tt.id, v.feld_key, v.label, v.sichtbar, v.pflicht, v.reihenfolge
@@ -195,8 +196,8 @@ def upgrade() -> None:
             ) AS v(feld_key, label, sichtbar, pflicht, reihenfolge)
             WHERE tt.key = '{tt_key}'
             ON CONFLICT (tickettyp_id, feld_key) DO NOTHING;
-            """
-        )
+            """  # noqa: S608
+        op.execute(sql)
 
     # ============================================================
     # 3) anlagen — technische Einrichtungen
