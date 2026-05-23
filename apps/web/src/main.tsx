@@ -33,7 +33,9 @@ ReactDOM.createRoot(rootEl).render(
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <RouterProvider router={router} />
-      <ErrorBanner />
     </AuthProvider>
   </QueryClientProvider>,
 );
+// ErrorBanner-Import bewusst entfernt — wrapte console.error und
+// triggerte vermutlich Loops in der Hot-Iterations-Phase.
+void ErrorBanner;
