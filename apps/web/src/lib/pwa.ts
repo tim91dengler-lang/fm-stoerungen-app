@@ -17,9 +17,23 @@ const listeners = new Set<(available: boolean) => void>();
 export function registerServiceWorker(): void {
   if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator)) return;
-  if (import.meta.env.MODE !== 'production') return;
+  // Service Worker während Hot-Iteration deaktiviert (Tim 2026-05-23) —
+  // hat in der Phase mehr Probleme verursacht als gelöst (gecachte alte UI).
+  // Stattdessen: alle bisherigen Registrierungen löschen + Caches leeren,
+  // damit Tester sofort die aktuelle App-Version sehen.
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    void (async () => {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          for (const k of keys) await caches.delete(k);
+        }
+      } catch {
+        // ignore — best-effort cleanup
+      }
+    })();
   });
 }
 
