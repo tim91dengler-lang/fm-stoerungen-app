@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
 import {
   Download,
   FileBox,
   FileText,
   Image as ImageIcon,
   Plus,
-  Search,
   Trash2,
   UploadCloud,
 } from 'lucide-react';
@@ -14,6 +14,21 @@ import clsx from 'clsx';
 import { api } from '../api/client';
 import { dokumentApi } from '../api/endpoints';
 import type { DokumentRead } from '../api/types';
+import { PowerListenView } from '../core/liste/PowerListenView';
+import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
+import { TextFilter } from '../core/liste/columnFilters';
+
+interface ViewConfig {
+  sorting: SortingState;
+  visibility: VisibilityState;
+  columnOrder: string[];
+}
+
+const DEFAULT_CONFIG: ViewConfig = {
+  sorting: [{ id: 'name', desc: false }],
+  visibility: {},
+  columnOrder: ['name', 'kategorie', 'size', 'hochgeladen', 'links', '__actions__'],
+};
 
 function fileIcon(mime: string) {
   if (mime.startsWith('image/')) return ImageIcon;
@@ -30,6 +45,8 @@ function formatBytes(b: number): string {
 export function DokumentePage() {
   const [search, setSearch] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
@@ -79,6 +96,119 @@ export function DokumentePage() {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  const columns = useMemo<ColumnDef<DokumentRead>[]>(
+    () => [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: 'Name',
+        cell: (ctx) => {
+          const d = ctx.row.original;
+          const Icon = fileIcon(d.mime_type);
+          return (
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4 text-zinc-500" />
+              <div className="min-w-0">
+                <div className="truncate font-medium text-zinc-200">{d.name}</div>
+                <div className="truncate text-xs text-zinc-500">{d.filename}</div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'kategorie',
+        accessorKey: 'kategorie',
+        header: 'Kategorie',
+        cell: (ctx) => {
+          const k = ctx.row.original.kategorie;
+          if (!k) return <span className="text-zinc-500">—</span>;
+          return (
+            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+              {k}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'size',
+        accessorKey: 'size_bytes',
+        header: 'Größe',
+        cell: (ctx) => (
+          <span className="text-xs text-zinc-500">{formatBytes(ctx.row.original.size_bytes)}</span>
+        ),
+      },
+      {
+        id: 'hochgeladen',
+        accessorFn: (row) => row.hochgeladen_von?.full_name ?? '',
+        header: 'Hochgeladen',
+        cell: (ctx) => {
+          const d = ctx.row.original;
+          return (
+            <div className="text-xs text-zinc-500">
+              {d.hochgeladen_von?.full_name ?? '—'}
+              <div className="text-[10px]">
+                {new Date(d.created_at).toLocaleDateString('de-DE')}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'links',
+        accessorFn: (row) => row.links.map((l) => l.target_type).join(' '),
+        header: 'Verknüpfungen',
+        cell: (ctx) => {
+          const links = ctx.row.original.links;
+          if (links.length === 0) return <span className="text-zinc-500">—</span>;
+          return (
+            <div className="flex flex-wrap gap-1">
+              {links.map((l) => (
+                <span
+                  key={`${l.target_type}-${l.target_id}`}
+                  className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-zinc-400"
+                >
+                  {l.target_type}
+                </span>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        id: '__actions__',
+        header: '',
+        enableSorting: false,
+        enableColumnFilter: false,
+        cell: (ctx) => (
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => download(ctx.row.original)}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              title="Herunterladen"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`"${ctx.row.original.name}" löschen?`))
+                  remove.mutate(ctx.row.original.id);
+              }}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+              title="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
@@ -138,115 +268,44 @@ export function DokumentePage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="search"
-            placeholder="Suchen …"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border border-zinc-700 bg-zinc-950 py-1.5 pl-8 pr-3 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
+      <PowerListenView<DokumentRead>
+        viewKey="dokumente"
+        columns={columns}
+        data={filtered}
+        search={search}
+        onSearchChange={setSearch}
+        visibility={config.visibility}
+        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
+        sorting={config.sorting}
+        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
+        columnFilters={[]}
+        onColumnFiltersChange={() => {}}
+        columnOrder={config.columnOrder}
+        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        filterRenderers={{
+          name: TextFilter,
+          kategorie: TextFilter,
+          hochgeladen: TextFilter,
+        }}
+        count={{
+          filtered: filtered.length,
+          total: listQuery.data?.length ?? 0,
+        }}
+        toolbarLeft={
+          <SavedViewsMenu
+            viewKey="dokumente"
+            currentConfig={config as unknown as Record<string, unknown>}
+            onApply={(c) => {
+              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
+              setActiveViewId(null);
+            }}
+            activeId={activeViewId}
           />
-        </div>
-        <div className="text-xs text-zinc-500">
-          {filtered.length} / {listQuery.data?.length ?? 0}
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/40">
-        {listQuery.isLoading && (
-          <div className="py-12 text-center text-sm text-zinc-500">Lade Dokumente …</div>
-        )}
-        {!listQuery.isLoading && filtered.length === 0 && (
-          <div className="py-12 text-center">
-            <FileBox className="mx-auto mb-2 h-8 w-8 text-zinc-700" />
-            <p className="text-sm text-zinc-400">Keine Dokumente gefunden.</p>
-          </div>
-        )}
-        {filtered.length > 0 && (
-          <table className="min-w-full divide-y divide-zinc-800 text-sm">
-            <thead className="bg-zinc-900/60 text-left text-xs uppercase tracking-wide text-zinc-400">
-              <tr>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Kategorie</th>
-                <th className="px-4 py-2 font-medium">Größe</th>
-                <th className="px-4 py-2 font-medium">Hochgeladen</th>
-                <th className="px-4 py-2 font-medium">Verknüpfungen</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {filtered.map((d) => {
-                const Icon = fileIcon(d.mime_type);
-                return (
-                  <tr key={d.id} className="hover:bg-zinc-900/50">
-                    <td className="px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-zinc-500" />
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-zinc-200">{d.name}</div>
-                          <div className="truncate text-xs text-zinc-500">{d.filename}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-zinc-400">
-                      {d.kategorie ? (
-                        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs">
-                          {d.kategorie}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-zinc-500">{formatBytes(d.size_bytes)}</td>
-                    <td className="px-4 py-2 text-xs text-zinc-500">
-                      {d.hochgeladen_von?.full_name ?? '—'}
-                      <div className="text-[10px]">{new Date(d.created_at).toLocaleDateString('de-DE')}</div>
-                    </td>
-                    <td className="px-4 py-2 text-xs text-zinc-400">
-                      {d.links.length === 0 ? (
-                        '—'
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {d.links.map((l) => (
-                            <span
-                              key={`${l.target_type}-${l.target_id}`}
-                              className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-zinc-400"
-                            >
-                              {l.target_type}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => download(d)}
-                        className="mr-1 rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                        title="Herunterladen"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`"${d.name}" löschen?`)) remove.mutate(d.id);
-                        }}
-                        className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-                        title="Löschen"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+        }
+        searchPlaceholder="Suche in Dokumenten …"
+        showFooter
+        itemLabel={{ singular: 'Dokument', plural: 'Dokumente' }}
+      />
     </div>
   );
 }
