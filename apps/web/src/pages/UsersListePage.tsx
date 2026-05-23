@@ -45,7 +45,7 @@ export function UsersListePage() {
           placeholder="Suche in Name und E-Mail …"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 bg-zinc-950 text-zinc-100"
         />
       </div>
 

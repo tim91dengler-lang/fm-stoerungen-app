@@ -147,7 +147,7 @@ export function ObjektePage() {
           placeholder="Suche in Objekt-Name …"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
+          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm bg-zinc-950 text-zinc-100"
         />
       </div>
 
@@ -254,7 +254,7 @@ export function ObjektePage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
 
@@ -267,7 +267,7 @@ export function ObjektePage() {
                   onChange={(e) =>
                     setForm({ ...form, adresse_id: e.target.value || null })
                   }
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 >
                   <option value="">— Keine —</option>
                   {adressenQuery.data?.items.map((a) => (
@@ -287,7 +287,7 @@ export function ObjektePage() {
                   rows={2}
                   value={form.notiz ?? ''}
                   onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
 
@@ -342,7 +342,7 @@ export function ObjektePage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm bg-zinc-950 text-zinc-100"
               >
                 Abbrechen
               </button>
@@ -377,7 +377,7 @@ function PartnerLinkAdder({
       <select
         value={partnerId}
         onChange={(e) => setPartnerId(e.target.value)}
-        className="rounded-md border border-zinc-700 px-2 py-1 text-sm"
+        className="rounded-md border border-zinc-700 px-2 py-1 text-sm bg-zinc-950 text-zinc-100"
       >
         <option value="">— Partner wählen —</option>
         {partnerOptions.map((p) => (
@@ -389,7 +389,7 @@ function PartnerLinkAdder({
       <select
         value={rolle}
         onChange={(e) => setRolle(e.target.value as PartnerTyp)}
-        className="rounded-md border border-zinc-700 px-2 py-1 text-sm"
+        className="rounded-md border border-zinc-700 px-2 py-1 text-sm bg-zinc-950 text-zinc-100"
       >
         {PARTNER_TYPEN.map((t) => (
           <option key={t} value={t}>

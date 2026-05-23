@@ -129,7 +129,7 @@ export function AuswahllistenPage() {
                     setNewListeKey(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '_'))
                   }
                   placeholder="z.B. gewerk"
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
               <div>
@@ -141,7 +141,7 @@ export function AuswahllistenPage() {
                   value={newListeLabel}
                   onChange={(e) => setNewListeLabel(e.target.value)}
                   placeholder="z.B. Gewerk"
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
             </div>
@@ -149,7 +149,7 @@ export function AuswahllistenPage() {
               <button
                 type="button"
                 onClick={() => setShowCreateListe(false)}
-                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm bg-zinc-950 text-zinc-100"
               >
                 Abbrechen
               </button>
@@ -267,19 +267,19 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
             onChange={(e) =>
               setNewKey(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '_'))
             }
-            className="w-32 rounded-md border border-zinc-700 px-2 py-1 text-sm"
+            className="w-32 rounded-md border border-zinc-700 px-2 py-1 text-sm bg-zinc-950 text-zinc-100"
           />
           <input
             type="text"
             value={newLabel}
             placeholder="Anzeige-Label"
             onChange={(e) => setNewLabel(e.target.value)}
-            className="flex-1 rounded-md border border-zinc-700 px-2 py-1 text-sm"
+            className="flex-1 rounded-md border border-zinc-700 px-2 py-1 text-sm bg-zinc-950 text-zinc-100"
           />
           <select
             value={newFarbe}
             onChange={(e) => setNewFarbe(e.target.value)}
-            className="rounded-md border border-zinc-700 px-2 py-1 text-sm"
+            className="rounded-md border border-zinc-700 px-2 py-1 text-sm bg-zinc-950 text-zinc-100"
           >
             {[
               'slate',

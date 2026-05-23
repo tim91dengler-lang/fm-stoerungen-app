@@ -132,7 +132,7 @@ export function AdressenPage() {
           placeholder="Suche in Straße, PLZ, Ort …"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+          className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 bg-zinc-950 text-zinc-100"
         />
       </div>
 
@@ -255,7 +255,7 @@ export function AdressenPage() {
                     onChange={(e) =>
                       setForm({ ...form, strasse: e.target.value })
                     }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                   />
                 </div>
                 <div>
@@ -268,7 +268,7 @@ export function AdressenPage() {
                     onChange={(e) =>
                       setForm({ ...form, hausnummer: e.target.value })
                     }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                   />
                 </div>
               </div>
@@ -283,7 +283,7 @@ export function AdressenPage() {
                   onChange={(e) =>
                     setForm({ ...form, adresszusatz: e.target.value })
                   }
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
 
@@ -296,7 +296,7 @@ export function AdressenPage() {
                     type="text"
                     value={form.plz}
                     onChange={(e) => setForm({ ...form, plz: e.target.value })}
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                   />
                 </div>
                 <div className="col-span-2">
@@ -307,7 +307,7 @@ export function AdressenPage() {
                     type="text"
                     value={form.ort}
                     onChange={(e) => setForm({ ...form, ort: e.target.value })}
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                   />
                 </div>
               </div>
@@ -322,7 +322,7 @@ export function AdressenPage() {
                   onChange={(e) =>
                     setForm({ ...form, land: e.target.value.toUpperCase() })
                   }
-                  className="w-24 rounded-md border border-zinc-700 px-3 py-2 text-sm uppercase"
+                  className="w-24 rounded-md border border-zinc-700 px-3 py-2 text-sm uppercase bg-zinc-950 text-zinc-100"
                   maxLength={2}
                 />
               </div>
@@ -337,7 +337,7 @@ export function AdressenPage() {
                     setForm({ ...form, bemerkung: e.target.value })
                   }
                   rows={2}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
 
@@ -353,7 +353,7 @@ export function AdressenPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm bg-zinc-950 text-zinc-100"
               >
                 Abbrechen
               </button>

@@ -158,7 +158,7 @@ export function PartnerPage() {
             placeholder="Suche in Name, Ansprechpartner, E-Mail …"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="min-w-[16rem] flex-1 rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
+            className="min-w-[16rem] flex-1 rounded-md border border-zinc-700 px-3 py-1.5 text-sm bg-zinc-950 text-zinc-100"
           />
           <div className="flex flex-wrap gap-1">
             {PARTNER_TYPEN.map((t) => (
@@ -285,7 +285,7 @@ export function PartnerPage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
 
@@ -321,7 +321,7 @@ export function PartnerPage() {
                     onChange={(e) =>
                       setForm({ ...form, ansprechpartner: e.target.value })
                     }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                   />
                 </div>
                 <div>
@@ -334,7 +334,7 @@ export function PartnerPage() {
                     onChange={(e) =>
                       setForm({ ...form, telefon: e.target.value })
                     }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                   />
                 </div>
               </div>
@@ -347,7 +347,7 @@ export function PartnerPage() {
                   type="email"
                   value={form.email ?? ''}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
 
@@ -360,7 +360,7 @@ export function PartnerPage() {
                   onChange={(e) =>
                     setForm({ ...form, adresse_id: e.target.value || null })
                   }
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 >
                   <option value="">— Keine —</option>
                   {adressenQuery.data?.items.map((a) => (
@@ -380,7 +380,7 @@ export function PartnerPage() {
                   rows={2}
                   value={form.notiz ?? ''}
                   onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm bg-zinc-950 text-zinc-100"
                 />
               </div>
             </div>
@@ -389,7 +389,7 @@ export function PartnerPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm bg-zinc-950 text-zinc-100"
               >
                 Abbrechen
               </button>
