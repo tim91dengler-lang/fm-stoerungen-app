@@ -52,4 +52,11 @@ export default tseslint.config(
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
+  {
+    // E2E-Tests dürfen console.log für Diagnose-Output nutzen.
+    files: ['e2e/**/*.{ts,tsx}'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 );

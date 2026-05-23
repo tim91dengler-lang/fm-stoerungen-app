@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
 import {
   Calendar,
   CheckCircle2,
@@ -8,7 +9,6 @@ import {
   FolderKanban,
   Pencil,
   Plus,
-  Search,
   Trash2,
   XCircle,
 } from 'lucide-react';
@@ -19,6 +19,21 @@ import type {
   ProjektRead,
   ProjektStatus,
 } from '../api/types';
+import { PowerListenView } from '../core/liste/PowerListenView';
+import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
+import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+
+interface ViewConfig {
+  sorting: SortingState;
+  visibility: VisibilityState;
+  columnOrder: string[];
+}
+
+const DEFAULT_CONFIG: ViewConfig = {
+  sorting: [{ id: 'name', desc: false }],
+  visibility: {},
+  columnOrder: ['name', 'status', 'verantwortlich', 'zeitraum', 'ticket_count', '__actions__'],
+};
 
 const STATUS_LABEL: Record<ProjektStatus, string> = {
   geplant: 'Geplant',
@@ -58,6 +73,8 @@ export function ProjektePage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProjektCreate>(EMPTY_FORM);
+  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -148,6 +165,114 @@ export function ProjektePage() {
     );
   }
 
+  const columns = useMemo<ColumnDef<ProjektRead>[]>(
+    () => [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: 'Projekt',
+        cell: (ctx) => {
+          const p = ctx.row.original;
+          return (
+            <div>
+              <Link
+                to={`/tickets?projekt_id=${p.id}`}
+                className="font-medium text-zinc-100 hover:text-emerald-300"
+              >
+                {p.name}
+              </Link>
+              {p.beschreibung && (
+                <div className="text-xs text-zinc-500 line-clamp-1">{p.beschreibung}</div>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        header: 'Status',
+        cell: (ctx) => {
+          const s = ctx.row.original.status;
+          const Icon = STATUS_ICON[s];
+          return (
+            <span
+              className={clsx(
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                STATUS_COLOR[s],
+              )}
+            >
+              <Icon className="h-3 w-3" /> {STATUS_LABEL[s]}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'verantwortlich',
+        accessorFn: (row) => row.verantwortlich?.full_name ?? '',
+        header: 'Verantwortlich',
+        cell: (ctx) =>
+          ctx.row.original.verantwortlich?.full_name ?? <span className="text-zinc-500">—</span>,
+      },
+      {
+        id: 'zeitraum',
+        accessorFn: (row) => `${row.start_am ?? ''} ${row.ende_am ?? ''}`,
+        header: 'Zeitraum',
+        cell: (ctx) => {
+          const p = ctx.row.original;
+          if (!p.start_am && !p.ende_am) return <span className="text-zinc-500">—</span>;
+          return (
+            <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
+              <Calendar className="h-3 w-3" />
+              {p.start_am ?? '?'} → {p.ende_am ?? '?'}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'ticket_count',
+        accessorKey: 'ticket_count',
+        header: 'Tickets',
+        cell: (ctx) => (
+          <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+            {ctx.row.original.ticket_count}
+          </span>
+        ),
+      },
+      {
+        id: '__actions__',
+        header: '',
+        enableSorting: false,
+        enableColumnFilter: false,
+        cell: (ctx) => (
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => openEdit(ctx.row.original)}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              title="Bearbeiten"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Projekt "${ctx.row.original.name}" wirklich löschen?`))
+                  remove.mutate(ctx.row.original.id);
+              }}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+              title="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
       {/* Header */}
@@ -169,128 +294,70 @@ export function ProjektePage() {
         </button>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-          <input
-            type="search"
-            placeholder="Suchen …"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border border-zinc-700 bg-zinc-950 py-1.5 pl-8 pr-3 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
-          />
-        </div>
-        <div className="flex items-center gap-1">
-          {(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => toggleStatusFilter(s)}
-              className={clsx(
-                'rounded-md border px-2 py-1 text-xs',
-                statusFilter.includes(s)
-                  ? STATUS_COLOR[s]
-                  : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800',
-              )}
-            >
-              {STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto text-xs text-zinc-500">
-          {filtered.length} / {listQuery.data?.length ?? 0}
-        </div>
+      <div className="flex items-center gap-1">
+        {(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => toggleStatusFilter(s)}
+            className={clsx(
+              'rounded-md border px-2 py-1 text-xs',
+              statusFilter.includes(s)
+                ? STATUS_COLOR[s]
+                : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800',
+            )}
+          >
+            {STATUS_LABEL[s]}
+          </button>
+        ))}
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {listQuery.isLoading && (
-          <div className="col-span-full py-12 text-center text-sm text-zinc-500">
-            Lade Projekte …
-          </div>
-        )}
-        {!listQuery.isLoading && filtered.length === 0 && (
-          <div className="col-span-full rounded-lg border border-dashed border-zinc-800 py-12 text-center">
-            <FolderKanban className="mx-auto mb-2 h-8 w-8 text-zinc-700" />
-            <div className="text-sm text-zinc-400">Noch keine Projekte angelegt.</div>
-            <button
-              type="button"
-              onClick={openCreate}
-              className="mt-3 inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300"
-            >
-              <Plus className="h-3 w-3" /> Erstes Projekt anlegen
-            </button>
-          </div>
-        )}
-        {filtered.map((p) => {
-          const Icon = STATUS_ICON[p.status];
-          return (
-            <div
-              key={p.id}
-              className="group flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 hover:border-zinc-700"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <Link
-                  to={`/tickets?projekt_id=${p.id}`}
-                  className="min-w-0 flex-1 text-sm font-semibold text-zinc-100 hover:text-emerald-300"
-                >
-                  <div className="truncate">{p.name}</div>
-                </Link>
-                <span
-                  className={clsx(
-                    'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                    STATUS_COLOR[p.status],
-                  )}
-                >
-                  <Icon className="h-3 w-3" /> {STATUS_LABEL[p.status]}
-                </span>
-              </div>
-              {p.beschreibung && (
-                <p className="line-clamp-2 text-xs text-zinc-400">{p.beschreibung}</p>
-              )}
-              <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-zinc-500">
-                <div className="flex items-center gap-1">
-                  {p.verantwortlich && (
-                    <span className="truncate">👤 {p.verantwortlich.full_name}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 font-mono">
-                    {p.ticket_count} Ticket{p.ticket_count === 1 ? '' : 's'}
-                  </span>
-                </div>
-              </div>
-              {(p.start_am || p.ende_am) && (
-                <div className="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <Calendar className="h-3 w-3" />
-                  {p.start_am ?? '?'} → {p.ende_am ?? '?'}
-                </div>
-              )}
-              <div className="mt-2 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => openEdit(p)}
-                  className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                  title="Bearbeiten"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (confirm(`Projekt "${p.name}" wirklich löschen?`)) remove.mutate(p.id);
-                  }}
-                  className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-                  title="Löschen"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <PowerListenView<ProjektRead>
+        viewKey="projekte"
+        columns={columns}
+        data={filtered}
+        search={search}
+        onSearchChange={setSearch}
+        visibility={config.visibility}
+        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
+        sorting={config.sorting}
+        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
+        columnFilters={[]}
+        onColumnFiltersChange={() => {}}
+        columnOrder={config.columnOrder}
+        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        filterRenderers={{
+          name: TextFilter,
+          verantwortlich: TextFilter,
+          status: (props) => (
+            <SelectFilter
+              {...props}
+              options={(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => ({
+                value: s,
+                label: STATUS_LABEL[s],
+              }))}
+            />
+          ),
+        }}
+        count={{
+          filtered: filtered.length,
+          total: listQuery.data?.length ?? 0,
+        }}
+        toolbarLeft={
+          <SavedViewsMenu
+            viewKey="projekte"
+            currentConfig={config as unknown as Record<string, unknown>}
+            onApply={(c) => {
+              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
+              setActiveViewId(null);
+            }}
+            activeId={activeViewId}
+          />
+        }
+        searchPlaceholder="Suche in Projekten …"
+        showFooter
+        itemLabel={{ singular: 'Projekt', plural: 'Projekte' }}
+      />
 
       {/* Modal */}
       {showModal && (
