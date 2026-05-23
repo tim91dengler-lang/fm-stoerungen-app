@@ -59,8 +59,13 @@ jobs:
           tags: |
             ${{ env.IMAGE_WEB }}:${{ steps.meta.outputs.tag }}
             ${{ env.IMAGE_WEB }}:staging
-          cache-from: type=gha,scope=web
-          cache-to: type=gha,scope=web,mode=max
+          # Cache am Commit-SHA festmachen — gemeinsamer Web-Cache hatte am
+          # 2026-05-23 ein altes `npm run build`-Result eingefroren, das auch
+          # bei neuen Quellen wiederverwendet wurde. Mit SHA-Scope startet der
+          # Cache pro Commit frisch; npm-Module nutzen den Build-internen Cache
+          # über die buildx-mount weiter.
+          cache-from: type=gha,scope=web-${{ github.sha }}
+          cache-to: type=gha,scope=web-${{ github.sha }},mode=max
           platforms: linux/arm64
 
   deploy:
