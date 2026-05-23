@@ -108,8 +108,9 @@ async def create_user(
     )
     db.add(user)
     await db.flush()
-    await db.refresh(user, ["roles"])
-    return user
+    new_id = user.id
+    db.expunge(user)
+    return await get_user(db, new_id, mandant_id)
 
 
 async def update_user(
@@ -134,8 +135,10 @@ async def update_user(
         user.roles = await _fetch_roles(db, role_ids, mandant_id)
 
     await db.flush()
-    await db.refresh(user, ["updated_at", "roles"])
-    return user
+    # Reload mit eager-loaded relationships — partial refresh führte zu
+    # MissingGreenlet beim Pydantic-Validate.
+    db.expunge(user)
+    return await get_user(db, user_id, mandant_id)
 
 
 async def soft_delete_user(

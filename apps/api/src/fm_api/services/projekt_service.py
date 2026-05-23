@@ -82,8 +82,10 @@ async def create_projekt(db: AsyncSession, mandant_id: UUID, *, payload: dict[st
     p = Projekt(mandant_id=mandant_id, **payload)
     db.add(p)
     await db.flush()
-    await db.refresh(p, ["verantwortlich"])
-    return p
+    new_id = p.id
+    db.expunge(p)
+    fresh, _ = await get_projekt(db, mandant_id, new_id)
+    return fresh
 
 
 async def update_projekt(
@@ -98,8 +100,11 @@ async def update_projekt(
             continue
         setattr(p, key, value)
     await db.flush()
-    await db.refresh(p, ["verantwortlich"])
-    return p
+    # Reload mit eager-loaded relationships statt partial refresh — sonst
+    # MissingGreenlet beim Pydantic-Validate auf den expired Attributen.
+    db.expunge(p)
+    fresh, _ = await get_projekt(db, mandant_id, projekt_id)
+    return fresh
 
 
 async def soft_delete_projekt(db: AsyncSession, mandant_id: UUID, projekt_id: UUID) -> None:

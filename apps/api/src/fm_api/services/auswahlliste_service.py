@@ -145,8 +145,9 @@ async def create_liste(
         raise DuplicateAuswahllisteError(
             f"auswahlliste with key '{key}' already exists for mandant {mandant_id}"
         ) from exc
-    await db.refresh(liste, ["werte"])
-    return liste
+    new_id = liste.id
+    db.expunge(liste)
+    return await get_liste_by_id(db, mandant_id, new_id)
 
 
 async def update_liste(
@@ -165,8 +166,8 @@ async def update_liste(
     if "beschreibung" in updates:
         liste.beschreibung = updates["beschreibung"]
     await db.flush()
-    await db.refresh(liste, ["werte"])
-    return liste
+    db.expunge(liste)
+    return await get_liste_by_id(db, mandant_id, liste_id)
 
 
 async def delete_liste(db: AsyncSession, mandant_id: UUID, liste_id: UUID) -> None:

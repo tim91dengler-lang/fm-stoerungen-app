@@ -82,8 +82,9 @@ async def create_partner(
     partner = GeschaeftsPartner(mandant_id=mandant_id, typen=typen, **payload)
     db.add(partner)
     await db.flush()
-    await db.refresh(partner, ["adresse"])
-    return partner
+    new_id = partner.id
+    db.expunge(partner)
+    return await get_partner(db, new_id, mandant_id)
 
 
 async def update_partner(
@@ -101,8 +102,10 @@ async def update_partner(
             continue
         setattr(partner, key, value)
     await db.flush()
-    await db.refresh(partner, ["adresse"])
-    return partner
+    # Nach flush sind alle Attribute expired. Statt nur `adresse` zu refreshen,
+    # neu laden mit eager-loading — sonst MissingGreenlet beim Pydantic-Validate.
+    db.expunge(partner)
+    return await get_partner(db, partner_id, mandant_id)
 
 
 async def soft_delete_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID) -> None:
