@@ -42,7 +42,7 @@ async def list_users(
     _admin: AdminDep,
     search: str | None = Query(default=None, max_length=200),
     include_inactive: bool = Query(default=False),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> PaginatedResponse[UserRead]:
     users, total = await user_service.list_users(

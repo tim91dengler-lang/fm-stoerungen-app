@@ -22,7 +22,7 @@ async def list_partner(
     search: str | None = Query(default=None, max_length=200),
     typ: list[str] | None = Query(default=None),
     include_deleted: bool = Query(default=False),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> PaginatedResponse[PartnerRead]:
     items, total = await partner_service.list_partner(

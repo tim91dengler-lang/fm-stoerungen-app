@@ -42,7 +42,7 @@ async def list_adressen(
     db: AuditedDbSession,
     current: CurrentUserDep,
     search: str | None = Query(default=None, max_length=200),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> PaginatedResponse[AdresseRead]:
     items, total = await adresse_service.list_adressen(

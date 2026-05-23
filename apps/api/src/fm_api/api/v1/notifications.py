@@ -11,7 +11,7 @@ router = APIRouter()
 async def list_notifications(
     db: AuditedDbSession,
     current: CurrentUserDep,
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
 ) -> list[NotificationRead]:
     items = await notification_service.list_unread(
         db, current.mandant_id, current.user_id, limit=limit

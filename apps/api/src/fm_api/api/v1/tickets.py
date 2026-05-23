@@ -31,7 +31,7 @@ async def list_tickets(
     prioritaet_filter: list[str] | None = Query(default=None, alias="prioritaet"),
     zugewiesen_an_id: UUID | None = Query(default=None),
     include_deleted: bool = Query(default=False),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> PaginatedResponse[TicketRead]:
     tickets, total = await ticket_service.list_tickets(
