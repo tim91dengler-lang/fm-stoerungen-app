@@ -1,20 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
-import { AlertOctagon, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertOctagon, Plus } from 'lucide-react';
 import {
   anlageApi,
   auswahllistenApi,
   fehlercodeApi,
   tickettypApi,
 } from '../api/endpoints';
-import type {
-  FehlercodeCreate,
-  FehlercodeRead,
-} from '../api/types';
-import { PowerListenView } from '../core/liste/PowerListenView';
-import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter, type SelectOption } from '../core/liste/columnFilters';
+import type { FehlercodeCreate, FehlercodeRead } from '../api/types';
 
 const EMPTY_FORM: FehlercodeCreate = {
   code: '',
@@ -29,32 +22,8 @@ const EMPTY_FORM: FehlercodeCreate = {
   aktiv: true,
 };
 
-interface ViewConfig {
-  sorting: SortingState;
-  visibility: VisibilityState;
-  columnOrder: string[];
-}
-
-const DEFAULT_CONFIG: ViewConfig = {
-  sorting: [{ id: 'code', desc: false }],
-  visibility: { quelle: false, prio: false },
-  columnOrder: [
-    'code',
-    'titel',
-    'kategorie',
-    'anlage',
-    'prio',
-    'quelle',
-    'nutzung',
-    'aktiv',
-    '__actions__',
-  ],
-};
-
 export function FehlercodesPage() {
   const [search, setSearch] = useState('');
-  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
-  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FehlercodeCreate>(EMPTY_FORM);
@@ -102,6 +71,18 @@ export function FehlercodesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['fehlercodes'] }),
   });
 
+  const filtered = useMemo(() => {
+    const items = listQuery.data ?? [];
+    if (!search.trim()) return items;
+    const q = search.toLowerCase();
+    return items.filter(
+      (f) =>
+        f.code.toLowerCase().includes(q) ||
+        f.titel.toLowerCase().includes(q) ||
+        (f.beschreibung ?? '').toLowerCase().includes(q),
+    );
+  }, [listQuery.data, search]);
+
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -133,162 +114,15 @@ export function FehlercodesPage() {
     else create.mutate(form);
   }
 
-  const kategorieOptions: SelectOption[] = useMemo(
-    () =>
-      kategorienListe?.werte.map((w) => ({ value: w.key, label: w.label })) ?? [],
-    [kategorienListe],
-  );
-  const anlageOptions: SelectOption[] = useMemo(
-    () =>
-      anlagenQuery.data?.map((a) => ({ value: a.id, label: a.bezeichnung })) ?? [],
-    [anlagenQuery.data],
-  );
-
-  const columns = useMemo<ColumnDef<FehlercodeRead>[]>(() => {
-    return [
-      {
-        id: 'code',
-        accessorKey: 'code',
-        header: 'Code',
-        cell: (ctx) => (
-          <span
-            className="cursor-pointer rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-emerald-300 hover:bg-zinc-700"
-            onClick={() => openEdit(ctx.row.original)}
-          >
-            {ctx.row.original.code}
-          </span>
-        ),
-      },
-      {
-        id: 'titel',
-        accessorKey: 'titel',
-        header: 'Titel',
-        cell: (ctx) => {
-          const f = ctx.row.original;
-          return (
-            <div>
-              <div
-                className="font-medium text-zinc-100 cursor-pointer hover:text-emerald-300"
-                onClick={() => openEdit(f)}
-              >
-                {f.titel}
-              </div>
-              {f.beschreibung && (
-                <div className="text-xs text-zinc-500 line-clamp-1">{f.beschreibung}</div>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        id: 'kategorie',
-        accessorFn: (row) => row.kategorie?.key ?? '',
-        header: 'Kategorie',
-        cell: (ctx) => {
-          const k = ctx.row.original.kategorie;
-          if (!k) return <span className="text-zinc-500">—</span>;
-          return (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
-              {k.label}
-            </span>
-          );
-        },
-      },
-      {
-        id: 'anlage',
-        accessorFn: (row) => row.anlage?.bezeichnung ?? '',
-        header: 'Anlage',
-        cell: (ctx) =>
-          ctx.row.original.anlage?.bezeichnung ?? <span className="text-zinc-500">—</span>,
-      },
-      {
-        id: 'prio',
-        accessorFn: (row) => row.prio_default?.key ?? '',
-        header: 'Prio (Default)',
-        cell: (ctx) =>
-          ctx.row.original.prio_default?.label ?? <span className="text-zinc-500">—</span>,
-      },
-      {
-        id: 'quelle',
-        accessorKey: 'quelle',
-        header: 'Quelle',
-        cell: (ctx) => ctx.row.original.quelle ?? <span className="text-zinc-500">—</span>,
-      },
-      {
-        id: 'nutzung',
-        accessorKey: 'nutzung_count',
-        header: 'Verwendet',
-        cell: (ctx) => (
-          <span className="rounded-full bg-zinc-800 px-2 py-0.5 font-mono text-xs text-zinc-300">
-            {ctx.row.original.nutzung_count}×
-          </span>
-        ),
-      },
-      {
-        id: 'aktiv',
-        accessorFn: (row) => (row.aktiv ? 'aktiv' : 'inaktiv'),
-        header: 'Status',
-        cell: (ctx) =>
-          ctx.row.original.aktiv ? (
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
-              aktiv
-            </span>
-          ) : (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-              inaktiv
-            </span>
-          ),
-      },
-      {
-        id: '__actions__',
-        header: '',
-        enableSorting: false,
-        enableColumnFilter: false,
-        cell: (ctx) => (
-          <div className="flex justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => openEdit(ctx.row.original)}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              title="Bearbeiten"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const f = ctx.row.original;
-                if (f.nutzung_count > 0) {
-                  alert(
-                    `Dieser Fehlercode wird von ${f.nutzung_count} Ticket${
-                      f.nutzung_count === 1 ? '' : 's'
-                    } referenziert. Bitte zuerst deaktivieren statt löschen.`,
-                  );
-                  return;
-                }
-                if (confirm(`Fehlercode "${f.code}" löschen?`)) remove.mutate(f.id);
-              }}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-              title="Löschen"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ),
-      },
-    ];
-  }, [remove]);
-
   return (
-    <div className="space-y-4 px-4 py-6 lg:px-8">
-      <div className="flex items-center justify-between gap-3">
+    <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-zinc-100">
             <AlertOctagon className="h-5 w-5 text-amber-400" /> Fehlercodes
           </h1>
-          <p className="mt-0.5 text-sm text-zinc-500">
-            Stammvorlagen für wiederkehrende Störungen — bei Auswahl im Ticket wird die
-            Beschreibung übernommen
+          <p className="text-sm text-zinc-500">
+            {listQuery.data ? `${listQuery.data.length} Fehlercodes` : '—'}
           </p>
         </div>
         <button
@@ -300,54 +134,112 @@ export function FehlercodesPage() {
         </button>
       </div>
 
-      <PowerListenView<FehlercodeRead>
-        viewKey="fehlercodes"
-        columns={columns}
-        data={listQuery.data ?? []}
-        search={search}
-        onSearchChange={setSearch}
-        visibility={config.visibility}
-        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
-        sorting={config.sorting}
-        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
-        columnFilters={[]}
-        onColumnFiltersChange={() => {}}
-        columnOrder={config.columnOrder}
-        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
-        filterRenderers={{
-          code: TextFilter,
-          titel: TextFilter,
-          kategorie: (props) => <SelectFilter {...props} options={kategorieOptions} />,
-          anlage: (props) => <SelectFilter {...props} options={anlageOptions} />,
-          aktiv: (props) => (
-            <SelectFilter
-              {...props}
-              options={[
-                { value: 'aktiv', label: 'aktiv' },
-                { value: 'inaktiv', label: 'inaktiv' },
-              ]}
-            />
-          ),
-        }}
-        count={{
-          filtered: listQuery.data?.length ?? 0,
-          total: listQuery.data?.length ?? 0,
-        }}
-        toolbarLeft={
-          <SavedViewsMenu
-            viewKey="fehlercodes"
-            currentConfig={config as unknown as Record<string, unknown>}
-            onApply={(c) => {
-              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
-              setActiveViewId(null);
-            }}
-            activeId={activeViewId}
-          />
-        }
-        searchPlaceholder="Suche in Code / Titel …"
-        showFooter
-        itemLabel={{ singular: 'Fehlercode', plural: 'Fehlercodes' }}
-      />
+      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+        <input
+          type="search"
+          placeholder="Suche in Code, Titel, Beschreibung …"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100"
+        />
+      </div>
+
+      {listQuery.isLoading && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
+          Lade Fehlercodes …
+        </div>
+      )}
+      {!listQuery.isLoading && filtered.length === 0 && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
+          Keine Fehlercodes gefunden.
+        </div>
+      )}
+      {filtered.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+          <table className="min-w-full divide-y divide-zinc-800 text-sm">
+            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
+              <tr>
+                <th className="px-4 py-2 font-medium">Code</th>
+                <th className="px-4 py-2 font-medium">Titel</th>
+                <th className="px-4 py-2 font-medium">Kategorie</th>
+                <th className="px-4 py-2 font-medium">Anlage</th>
+                <th className="px-4 py-2 font-medium">Verwendet</th>
+                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800/60">
+              {filtered.map((f) => (
+                <tr key={f.id} className="hover:bg-zinc-900/50">
+                  <td className="px-4 py-2">
+                    <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-emerald-300">
+                      {f.code}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="font-medium text-zinc-100">{f.titel}</div>
+                    {f.beschreibung && (
+                      <div className="text-xs text-zinc-500 line-clamp-1">{f.beschreibung}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-zinc-400">
+                    {f.kategorie ? (
+                      <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs">
+                        {f.kategorie.label}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-zinc-400">{f.anlage?.bezeichnung ?? '—'}</td>
+                  <td className="px-4 py-2">
+                    <span className="rounded-full bg-zinc-800 px-2 py-0.5 font-mono text-xs text-zinc-300">
+                      {f.nutzung_count}×
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    {f.aktiv ? (
+                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
+                        aktiv
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
+                        inaktiv
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(f)}
+                      className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
+                    >
+                      Bearbeiten
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (f.nutzung_count > 0) {
+                          alert(
+                            `Dieser Fehlercode wird von ${f.nutzung_count} Ticket${
+                              f.nutzung_count === 1 ? '' : 's'
+                            } referenziert. Bitte zuerst deaktivieren statt löschen.`,
+                          );
+                          return;
+                        }
+                        if (confirm(`Fehlercode "${f.code}" löschen?`)) remove.mutate(f.id);
+                      }}
+                      className="text-xs font-medium text-red-400 hover:underline"
+                    >
+                      Löschen
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showModal && (
         <div
@@ -491,7 +383,7 @@ export function FehlercodesPage() {
                     className="accent-emerald-500"
                   />
                   <label htmlFor="aktiv" className="text-sm text-zinc-300">
-                    Aktiv (bei Inaktiv nicht im Ticket auswählbar)
+                    Aktiv
                   </label>
                 </div>
               </div>

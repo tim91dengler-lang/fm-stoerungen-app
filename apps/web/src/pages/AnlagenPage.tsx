@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
-import { Activity, Pencil, Plus, Trash2, Wind, Wrench, Thermometer, Zap, Droplets } from 'lucide-react';
+import {
+  Activity,
+  Droplets,
+  Plus,
+  Thermometer,
+  Wind,
+  Wrench,
+  Zap,
+} from 'lucide-react';
 import { anlageApi, auswahllistenApi, objektApi } from '../api/endpoints';
-import type {
-  AnlageCreate,
-  AnlageRead,
-} from '../api/types';
-import { PowerListenView } from '../core/liste/PowerListenView';
-import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter, type SelectOption } from '../core/liste/columnFilters';
+import type { AnlageCreate, AnlageRead } from '../api/types';
 
 const ICON_MAP: Record<string, typeof Activity> = {
   Wind,
@@ -36,22 +37,8 @@ const EMPTY_FORM: AnlageCreate = {
   reihenfolge: 0,
 };
 
-interface ViewConfig {
-  sorting: SortingState;
-  visibility: VisibilityState;
-  columnOrder: string[];
-}
-
-const DEFAULT_CONFIG: ViewConfig = {
-  sorting: [{ id: 'bezeichnung', desc: false }],
-  visibility: {},
-  columnOrder: ['bezeichnung', 'kategorie', 'objekt', 'stockwerk', 'aktiv', '__actions__'],
-};
-
 export function AnlagenPage() {
   const [search, setSearch] = useState('');
-  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
-  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AnlageCreate>(EMPTY_FORM);
@@ -96,6 +83,17 @@ export function AnlagenPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['anlagen'] }),
   });
 
+  const filtered = useMemo(() => {
+    const items = listQuery.data ?? [];
+    if (!search.trim()) return items;
+    const q = search.toLowerCase();
+    return items.filter(
+      (a) =>
+        a.bezeichnung.toLowerCase().includes(q) ||
+        (a.beschreibung ?? '').toLowerCase().includes(q),
+    );
+  }, [listQuery.data, search]);
+
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -125,126 +123,15 @@ export function AnlagenPage() {
     else create.mutate(form);
   }
 
-  const kategorieOptions: SelectOption[] = useMemo(
-    () =>
-      kategorienListe?.werte.map((w) => ({ value: w.key, label: w.label })) ?? [],
-    [kategorienListe],
-  );
-  const objektOptions: SelectOption[] = useMemo(
-    () =>
-      objekteQuery.data?.items.map((o) => ({ value: o.id, label: o.name })) ?? [],
-    [objekteQuery.data],
-  );
-
-  const columns = useMemo<ColumnDef<AnlageRead>[]>(() => {
-    return [
-      {
-        id: 'bezeichnung',
-        accessorKey: 'bezeichnung',
-        header: 'Anlage',
-        cell: (ctx) => {
-          const a = ctx.row.original;
-          const Icon = iconFor(a.icon_name);
-          return (
-            <div className="flex items-center gap-2">
-              <Icon className="h-4 w-4 text-emerald-300" />
-              <div>
-                <div
-                  className="font-medium text-zinc-100 cursor-pointer hover:text-emerald-300"
-                  onClick={() => openEdit(a)}
-                >
-                  {a.bezeichnung}
-                </div>
-                {a.beschreibung && (
-                  <div className="text-xs text-zinc-500 line-clamp-1">{a.beschreibung}</div>
-                )}
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        id: 'kategorie',
-        accessorFn: (row) => row.kategorie?.key ?? '',
-        header: 'Kategorie',
-        cell: (ctx) => {
-          const k = ctx.row.original.kategorie;
-          if (!k) return <span className="text-zinc-500">—</span>;
-          return (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
-              {k.label}
-            </span>
-          );
-        },
-      },
-      {
-        id: 'objekt',
-        accessorFn: (row) => row.objekt?.name ?? '',
-        header: 'Objekt',
-        cell: (ctx) => ctx.row.original.objekt?.name ?? <span className="text-zinc-500">—</span>,
-      },
-      {
-        id: 'stockwerk',
-        accessorFn: (row) => row.stockwerk?.bezeichnung ?? '',
-        header: 'Stockwerk',
-        cell: (ctx) =>
-          ctx.row.original.stockwerk?.bezeichnung ?? <span className="text-zinc-500">—</span>,
-      },
-      {
-        id: 'aktiv',
-        accessorFn: (row) => (row.aktiv ? 'aktiv' : 'inaktiv'),
-        header: 'Status',
-        cell: (ctx) =>
-          ctx.row.original.aktiv ? (
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
-              aktiv
-            </span>
-          ) : (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-              inaktiv
-            </span>
-          ),
-      },
-      {
-        id: '__actions__',
-        header: '',
-        enableSorting: false,
-        enableColumnFilter: false,
-        cell: (ctx) => (
-          <div className="flex justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => openEdit(ctx.row.original)}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              title="Bearbeiten"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm(`Anlage "${ctx.row.original.bezeichnung}" löschen?`)) remove.mutate(ctx.row.original.id);
-              }}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-              title="Löschen"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ),
-      },
-    ];
-  }, [remove]);
-
   return (
-    <div className="space-y-4 px-4 py-6 lg:px-8">
-      <div className="flex items-center justify-between gap-3">
+    <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-zinc-100">
             <Activity className="h-5 w-5 text-emerald-400" /> Anlagen
           </h1>
-          <p className="mt-0.5 text-sm text-zinc-500">
-            Technische Einrichtungen (RLT, Heizung, BMA, …) als Stammdaten
+          <p className="text-sm text-zinc-500">
+            {listQuery.data ? `${listQuery.data.length} Anlagen` : '—'}
           </p>
         </div>
         <button
@@ -256,53 +143,100 @@ export function AnlagenPage() {
         </button>
       </div>
 
-      <PowerListenView<AnlageRead>
-        viewKey="anlagen"
-        columns={columns}
-        data={listQuery.data ?? []}
-        search={search}
-        onSearchChange={setSearch}
-        visibility={config.visibility}
-        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
-        sorting={config.sorting}
-        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
-        columnFilters={[]}
-        onColumnFiltersChange={() => {}}
-        columnOrder={config.columnOrder}
-        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
-        filterRenderers={{
-          bezeichnung: TextFilter,
-          kategorie: (props) => <SelectFilter {...props} options={kategorieOptions} />,
-          objekt: (props) => <SelectFilter {...props} options={objektOptions} />,
-          aktiv: (props) => (
-            <SelectFilter
-              {...props}
-              options={[
-                { value: 'aktiv', label: 'aktiv' },
-                { value: 'inaktiv', label: 'inaktiv' },
-              ]}
-            />
-          ),
-        }}
-        count={{
-          filtered: listQuery.data?.length ?? 0,
-          total: listQuery.data?.length ?? 0,
-        }}
-        toolbarLeft={
-          <SavedViewsMenu
-            viewKey="anlagen"
-            currentConfig={config as unknown as Record<string, unknown>}
-            onApply={(c) => {
-              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
-              setActiveViewId(null);
-            }}
-            activeId={activeViewId}
-          />
-        }
-        searchPlaceholder="Suche in Anlagen …"
-        showFooter
-        itemLabel={{ singular: 'Anlage', plural: 'Anlagen' }}
-      />
+      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+        <input
+          type="search"
+          placeholder="Suche in Bezeichnung, Beschreibung …"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100"
+        />
+      </div>
+
+      {listQuery.isLoading && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
+          Lade Anlagen …
+        </div>
+      )}
+      {!listQuery.isLoading && filtered.length === 0 && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
+          Keine Anlagen gefunden.
+        </div>
+      )}
+      {filtered.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+          <table className="min-w-full divide-y divide-zinc-800 text-sm">
+            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
+              <tr>
+                <th className="px-4 py-2 font-medium">Anlage</th>
+                <th className="px-4 py-2 font-medium">Kategorie</th>
+                <th className="px-4 py-2 font-medium">Objekt</th>
+                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800/60">
+              {filtered.map((a) => {
+                const Icon = iconFor(a.icon_name);
+                return (
+                  <tr key={a.id} className="hover:bg-zinc-900/50">
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-emerald-300" />
+                        <div>
+                          <div className="font-medium text-zinc-100">{a.bezeichnung}</div>
+                          {a.beschreibung && (
+                            <div className="text-xs text-zinc-500">{a.beschreibung}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-zinc-400">
+                      {a.kategorie ? (
+                        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs">
+                          {a.kategorie.label}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-zinc-400">{a.objekt?.name ?? '—'}</td>
+                    <td className="px-4 py-2">
+                      {a.aktiv ? (
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
+                          aktiv
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
+                          inaktiv
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(a)}
+                        className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
+                      >
+                        Bearbeiten
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Anlage "${a.bezeichnung}" löschen?`)) remove.mutate(a.id);
+                        }}
+                        className="text-xs font-medium text-red-400 hover:underline"
+                      >
+                        Löschen
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showModal && (
         <div
@@ -344,7 +278,9 @@ export function AnlagenPage() {
                   <label className="block text-sm text-zinc-300">Kategorie</label>
                   <select
                     value={form.kategorie_wert_id ?? ''}
-                    onChange={(e) => setForm({ ...form, kategorie_wert_id: e.target.value || null })}
+                    onChange={(e) =>
+                      setForm({ ...form, kategorie_wert_id: e.target.value || null })
+                    }
                     className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   >
                     <option value="">— (keine) —</option>
