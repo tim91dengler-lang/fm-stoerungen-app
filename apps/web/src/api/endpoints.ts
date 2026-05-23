@@ -4,6 +4,9 @@ import type {
   AdresseRead,
   AdresseSuggestion,
   AdresseUpdate,
+  AnlageCreate,
+  AnlageRead,
+  AnlageUpdate,
   AuswahllisteCreate,
   AuswahllisteRead,
   AuswahllistenWertCreate,
@@ -16,6 +19,9 @@ import type {
   EinheitCreate,
   EinheitRead,
   EinheitUpdate,
+  FehlercodeCreate,
+  FehlercodeRead,
+  FehlercodeUpdate,
   GespeicherteAnsichtCreate,
   GespeicherteAnsichtRead,
   GespeicherteAnsichtUpdate,
@@ -38,6 +44,7 @@ import type {
   StockwerkCreate,
   StockwerkRead,
   StockwerkUpdate,
+  TickettypFeldUpdate,
   TickettypRead,
   TickettypCreate,
   TickettypUpdate,
@@ -206,12 +213,60 @@ export const ansichtenApi = {
 export const tickettypApi = {
   list: () =>
     api.get<TickettypRead[]>('/tickettypen').then((r) => r.data),
+  get: (id: UUID) =>
+    api.get<TickettypRead>(`/tickettypen/${id}`).then((r) => r.data),
   create: (payload: TickettypCreate) =>
     api.post<TickettypRead>('/tickettypen', payload).then((r) => r.data),
   update: (id: UUID, payload: TickettypUpdate) =>
     api.patch<TickettypRead>(`/tickettypen/${id}`, payload).then((r) => r.data),
+  updateFelder: (id: UUID, payload: TickettypFeldUpdate[]) =>
+    api
+      .patch<TickettypRead>(`/tickettypen/${id}/felder`, payload)
+      .then((r) => r.data),
   remove: (id: UUID) =>
     api.delete<void>(`/tickettypen/${id}`).then(() => undefined),
+};
+
+export const anlageApi = {
+  list: (
+    params: {
+      search?: string;
+      objekt_id?: UUID;
+      aktiv_only?: boolean;
+    } = {},
+  ) =>
+    api.get<AnlageRead[]>('/anlagen', { params }).then((r) => r.data),
+  get: (id: UUID) =>
+    api.get<AnlageRead>(`/anlagen/${id}`).then((r) => r.data),
+  create: (payload: AnlageCreate) =>
+    api.post<AnlageRead>('/anlagen', payload).then((r) => r.data),
+  update: (id: UUID, payload: AnlageUpdate) =>
+    api.patch<AnlageRead>(`/anlagen/${id}`, payload).then((r) => r.data),
+  remove: (id: UUID) =>
+    api.delete<void>(`/anlagen/${id}`).then(() => undefined),
+};
+
+export const fehlercodeApi = {
+  list: (
+    params: {
+      search?: string;
+      anlage_id?: UUID;
+      aktiv_only?: boolean;
+    } = {},
+  ) =>
+    api
+      .get<FehlercodeRead[]>('/fehlercodes', { params })
+      .then((r) => r.data),
+  get: (id: UUID) =>
+    api.get<FehlercodeRead>(`/fehlercodes/${id}`).then((r) => r.data),
+  create: (payload: FehlercodeCreate) =>
+    api.post<FehlercodeRead>('/fehlercodes', payload).then((r) => r.data),
+  update: (id: UUID, payload: FehlercodeUpdate) =>
+    api
+      .patch<FehlercodeRead>(`/fehlercodes/${id}`, payload)
+      .then((r) => r.data),
+  remove: (id: UUID) =>
+    api.delete<void>(`/fehlercodes/${id}`).then(() => undefined),
 };
 
 export const projektApi = {

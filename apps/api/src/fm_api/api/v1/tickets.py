@@ -84,6 +84,8 @@ async def create_ticket(
             zugewiesen_an_id=payload.zugewiesen_an_id,
             tickettyp_id=payload.tickettyp_id,
             projekt_id=payload.projekt_id,
+            anlage_id=payload.anlage_id,
+            fehlercode_id=payload.fehlercode_id,
             quelle_slug=payload.quelle,
             melder=payload.melder,
             faelligkeit_am=payload.faelligkeit_am,

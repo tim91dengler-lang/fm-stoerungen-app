@@ -59,6 +59,7 @@ class AuswahllistenWert(UuidPkMixin, TimestampMixin, Base):
     label: Mapped[str] = mapped_column(String(200), nullable=False)
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     farbe: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    icon_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ist_aktiv: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

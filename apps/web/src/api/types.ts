@@ -97,6 +97,18 @@ export interface ProjektRefMini {
   status: string;
 }
 
+export interface AnlageRef {
+  id: UUID;
+  bezeichnung: string;
+  icon_name: string | null;
+}
+
+export interface FehlercodeRef {
+  id: UUID;
+  code: string;
+  titel: string;
+}
+
 export interface TicketRead {
   id: UUID;
   mandant_id: UUID;
@@ -117,6 +129,8 @@ export interface TicketRead {
   partner: PartnerRef | null;
   tickettyp: TickettypRef | null;
   projekt: ProjektRefMini | null;
+  anlage: AnlageRef | null;
+  fehlercode: FehlercodeRef | null;
   faelligkeit_am: string | null;
   wiederholung: string | null;
   wartet_grund: AuswahlWertRef | null;
@@ -159,6 +173,8 @@ export interface TicketCreate {
   zugewiesen_an_id?: UUID | null;
   tickettyp_id?: UUID | null;
   projekt_id?: UUID | null;
+  anlage_id?: UUID | null;
+  fehlercode_id?: UUID | null;
   faelligkeit_am?: string | null;
   wiederholung?: string | null;
 }
@@ -181,6 +197,8 @@ export interface TicketUpdate {
   zugewiesen_an_id?: UUID | null;
   tickettyp_id?: UUID | null;
   projekt_id?: UUID | null;
+  anlage_id?: UUID | null;
+  fehlercode_id?: UUID | null;
   faelligkeit_am?: string | null;
   wiederholung?: string | null;
   wartet_grund?: string | null;
@@ -208,6 +226,7 @@ export interface AuswahllistenWertRead {
   label: string;
   reihenfolge: number;
   farbe: string | null;
+  icon_name: string | null;
   ist_aktiv: boolean;
   ist_system: boolean;
   meta: Record<string, unknown> | null;
@@ -220,6 +239,7 @@ export interface AuswahllistenWertCreate {
   label: string;
   reihenfolge?: number;
   farbe?: string | null;
+  icon_name?: string | null;
   ist_aktiv?: boolean;
   meta?: Record<string, unknown> | null;
 }
@@ -228,6 +248,7 @@ export interface AuswahllistenWertUpdate {
   label?: string;
   reihenfolge?: number;
   farbe?: string | null;
+  icon_name?: string | null;
   ist_aktiv?: boolean;
   meta?: Record<string, unknown> | null;
 }
@@ -520,6 +541,26 @@ export type HausUpdate = Partial<HausWriteBase>;
 
 // ---------------------------------------------------------------- Tickettypen
 
+export interface TickettypFeldRead {
+  id: UUID;
+  feld_key: string;
+  label: string;
+  ist_system_feld: boolean;
+  sichtbar: boolean;
+  pflicht: boolean;
+  nur_admin_sichtbar: boolean;
+  reihenfolge: number;
+}
+
+export interface TickettypFeldUpdate {
+  feld_key: string;
+  sichtbar?: boolean;
+  pflicht?: boolean;
+  nur_admin_sichtbar?: boolean;
+  reihenfolge?: number;
+  label?: string;
+}
+
 export interface TickettypRead {
   id: UUID;
   mandant_id: UUID;
@@ -532,6 +573,7 @@ export interface TickettypRead {
   default_reminder_tage: number;
   reihenfolge: number;
   ist_system: boolean;
+  felder: TickettypFeldRead[];
   created_at: string;
   updated_at: string;
 }
@@ -639,3 +681,85 @@ export interface DokumentUpdate {
   beschreibung?: string | null;
   links?: DokumentLink[];
 }
+
+// ---------------------------------------------------------------- Anlagen
+
+export interface KategorieRef {
+  id: UUID;
+  key: string;
+  label: string;
+  farbe: string | null;
+  icon_name: string | null;
+}
+
+export interface AnlageRead {
+  id: UUID;
+  mandant_id: UUID;
+  bezeichnung: string;
+  beschreibung: string | null;
+  icon_name: string | null;
+  kategorie_wert_id: UUID | null;
+  objekt_id: UUID | null;
+  stockwerk_id: UUID | null;
+  aktiv: boolean;
+  reihenfolge: number;
+  kategorie: KategorieRef | null;
+  objekt: { id: UUID; name: string } | null;
+  stockwerk: { id: UUID; bezeichnung: string } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnlageWriteBase {
+  bezeichnung: string;
+  beschreibung?: string | null;
+  icon_name?: string | null;
+  kategorie_wert_id?: UUID | null;
+  objekt_id?: UUID | null;
+  stockwerk_id?: UUID | null;
+  aktiv?: boolean;
+  reihenfolge?: number;
+}
+
+export type AnlageCreate = AnlageWriteBase;
+export type AnlageUpdate = Partial<AnlageWriteBase>;
+
+// ---------------------------------------------------------------- Fehlercodes
+
+export interface FehlercodeRead {
+  id: UUID;
+  mandant_id: UUID;
+  code: string;
+  titel: string;
+  beschreibung: string | null;
+  loesung: string | null;
+  kategorie_wert_id: UUID | null;
+  prio_default_wert_id: UUID | null;
+  tickettyp_default_id: UUID | null;
+  anlage_id: UUID | null;
+  quelle: string | null;
+  aktiv: boolean;
+  kategorie: KategorieRef | null;
+  prio_default: { id: UUID; key: string; label: string; farbe: string | null } | null;
+  tickettyp_default: { id: UUID; key: string; label: string } | null;
+  anlage: { id: UUID; bezeichnung: string; icon_name: string | null } | null;
+  nutzung_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FehlercodeWriteBase {
+  code: string;
+  titel: string;
+  beschreibung?: string | null;
+  loesung?: string | null;
+  kategorie_wert_id?: UUID | null;
+  prio_default_wert_id?: UUID | null;
+  tickettyp_default_id?: UUID | null;
+  anlage_id?: UUID | null;
+  quelle?: string | null;
+  aktiv?: boolean;
+}
+
+export type FehlercodeCreate = FehlercodeWriteBase;
+export type FehlercodeUpdate = Partial<FehlercodeWriteBase>;

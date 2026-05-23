@@ -9,6 +9,8 @@ Was wird angelegt (pro Default-Mandant):
 - 5 Partner (Mieter / Eigentümer / Auftraggeber / Nachunternehmer)
 - 2 Techniker-User (max + lisa)
 - 2 Projekte
+- 7 Anlagen (RLT, Heizkreis, BMA, Aufzug, …)
+- ~18 Fehlercodes (Mockup-Datensatz Schartec/EBO)
 - ca. 15 Tickets mit realistischen Stati, Prios, Fälligkeiten, Wartet-Sub
 
 Usage (im API-Container):
@@ -28,7 +30,9 @@ from fm_api.core.security import hash_password
 from fm_api.db.session import SessionLocal
 from fm_api.models import (
     Adresse,
+    Anlage,
     Auswahlliste,
+    Fehlercode,
     GeschaeftsPartner,
     Haus,
     Mandant,
@@ -345,6 +349,283 @@ async def main() -> int:
 
         wartet_material = await aw("wartet_grund", "material")
         wartet_extern = await aw("wartet_grund", "extern")
+
+        # ---- Kategorie-Auswahlwerte für Anlagen/Fehlercodes ----------------
+        # Wir nutzen die existierende Auswahlliste `ticket_kategorie`.
+        kategorien_by_key: dict[str, UUID] = {}
+        kat_liste = (
+            await db.execute(
+                select(Auswahlliste).where(
+                    Auswahlliste.mandant_id == m_id,
+                    Auswahlliste.key == "ticket_kategorie",
+                )
+            )
+        ).scalar_one_or_none()
+        if kat_liste is not None:
+            for w in kat_liste.werte:
+                kategorien_by_key[w.key] = w.id
+
+        # ---- Anlagen -------------------------------------------------------
+        anlagen_data = [
+            # bezeichnung, beschreibung, icon, kategorie-key, objekt-name
+            (
+                "RLT-03",
+                "Bürohaus Marktplatz, Lüftung 3. OG",
+                "Wind",
+                "klima",
+                "Bürohaus Marktplatz",
+            ),
+            (
+                "RLT-01/02/03",
+                "Bürohaus Marktplatz, Sammelmeldung Lüftung",
+                "Wind",
+                "klima",
+                "Bürohaus Marktplatz",
+            ),
+            (
+                "Heizkreis Süd",
+                "Wohnpark, Vorderhaus 2. OG",
+                "Thermometer",
+                "heizung",
+                "Wohnpark Heilbronner Straße",
+            ),
+            (
+                "BMA Zentrale",
+                "Brandmeldeanlage Bürohaus Marktplatz",
+                "AlertOctagon",
+                None,
+                "Bürohaus Marktplatz",
+            ),
+            (
+                "Aufzug A",
+                "Wohnpark Vorderhaus Personen-Aufzug",
+                "Activity",
+                None,
+                "Wohnpark Heilbronner Straße",
+            ),
+            (
+                "Hebeanlage Tiefgarage",
+                "Wohnpark Tiefgarage, Abwasser-Hebeanlage",
+                "Droplets",
+                "sanitaer",
+                "Wohnpark Heilbronner Straße",
+            ),
+            (
+                "UV Außentor",
+                "Galerie Königstraße, Hauptverteilung Außenanlagen",
+                "Zap",
+                None,
+                "Galerie Königstraße",
+            ),
+        ]
+        anlagen_by_bez: dict[str, Anlage] = {}
+        # Objekt-Lookup
+        objekte_by_name: dict[str, Objekt] = {
+            o.name: o
+            for o in (await db.execute(select(Objekt).where(Objekt.mandant_id == m_id)))
+            .scalars()
+            .all()
+        }
+        for bez, beschr, icon, kat_key, obj_name in anlagen_data:
+            existing = (
+                await db.execute(
+                    select(Anlage).where(
+                        Anlage.mandant_id == m_id,
+                        Anlage.bezeichnung == bez,
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                obj_ref = objekte_by_name.get(obj_name)
+                anl = Anlage(
+                    mandant_id=m_id,
+                    bezeichnung=bez,
+                    beschreibung=beschr,
+                    icon_name=icon,
+                    kategorie_wert_id=kategorien_by_key.get(kat_key) if kat_key else None,
+                    objekt_id=obj_ref.id if obj_ref else None,
+                    aktiv=True,
+                )
+                db.add(anl)
+                await db.flush()
+                print(f"[mockup-seed] anlage {bez}")
+                anlagen_by_bez[bez] = anl
+            else:
+                anlagen_by_bez[bez] = existing
+
+        # ---- Fehlercodes ---------------------------------------------------
+        fehlercodes_data = [
+            # code, titel, beschreibung, loesung, kategorie-key, prio-default-key, anlage-bez, quelle
+            (
+                "RLT-3471",
+                "Filter verschmutzt — Differenzdruck hoch",
+                "Differenzdruck > 250 Pa über der Filterstufe. Filter ist verschmutzt und reduziert den Volumenstrom.",
+                "1. Filter ausbauen (F7 580 x 580 x 96 mm). 2. Neuen Filter einsetzen. 3. Differenzdruck-Anzeige am Touchpanel zurücksetzen. 4. Volumenstrom 5 min nachlaufen lassen.",
+                "klima",
+                "mittel",
+                "RLT-03",
+                "schartec",
+            ),
+            (
+                "RLT-4012",
+                "Frostschutzalarm Vorlaufventil",
+                "Vorlauftemperatur Heizregister < 5 °C bei aktivem Lüfter. Frostschutz-Thermostat hat ausgelöst.",
+                "1. Heizkreislauf-Druck prüfen (Soll > 1,5 bar). 2. Vorlaufventil manuell öffnen. 3. Bei wiederholtem Auslösen: Thermostat tauschen.",
+                "klima",
+                "hoch",
+                "RLT-03",
+                "schartec",
+            ),
+            (
+                "RLT-2155",
+                "Brandschutzklappe ausgelöst",
+                "BSK in Lüftungsstrang hat ausgelöst, Endlagenschalter meldet ZU. Lüfter wurde automatisch gestoppt.",
+                "1. Brandmeldung prüfen — falls Fehlauslösung: BMA quittieren. 2. BSK manuell mit Vierkantschlüssel öffnen. 3. Endlagenschalter im EBO quittieren.",
+                "klima",
+                "kritisch",
+                "RLT-01/02/03",
+                "schartec",
+            ),
+            (
+                "RLT-5560",
+                "Differenzdruck Zuluft zu hoch",
+                "Zuluftdruck über Sollwert. Vermutlich Volumenstrom-Regler oder Zuluftklappe defekt.",
+                "1. Volumenstrom-Regelung im EBO prüfen. 2. Klappenstellung mechanisch kontrollieren.",
+                "klima",
+                "mittel",
+                "RLT-03",
+                "schartec",
+            ),
+            (
+                "HZG-1101",
+                "Vorlauftemperatur zu niedrig",
+                "Vorlauftemperatur erreicht Sollwert nicht. Mieter-Beschwerden über kalte Räume möglich.",
+                "1. Kessel-Status prüfen. 2. Vorlauf-Mischer kontrollieren. 3. Heizkurve im EBO prüfen.",
+                "heizung",
+                "hoch",
+                "Heizkreis Süd",
+                "schartec",
+            ),
+            (
+                "HZG-1340",
+                "Druckverlust Heizkreis",
+                "Anlagendruck unter Mindestwert (1,2 bar). Mögliche Leckage oder Luft im System.",
+                "1. Sichtkontrolle auf Leckagen. 2. Druck über Befüllventil aufbauen (max 2,0 bar). 3. Entlüften der Heizkörper.",
+                "heizung",
+                "mittel",
+                "Heizkreis Süd",
+                "schartec",
+            ),
+            (
+                "HZG-2200",
+                "Wärmepumpe Sammelstörung",
+                "Wärmepumpen-Modul meldet allgemeinen Störung. Detail-Code am Display ablesen.",
+                "1. Detail-Fehlercode am WP-Display ablesen. 2. Hersteller-Hotline mit Code anrufen.",
+                "heizung",
+                "mittel",
+                None,
+                "schartec",
+            ),
+            (
+                "ELE-0610",
+                "FI-Schalter ausgelöst",
+                "Fehlerstrom-Schutzschalter in Unterverteilung hat ausgelöst. Stromkreis spannungsfrei.",
+                "1. Verbraucher am Strang einzeln abklemmen. 2. FI testen. 3. Verbraucher einzeln wieder zuschalten.",
+                None,
+                "mittel",
+                None,
+                "schartec",
+            ),
+            (
+                "ELE-1240",
+                "Unterverteilung Außentor Störung",
+                "Sammelstörung UV Außentor — Lichtschranke, Antrieb, Notentriegelung.",
+                "1. Lichtschranke reinigen. 2. Endschalter prüfen. 3. Notentriegelungs-Schalter kontrollieren.",
+                None,
+                "mittel",
+                "UV Außentor",
+                "schartec",
+            ),
+            (
+                "ELE-3045",
+                "Notbeleuchtung Akku fehlerhaft",
+                "Akku-Kapazität einer Notleuchten-Linie unter 80 %.",
+                "1. Linie im EBO identifizieren. 2. Akku-Modul tauschen. 3. Funktionstest auslösen.",
+                None,
+                "mittel",
+                None,
+                "schartec",
+            ),
+            (
+                "SAN-1100",
+                "Hebeanlage Sammelstörung",
+                "Hebeanlage Tiefgarage meldet Störung. Bei Regenwetter Überflutungs-Risiko.",
+                "1. Niveauschalter prüfen. 2. Pumpe manuell anlaufen lassen. 3. Bei wiederholtem Auslösen: SHK-Firma rufen.",
+                "sanitaer",
+                "hoch",
+                "Hebeanlage Tiefgarage",
+                "schartec",
+            ),
+            (
+                "SAN-2200",
+                "Druckminderer Trinkwasser leckt",
+                "Tropfwasser am Druckminderer Trinkwasser-Eingang. Druck im Netz möglicherweise zu hoch.",
+                "1. Eingangsdruck am Manometer ablesen. 2. Wenn > 6 bar: Druckminderer nachjustieren auf 4 bar.",
+                "sanitaer",
+                "mittel",
+                None,
+                "schartec",
+            ),
+            (
+                "SAN-3300",
+                "Warmwasser-Boiler kalt",
+                "Warmwasser-Auslauftemperatur < 50 °C. Legionellen-Risiko bei dauerhaften Werten unter 55 °C.",
+                "1. Heizpatrone Boiler prüfen. 2. Boilerthermostat auf 60 °C. 3. Legionellen-Schaltung im EBO aktivieren.",
+                "sanitaer",
+                "mittel",
+                None,
+                "schartec",
+            ),
+            (
+                "AUF-0001",
+                "Aufzug Notruf ausgelöst",
+                "Person hat im Aufzug den Notruf-Knopf betätigt. Sofortige Reaktion erforderlich.",
+                "1. Sprechverbindung mit Person aufnehmen. 2. Befindlichkeit klären. 3. Notbefreiung oder Aufzug-Notdienst.",
+                None,
+                "kritisch",
+                "Aufzug A",
+                "schartec",
+            ),
+        ]
+        for code, titel, beschr, loesung, kat_key, prio_key, anl_bez, quelle in fehlercodes_data:
+            existing_fc = (
+                await db.execute(
+                    select(Fehlercode).where(
+                        Fehlercode.mandant_id == m_id,
+                        Fehlercode.code == code,
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing_fc is not None:
+                continue
+            anl_ref = anlagen_by_bez.get(anl_bez) if anl_bez else None
+            prio_id_val = await aw("ticket_prioritaet", prio_key) if prio_key else None
+            db.add(
+                Fehlercode(
+                    mandant_id=m_id,
+                    code=code,
+                    titel=titel,
+                    beschreibung=beschr,
+                    loesung=loesung,
+                    kategorie_wert_id=kategorien_by_key.get(kat_key) if kat_key else None,
+                    prio_default_wert_id=prio_id_val,
+                    anlage_id=anl_ref.id if anl_ref else None,
+                    quelle=quelle,
+                    aktiv=True,
+                )
+            )
+        await db.flush()
+        print(f"[mockup-seed] fehlercodes: {len(fehlercodes_data)} geprüft/angelegt")
 
         # ---- Tickets -------------------------------------------------------
         admin = (

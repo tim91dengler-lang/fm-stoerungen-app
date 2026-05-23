@@ -76,6 +76,8 @@ _TICKET_LOAD_OPTIONS = (
     selectinload(Ticket.quelle_wert),
     selectinload(Ticket.wartet_grund_wert),
     selectinload(Ticket.wartet_nachunternehmer),
+    selectinload(Ticket.anlage),
+    selectinload(Ticket.fehlercode),
 )
 
 
@@ -220,6 +222,8 @@ async def create_ticket(
     zugewiesen_an_id: UUID | None = None,
     tickettyp_id: UUID | None = None,
     projekt_id: UUID | None = None,
+    anlage_id: UUID | None = None,
+    fehlercode_id: UUID | None = None,
     quelle_slug: str | None = None,
     melder: str | None = None,
     faelligkeit_am: Any | None = None,
@@ -278,6 +282,8 @@ async def create_ticket(
         partner_id=partner_id,
         tickettyp_id=tickettyp_id,
         projekt_id=projekt_id,
+        anlage_id=anlage_id,
+        fehlercode_id=fehlercode_id,
         quelle_id=quelle_wert.id if quelle_wert else None,
         melder=melder,
         eroeffnet_von_id=eroeffnet_von_id,
@@ -329,6 +335,8 @@ async def update_ticket(
         "einheit_id",
         "tickettyp_id",
         "projekt_id",
+        "anlage_id",
+        "fehlercode_id",
     ):
         if direct in updates:
             setattr(ticket, direct, updates[direct])

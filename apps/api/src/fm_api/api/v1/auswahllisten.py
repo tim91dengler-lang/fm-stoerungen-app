@@ -135,6 +135,7 @@ async def add_wert(
             label=payload.label,
             reihenfolge=payload.reihenfolge,
             farbe=payload.farbe,
+            icon_name=payload.icon_name,
             ist_aktiv=payload.ist_aktiv,
             meta=payload.meta,
         )
