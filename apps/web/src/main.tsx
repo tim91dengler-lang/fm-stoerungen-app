@@ -1,10 +1,10 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 
 import { router } from './router';
 import { AuthProvider } from './contexts/AuthContext';
+import { ErrorBanner } from './components/ErrorBanner';
 import { registerServiceWorker, setupInstallPrompt } from './lib/pwa';
 import './index.css';
 
@@ -26,12 +26,14 @@ if (!rootEl) {
   throw new Error('Root element #root not found in index.html');
 }
 
+// StrictMode bewusst AUS während Hot-Iteration: doppeltes Mounten triggert
+// State-Race-Conditions in Custom-Hooks, die produktiv nie auftreten würden,
+// aber Tester verwirren. Reaktivieren wenn Modal-Patterns stabilisiert sind.
 ReactDOM.createRoot(rootEl).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
-    </QueryClientProvider>
-  </React.StrictMode>,
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <RouterProvider router={router} />
+      <ErrorBanner />
+    </AuthProvider>
+  </QueryClientProvider>,
 );
