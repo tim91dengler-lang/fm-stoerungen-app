@@ -1,12 +1,20 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Wrench, Calendar, Binoculars } from 'lucide-react';
+import {
+  Activity,
+  AlertOctagon,
+  Binoculars,
+  Calendar,
+  Wrench,
+} from 'lucide-react';
 import clsx from 'clsx';
 import {
+  anlageApi,
   auswahllistenApi,
+  fehlercodeApi,
   objektApi,
   objektstrukturApi,
   partnerApi,
@@ -15,14 +23,14 @@ import {
   tickettypApi,
   userApi,
 } from '../api/endpoints';
+import type { TickettypFeldRead, TickettypRead } from '../api/types';
 
+// Schema lax — Pflichtfelder werden pro Vorlage validiert (siehe submit())
 const schema = z.object({
   tickettyp_id: z.string().uuid().optional().nullable(),
-  titel: z.string().min(1, 'Titel fehlt').max(200),
+  titel: z.string().max(200).optional().default(''),
   beschreibung: z.string().max(10_000).optional().default(''),
-  prioritaet: z
-    .enum(['niedrig', 'mittel', 'hoch', 'kritisch'])
-    .default('mittel'),
+  prioritaet: z.enum(['niedrig', 'mittel', 'hoch', 'kritisch']).default('mittel'),
   kategorie: z.string().optional().nullable(),
   quelle: z.string().optional().nullable(),
   melder: z.string().max(200).optional().nullable(),
@@ -32,8 +40,11 @@ const schema = z.object({
   einheit_id: z.string().uuid().optional().nullable(),
   partner_id: z.string().uuid().optional().nullable(),
   projekt_id: z.string().uuid().optional().nullable(),
+  anlage_id: z.string().uuid().optional().nullable(),
+  fehlercode_id: z.string().uuid().optional().nullable(),
   zugewiesen_an_id: z.string().uuid().optional().nullable(),
   faelligkeit_am: z.string().optional().nullable(),
+  wiederholung: z.string().optional().nullable(),
 });
 
 type Form = z.infer<typeof schema>;
@@ -47,6 +58,7 @@ const TYP_ICONS = {
   wrench: Wrench,
   calendar: Calendar,
   binoculars: Binoculars,
+  target: Binoculars,
 } as const;
 
 function typIcon(key: string | null | undefined) {
@@ -67,37 +79,52 @@ function colorClasses(farbe: string | null | undefined): string {
   }
 }
 
+/** Liefert die Sichtbar/Pflicht-Map aus den Vorlage-Feldern, indexiert nach feld_key. */
+function buildFelderMap(typ: TickettypRead | null): Map<string, TickettypFeldRead> {
+  const m = new Map<string, TickettypFeldRead>();
+  if (!typ) return m;
+  for (const f of typ.felder) {
+    m.set(f.feld_key, f);
+  }
+  return m;
+}
+
 export function TicketErfassenModal({ onClose, onCreated }: Props) {
   const { data: tickettypen = [] } = useQuery({
     queryKey: ['tickettypen'],
     queryFn: () => tickettypApi.list(),
     staleTime: 5 * 60_000,
   });
-
   const { data: users } = useQuery({
     queryKey: ['users-for-assign'],
     queryFn: () => userApi.list({ limit: 200 }),
     staleTime: 60_000,
   });
-
   const { data: objekte } = useQuery({
     queryKey: ['objekte-for-ticket'],
     queryFn: () => objektApi.list({ limit: 500 }),
     staleTime: 60_000,
   });
-
   const { data: partnerListe } = useQuery({
     queryKey: ['partner-for-ticket'],
     queryFn: () => partnerApi.list({ limit: 500 }),
     staleTime: 60_000,
   });
-
   const { data: projekte } = useQuery({
     queryKey: ['projekte-active'],
     queryFn: () => projektApi.list({ status: ['geplant', 'laufend'] }),
     staleTime: 60_000,
   });
-
+  const { data: anlagen } = useQuery({
+    queryKey: ['anlagen-for-ticket'],
+    queryFn: () => anlageApi.list({ aktiv_only: true }),
+    staleTime: 60_000,
+  });
+  const { data: fehlercodes } = useQuery({
+    queryKey: ['fehlercodes-for-ticket'],
+    queryFn: () => fehlercodeApi.list({ aktiv_only: true }),
+    staleTime: 60_000,
+  });
   const { data: auswahllisten } = useQuery({
     queryKey: ['auswahllisten'],
     queryFn: () => auswahllistenApi.list(),
@@ -106,6 +133,8 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
 
   const kategorienListe = auswahllisten?.find((l) => l.key === 'ticket_kategorie');
   const quellenListe = auswahllisten?.find((l) => l.key === 'eingangskanal');
+
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -130,8 +159,11 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
       einheit_id: null,
       partner_id: null,
       projekt_id: null,
+      anlage_id: null,
+      fehlercode_id: null,
       zugewiesen_an_id: null,
       faelligkeit_am: null,
+      wiederholung: null,
     },
   });
 
@@ -139,11 +171,23 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
   const selectedObjektId = watch('objekt_id');
   const selectedHausId = watch('haus_id');
   const selectedStockwerkId = watch('stockwerk_id');
+  const selectedFehlercodeId = watch('fehlercode_id');
 
   const selectedTyp = useMemo(
     () => tickettypen.find((t) => t.id === selectedTypId) ?? null,
     [tickettypen, selectedTypId],
   );
+  const felderMap = useMemo(() => buildFelderMap(selectedTyp), [selectedTyp]);
+
+  function feldSichtbar(key: string): boolean {
+    if (!selectedTyp) return true;
+    const f = felderMap.get(key);
+    return f ? f.sichtbar : true;
+  }
+  function feldPflicht(key: string): boolean {
+    const f = felderMap.get(key);
+    return f ? f.pflicht && f.sichtbar : false;
+  }
 
   useEffect(() => {
     if (!selectedTypId && tickettypen.length > 0) {
@@ -168,18 +212,20 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
     [haus, selectedStockwerkId],
   );
 
-  const showFaelligkeit =
-    selectedTyp &&
-    (selectedTyp.key === 'wartung' ||
-      selectedTyp.key === 'baubegehung' ||
-      (selectedTyp.pflichtfelder ?? []).includes('faelligkeit_am'));
+  // Fehlercode-Pre-Fill: nur Beschreibung übernehmen (Entscheidung Tim 2026-05-22)
+  useEffect(() => {
+    if (!selectedFehlercodeId) return;
+    const fc = fehlercodes?.find((f) => f.id === selectedFehlercodeId);
+    if (!fc) return;
+    if (fc.beschreibung) setValue('beschreibung', fc.beschreibung);
+  }, [selectedFehlercodeId, fehlercodes, setValue]);
 
   const create = useMutation({
     mutationFn: (data: Form) =>
       ticketApi.create({
         tickettyp_id: data.tickettyp_id || null,
-        titel: data.titel,
-        beschreibung: data.beschreibung,
+        titel: data.titel ?? '',
+        beschreibung: data.beschreibung ?? '',
         prioritaet: data.prioritaet,
         kategorie: data.kategorie || null,
         quelle: data.quelle || null,
@@ -190,12 +236,43 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
         einheit_id: data.einheit_id || null,
         partner_id: data.partner_id || null,
         projekt_id: data.projekt_id || null,
+        anlage_id: data.anlage_id || null,
+        fehlercode_id: data.fehlercode_id || null,
         zugewiesen_an_id: data.zugewiesen_an_id || null,
         faelligkeit_am: data.faelligkeit_am || null,
+        wiederholung: data.wiederholung || null,
       }),
     onSuccess: () => onCreated(),
     onError: () => setError('root', { message: 'Anlegen fehlgeschlagen.' }),
   });
+
+  function onSubmit(data: Form) {
+    // Per-Vorlage Pflichtfeld-Validierung
+    const pflichtChecks: Array<[string, string, string | null | undefined]> = [
+      ['titel', 'Titel', data.titel],
+      ['beschreibung', 'Beschreibung', data.beschreibung],
+      ['objekt', 'Objekt', data.objekt_id],
+      ['haus', 'Haus', data.haus_id],
+      ['stockwerk', 'Stockwerk', data.stockwerk_id],
+      ['einheit', 'Einheit', data.einheit_id],
+      ['partner', 'Partner', data.partner_id],
+      ['kategorie', 'Kategorie', data.kategorie],
+      ['anlage', 'Anlage', data.anlage_id],
+      ['fehlercode', 'Fehlercode', data.fehlercode_id],
+      ['melder', 'Melder', data.melder],
+      ['quelle', 'Quelle', data.quelle],
+      ['projekt', 'Projekt', data.projekt_id],
+      ['faelligkeit_am', 'Fälligkeit', data.faelligkeit_am],
+    ];
+    for (const [key, label, value] of pflichtChecks) {
+      if (feldPflicht(key) && !value) {
+        setSubmitError(`Pflichtfeld "${label}" laut Vorlage ist nicht gesetzt.`);
+        return;
+      }
+    }
+    setSubmitError(null);
+    create.mutate(data);
+  }
 
   return (
     <div
@@ -220,10 +297,10 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit((data) => create.mutate(data))} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Tickettyp-Picker */}
           <div>
-            <label className="block text-sm font-medium text-zinc-300">Tickettyp</label>
+            <label className="block text-sm font-medium text-zinc-300">Vorlage</label>
             <div className="mt-1 grid grid-cols-3 gap-2">
               {tickettypen.map((t) => {
                 const Icon = typIcon(t.icon);
@@ -248,239 +325,325 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="titel" className="block text-sm font-medium text-zinc-300">
-              Titel <span className="text-red-400">*</span>
-            </label>
-            <input
-              id="titel"
-              {...register('titel')}
-              autoFocus
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-              placeholder={
-                selectedTyp?.key === 'wartung'
-                  ? 'z. B. Wartung Heizungsanlage Q2'
-                  : 'Kurze Beschreibung des Problems'
-              }
-            />
-            {errors.titel && <p className="mt-1 text-xs text-red-400">{errors.titel.message}</p>}
-          </div>
-
-          <div>
-            <label htmlFor="beschreibung" className="block text-sm font-medium text-zinc-300">
-              Beschreibung
-            </label>
-            <textarea
-              id="beschreibung"
-              rows={3}
-              {...register('beschreibung')}
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          {feldSichtbar('fehlercode') && (
             <div>
-              <label htmlFor="prioritaet" className="block text-sm font-medium text-zinc-300">
-                Priorität
+              <label
+                htmlFor="fehlercode_id"
+                className="block text-sm font-medium text-zinc-300"
+              >
+                <AlertOctagon className="-mt-0.5 mr-1 inline h-3.5 w-3.5 text-amber-400" />
+                Fehlercode {feldPflicht('fehlercode') && <span className="text-red-400">*</span>}
               </label>
               <select
-                id="prioritaet"
-                {...register('prioritaet')}
+                id="fehlercode_id"
+                {...register('fehlercode_id', {
+                  setValueAs: (v) => (v === '' ? null : v),
+                })}
                 className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
               >
-                <option value="niedrig">Niedrig</option>
-                <option value="mittel">Mittel</option>
-                <option value="hoch">Hoch</option>
-                <option value="kritisch">Kritisch</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="kategorie" className="block text-sm font-medium text-zinc-300">
-                Kategorie
-              </label>
-              <select
-                id="kategorie"
-                {...register('kategorie', { setValueAs: (v) => (v === '' ? null : v) })}
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-              >
-                <option value="">— (keine) —</option>
-                {kategorienListe?.werte.map((w) => (
-                  <option key={w.id} value={w.key}>
-                    {w.label}
+                <option value="">— (kein Fehlercode) —</option>
+                {fehlercodes?.map((fc) => (
+                  <option key={fc.id} value={fc.id}>
+                    {fc.code} — {fc.titel}
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-[10px] text-zinc-500">
+                Bei Auswahl wird die Beschreibung übernommen.
+              </p>
             </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-3">
+          {feldSichtbar('titel') && (
             <div>
-              <label htmlFor="quelle" className="block text-sm font-medium text-zinc-300">
-                Quelle / Eingangskanal
-              </label>
-              <select
-                id="quelle"
-                {...register('quelle', { setValueAs: (v) => (v === '' ? null : v) })}
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-              >
-                <option value="">— (keine) —</option>
-                {quellenListe?.werte.map((w) => (
-                  <option key={w.id} value={w.key}>
-                    {w.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="melder" className="block text-sm font-medium text-zinc-300">
-                Melder / Anrufer
+              <label htmlFor="titel" className="block text-sm font-medium text-zinc-300">
+                Titel {feldPflicht('titel') && <span className="text-red-400">*</span>}
               </label>
               <input
-                id="melder"
-                {...register('melder')}
-                placeholder="Name oder Telefonnummer"
+                id="titel"
+                {...register('titel')}
+                autoFocus
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                placeholder={
+                  selectedTyp?.key === 'wartung'
+                    ? 'z. B. Wartung Heizungsanlage Q2'
+                    : 'Kurze Beschreibung des Problems'
+                }
+              />
+              {errors.titel && (
+                <p className="mt-1 text-xs text-red-400">{errors.titel.message}</p>
+              )}
+            </div>
+          )}
+
+          {feldSichtbar('beschreibung') && (
+            <div>
+              <label
+                htmlFor="beschreibung"
+                className="block text-sm font-medium text-zinc-300"
+              >
+                Beschreibung {feldPflicht('beschreibung') && <span className="text-red-400">*</span>}
+              </label>
+              <textarea
+                id="beschreibung"
+                rows={3}
+                {...register('beschreibung')}
                 className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
               />
             </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {feldSichtbar('prio') && (
+              <div>
+                <label htmlFor="prioritaet" className="block text-sm font-medium text-zinc-300">
+                  Priorität
+                </label>
+                <select
+                  id="prioritaet"
+                  {...register('prioritaet')}
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                >
+                  <option value="niedrig">Niedrig</option>
+                  <option value="mittel">Mittel</option>
+                  <option value="hoch">Hoch</option>
+                  <option value="kritisch">Kritisch</option>
+                </select>
+              </div>
+            )}
+            {feldSichtbar('kategorie') && (
+              <div>
+                <label htmlFor="kategorie" className="block text-sm font-medium text-zinc-300">
+                  Kategorie {feldPflicht('kategorie') && <span className="text-red-400">*</span>}
+                </label>
+                <select
+                  id="kategorie"
+                  {...register('kategorie', { setValueAs: (v) => (v === '' ? null : v) })}
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                >
+                  <option value="">— (keine) —</option>
+                  {kategorienListe?.werte.map((w) => (
+                    <option key={w.id} value={w.key}>
+                      {w.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {feldSichtbar('quelle') && (
+              <div>
+                <label htmlFor="quelle" className="block text-sm font-medium text-zinc-300">
+                  Quelle
+                </label>
+                <select
+                  id="quelle"
+                  {...register('quelle', { setValueAs: (v) => (v === '' ? null : v) })}
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                >
+                  <option value="">— (keine) —</option>
+                  {quellenListe?.werte.map((w) => (
+                    <option key={w.id} value={w.key}>
+                      {w.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {feldSichtbar('melder') && (
+              <div>
+                <label htmlFor="melder" className="block text-sm font-medium text-zinc-300">
+                  Melder / Anrufer
+                </label>
+                <input
+                  id="melder"
+                  {...register('melder')}
+                  placeholder="Name oder Telefonnummer"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                />
+              </div>
+            )}
           </div>
 
           {/* Ort: Objekt -> Haus -> Stockwerk -> Einheit */}
-          <div className="rounded-md border border-zinc-800 bg-zinc-950/40 p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Ort
+          {(feldSichtbar('objekt') ||
+            feldSichtbar('haus') ||
+            feldSichtbar('stockwerk') ||
+            feldSichtbar('einheit')) && (
+            <div className="rounded-md border border-zinc-800 bg-zinc-950/40 p-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Ort
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {feldSichtbar('objekt') && (
+                  <div>
+                    <label htmlFor="objekt_id" className="block text-xs text-zinc-400">
+                      Objekt {feldPflicht('objekt') && <span className="text-red-400">*</span>}
+                    </label>
+                    <select
+                      id="objekt_id"
+                      {...register('objekt_id', {
+                        setValueAs: (v) => (v === '' ? null : v),
+                        onChange: () => {
+                          setValue('haus_id', null);
+                          setValue('stockwerk_id', null);
+                          setValue('einheit_id', null);
+                        },
+                      })}
+                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                    >
+                      <option value="">— (keins) —</option>
+                      {objekte?.items.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {feldSichtbar('haus') && (
+                  <div>
+                    <label htmlFor="haus_id" className="block text-xs text-zinc-400">
+                      Haus
+                    </label>
+                    <select
+                      id="haus_id"
+                      disabled={!selectedObjektId}
+                      {...register('haus_id', {
+                        setValueAs: (v) => (v === '' ? null : v),
+                        onChange: () => {
+                          setValue('stockwerk_id', null);
+                          setValue('einheit_id', null);
+                        },
+                      })}
+                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
+                    >
+                      <option value="">— (keins) —</option>
+                      {hausTree?.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.bezeichnung}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {feldSichtbar('stockwerk') && (
+                  <div>
+                    <label htmlFor="stockwerk_id" className="block text-xs text-zinc-400">
+                      Stockwerk
+                    </label>
+                    <select
+                      id="stockwerk_id"
+                      disabled={!selectedHausId}
+                      {...register('stockwerk_id', {
+                        setValueAs: (v) => (v === '' ? null : v),
+                        onChange: () => setValue('einheit_id', null),
+                      })}
+                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
+                    >
+                      <option value="">— (keins) —</option>
+                      {haus?.stockwerke.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.bezeichnung}
+                          {s.ausrichtung ? ` · ${s.ausrichtung}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {feldSichtbar('einheit') && (
+                  <div>
+                    <label htmlFor="einheit_id" className="block text-xs text-zinc-400">
+                      Einheit
+                    </label>
+                    <select
+                      id="einheit_id"
+                      disabled={!selectedStockwerkId}
+                      {...register('einheit_id', { setValueAs: (v) => (v === '' ? null : v) })}
+                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
+                    >
+                      <option value="">— (keine) —</option>
+                      {stockwerk?.einheiten.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.bezeichnung}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {feldSichtbar('anlage') && (
               <div>
-                <label htmlFor="objekt_id" className="block text-xs text-zinc-400">
-                  Objekt
+                <label htmlFor="anlage_id" className="block text-sm font-medium text-zinc-300">
+                  <Activity className="-mt-0.5 mr-1 inline h-3.5 w-3.5 text-emerald-400" />
+                  Anlage {feldPflicht('anlage') && <span className="text-red-400">*</span>}
                 </label>
                 <select
-                  id="objekt_id"
-                  {...register('objekt_id', {
-                    setValueAs: (v) => (v === '' ? null : v),
-                    onChange: () => {
-                      setValue('haus_id', null);
-                      setValue('stockwerk_id', null);
-                      setValue('einheit_id', null);
-                    },
-                  })}
+                  id="anlage_id"
+                  {...register('anlage_id', { setValueAs: (v) => (v === '' ? null : v) })}
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                >
+                  <option value="">— (keine) —</option>
+                  {anlagen?.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.bezeichnung}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {feldSichtbar('partner') && (
+              <div>
+                <label htmlFor="partner_id" className="block text-sm font-medium text-zinc-300">
+                  Partner {feldPflicht('partner') && <span className="text-red-400">*</span>}
+                </label>
+                <select
+                  id="partner_id"
+                  {...register('partner_id', { setValueAs: (v) => (v === '' ? null : v) })}
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                >
+                  <option value="">— (keiner) —</option>
+                  {partnerListe?.items.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {feldSichtbar('projekt') && (
+              <div>
+                <label htmlFor="projekt_id" className="block text-sm font-medium text-zinc-300">
+                  Projekt
+                </label>
+                <select
+                  id="projekt_id"
+                  {...register('projekt_id', { setValueAs: (v) => (v === '' ? null : v) })}
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                 >
                   <option value="">— (keins) —</option>
-                  {objekte?.items.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
+                  {projekte?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
                     </option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label htmlFor="haus_id" className="block text-xs text-zinc-400">
-                  Haus
-                </label>
-                <select
-                  id="haus_id"
-                  disabled={!selectedObjektId}
-                  {...register('haus_id', {
-                    setValueAs: (v) => (v === '' ? null : v),
-                    onChange: () => {
-                      setValue('stockwerk_id', null);
-                      setValue('einheit_id', null);
-                    },
-                  })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
-                >
-                  <option value="">— (keins) —</option>
-                  {hausTree?.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.bezeichnung}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="stockwerk_id" className="block text-xs text-zinc-400">
-                  Stockwerk
-                </label>
-                <select
-                  id="stockwerk_id"
-                  disabled={!selectedHausId}
-                  {...register('stockwerk_id', {
-                    setValueAs: (v) => (v === '' ? null : v),
-                    onChange: () => setValue('einheit_id', null),
-                  })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
-                >
-                  <option value="">— (keins) —</option>
-                  {haus?.stockwerke.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.bezeichnung}
-                      {s.ausrichtung ? ` · ${s.ausrichtung}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="einheit_id" className="block text-xs text-zinc-400">
-                  Einheit
-                </label>
-                <select
-                  id="einheit_id"
-                  disabled={!selectedStockwerkId}
-                  {...register('einheit_id', { setValueAs: (v) => (v === '' ? null : v) })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
-                >
-                  <option value="">— (keine) —</option>
-                  {stockwerk?.einheiten.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.bezeichnung}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+            )}
             <div>
-              <label htmlFor="partner_id" className="block text-sm font-medium text-zinc-300">
-                Partner (Auftraggeber/Mieter)
-              </label>
-              <select
-                id="partner_id"
-                {...register('partner_id', { setValueAs: (v) => (v === '' ? null : v) })}
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+              <label
+                htmlFor="zugewiesen_an_id"
+                className="block text-sm font-medium text-zinc-300"
               >
-                <option value="">— (keiner) —</option>
-                {partnerListe?.items.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="projekt_id" className="block text-sm font-medium text-zinc-300">
-                Projekt
-              </label>
-              <select
-                id="projekt_id"
-                {...register('projekt_id', { setValueAs: (v) => (v === '' ? null : v) })}
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-              >
-                <option value="">— (keins) —</option>
-                {projekte?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="zugewiesen_an_id" className="block text-sm font-medium text-zinc-300">
                 Zugewiesen an
               </label>
               <select
@@ -496,13 +659,17 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
                 ))}
               </select>
             </div>
-            {showFaelligkeit && (
+          </div>
+
+          {feldSichtbar('faelligkeit_am') && (
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="faelligkeit_am" className="block text-sm font-medium text-zinc-300">
-                  Fälligkeit
-                  {(selectedTyp?.pflichtfelder ?? []).includes('faelligkeit_am') && (
-                    <span className="text-red-400"> *</span>
-                  )}
+                <label
+                  htmlFor="faelligkeit_am"
+                  className="block text-sm font-medium text-zinc-300"
+                >
+                  Fälligkeit{' '}
+                  {feldPflicht('faelligkeit_am') && <span className="text-red-400">*</span>}
                 </label>
                 <input
                   id="faelligkeit_am"
@@ -511,12 +678,33 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                 />
               </div>
-            )}
-          </div>
+              {feldSichtbar('wiederholung') && (
+                <div>
+                  <label
+                    htmlFor="wiederholung"
+                    className="block text-sm font-medium text-zinc-300"
+                  >
+                    Wiederholung
+                  </label>
+                  <select
+                    id="wiederholung"
+                    {...register('wiederholung', { setValueAs: (v) => (v === '' ? null : v) })}
+                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                  >
+                    <option value="">— (keine) —</option>
+                    <option value="weekly">Wöchentlich</option>
+                    <option value="monthly">Monatlich</option>
+                    <option value="quarterly">Quartalsweise</option>
+                    <option value="yearly">Jährlich</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
 
-          {errors.root && (
+          {(errors.root || submitError) && (
             <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
-              {errors.root.message}
+              {submitError ?? errors.root?.message}
             </div>
           )}
 

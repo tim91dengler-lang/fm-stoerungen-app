@@ -3,9 +3,11 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   Activity,
+  AlertOctagon,
   Building2,
   FolderKanban,
   FileStack,
+  Layers,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -60,6 +62,21 @@ const navGroups: NavGroup[] = [
         to: '/stammdaten/partner',
         label: 'Geschäftspartner',
         icon: <Users2 className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/anlagen',
+        label: 'Anlagen',
+        icon: <Activity className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/fehlercodes',
+        label: 'Fehlercodes',
+        icon: <AlertOctagon className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/vorlagen',
+        label: 'Vorlagen',
+        icon: <Layers className="h-4 w-4" />,
       },
       {
         to: '/stammdaten/auswahllisten',

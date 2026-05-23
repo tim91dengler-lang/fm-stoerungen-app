@@ -2,9 +2,11 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdressenPage } from './pages/AdressenPage';
+import { AnlagenPage } from './pages/AnlagenPage';
 import { AuswahllistenPage } from './pages/AuswahllistenPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DokumentePage } from './pages/DokumentePage';
+import { FehlercodesPage } from './pages/FehlercodesPage';
 import { KanbanPage } from './pages/KanbanPage';
 import { LoginPage } from './pages/LoginPage';
 import { MeineTicketsPage } from './pages/MeineTicketsPage';
@@ -16,6 +18,7 @@ import { ProjektePage } from './pages/ProjektePage';
 import { TicketsListePage } from './pages/TicketsListePage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
 import { UsersListePage } from './pages/UsersListePage';
+import { VorlagenPage } from './pages/VorlagenPage';
 import { WartungenPage } from './pages/WartungenPage';
 
 export const router = createBrowserRouter([
@@ -43,6 +46,9 @@ export const router = createBrowserRouter([
           { path: '/stammdaten/objekte', element: <ObjektePage /> },
           { path: '/stammdaten/objekte/:id', element: <ObjektDetailPage /> },
           { path: '/stammdaten/partner', element: <PartnerPage /> },
+          { path: '/stammdaten/anlagen', element: <AnlagenPage /> },
+          { path: '/stammdaten/fehlercodes', element: <FehlercodesPage /> },
+          { path: '/stammdaten/vorlagen', element: <VorlagenPage /> },
           { path: '/stammdaten/auswahllisten', element: <AuswahllistenPage /> },
           { path: '/users', element: <UsersListePage /> },
         ],
