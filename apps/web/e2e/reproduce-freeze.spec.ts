@@ -1,49 +1,43 @@
 import { test } from '@playwright/test';
 
-test('Was friert wirklich? Schritt-für-Schritt', async ({ page }) => {
+test.setTimeout(60_000);
+
+test('CPU-Profile sammeln', async ({ page }) => {
   await page.goto('http://178.105.172.110:8080/login');
   await page.getByLabel('E-Mail').fill('admin@example.com');
   await page.getByLabel('Passwort').fill('admin-dev-pass-12');
   await page.getByRole('button', { name: 'Anmelden' }).click();
   await page.waitForURL(/\/(dashboard|tickets)/, { timeout: 10_000 });
 
-  console.log('--- Phase 1: Sidebar-Klick zu Adressen (außerhalb der Page) ---');
-  let t = Date.now();
-  try {
-    await page.getByRole('link', { name: /^Adressen$/ }).click({ timeout: 4000 });
-    console.log(`  Sidebar-Link OK in ${Date.now() - t} ms`);
-  } catch {
-    console.log(`  Sidebar-Link FROZEN nach ${Date.now() - t} ms`);
-  }
+  await page.getByRole('link', { name: /^Adressen$/ }).click();
+  await page.waitForTimeout(2000);
 
-  await page.waitForTimeout(1500);
+  const client = await page.context().newCDPSession(page);
+  await client.send('Profiler.enable');
+  await client.send('Profiler.start');
 
-  console.log('--- Phase 2: Sidebar-Klick zu Dashboard ---');
-  t = Date.now();
-  try {
-    await page.getByRole('link', { name: 'Dashboard' }).click({ timeout: 4000 });
-    console.log(`  Sidebar-Dashboard OK in ${Date.now() - t} ms`);
-  } catch {
-    console.log(`  Sidebar-Dashboard FROZEN nach ${Date.now() - t} ms`);
-  }
+  void page
+    .getByRole('button', { name: /Spalten/i })
+    .click({ timeout: 3000 })
+    .catch(() => undefined);
 
-  console.log('--- Phase 3: Bell-Icon im Header klicken ---');
-  await page.waitForTimeout(1500);
-  t = Date.now();
-  try {
-    await page.getByLabel('Benachrichtigungen').click({ timeout: 4000 });
-    console.log(`  Bell OK in ${Date.now() - t} ms`);
-  } catch {
-    console.log(`  Bell FROZEN nach ${Date.now() - t} ms`);
-  }
+  await page.waitForTimeout(4000);
 
-  console.log('--- Phase 4: NACH Bell-Klick, ein Sidebar-Link ---');
-  await page.waitForTimeout(1500);
-  t = Date.now();
-  try {
-    await page.getByRole('link', { name: /^Adressen$/ }).click({ timeout: 4000 });
-    console.log(`  Sidebar OK in ${Date.now() - t} ms`);
-  } catch {
-    console.log(`  Sidebar FROZEN nach ${Date.now() - t} ms`);
+  const profile = await client.send('Profiler.stop');
+  const nodes = profile.profile.nodes;
+  const samples = profile.profile.samples ?? [];
+  const counts = new Map<number, number>();
+  for (const s of samples) counts.set(s, (counts.get(s) ?? 0) + 1);
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
+  console.log('--- TOP 30 hottest functions during freeze ---');
+  console.log(`(Total samples: ${samples.length})`);
+  for (const [nodeId, count] of sorted) {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) continue;
+    const cf = node.callFrame;
+    const url = (cf.url || '<?>').slice(-60);
+    console.log(
+      `${count.toString().padStart(5)} | ${(cf.functionName || '<anon>').slice(0, 40).padEnd(42)} | ${url}:${cf.lineNumber}`,
+    );
   }
 });

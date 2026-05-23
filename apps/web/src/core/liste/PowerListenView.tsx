@@ -422,8 +422,10 @@ export function PowerListenView<TData>({
                   const canSort = header.column.getCanSort();
                   const sortIdx = sorting.findIndex((s) => s.id === colId);
                   const sortDir = header.column.getIsSorted();
-                  const isDraggable =
-                    colId !== '__select__' && header.column.columnDef.enableHiding !== false;
+                  // Drag-Reorder temporär deaktiviert (Tim 2026-05-23) —
+                  // Verdacht dass draggable-Header in Chromium den Maus-Event-Loop blockiert.
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  const isDraggable = false;
                   return (
                     <th
                       key={header.id}
