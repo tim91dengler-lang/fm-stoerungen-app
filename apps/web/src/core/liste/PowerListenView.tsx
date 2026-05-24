@@ -15,7 +15,22 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { ChevronDown, ChevronRight, Columns3, Layers, Search } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronRight,
+  Columns3,
+  Layers,
+  Pin,
+  Search,
+  X,
+} from 'lucide-react';
+
+// Dataset-Mime-Type für Drag-Group: das Drop-Target unterscheidet so
+// zwischen Header-Reorder (text/plain) und Group-Drop (text/group-col).
+const GROUP_DRAG_MIME = 'text/group-col';
 
 // Stabile Row-Model-Factories — bei TanStack-Table v8 MÜSSEN diese eine
 // stabile Reference haben. `getCoreRowModel()` inline aufrufen erzeugt
@@ -112,6 +127,7 @@ export function PowerListenView<TData>({
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [draggingCol, setDraggingCol] = useState<string | null>(null);
+  const [dropZoneHover, setDropZoneHover] = useState(false);
   const columnPickerRef = useRef<HTMLDivElement>(null);
   const groupPickerRef = useRef<HTMLDivElement>(null);
 
@@ -250,11 +266,15 @@ export function PowerListenView<TData>({
     ? table.getSelectedRowModel().rows.map((r) => r.original)
     : [];
 
-  // Drag & Drop: Reorder via HTML5 D&D auf den th-Headers
+  // Drag & Drop: Reorder via HTML5 D&D auf den th-Headers,
+  // zusätzlich Group-Drag in die Drop-Zone oberhalb der Toolbar.
+  // Das Drop-Target entscheidet die Aktion: text/plain → Reorder,
+  // text/group-col → Group.
   function onDragStart(colId: string, e: React.DragEvent<HTMLDivElement>) {
     setDraggingCol(colId);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', colId);
+    e.dataTransfer.setData(GROUP_DRAG_MIME, colId);
   }
   function onDragOver(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -282,8 +302,163 @@ export function PowerListenView<TData>({
     onColumnOrderChange(next);
   }
 
+  // Drop-Zone für Gruppierung: nur aktiv wenn Aufrufer Grouping unterstützt.
+  // Backwards-Compat: Wenn `groupableColumns` gegeben ist, gilt diese
+  // Whitelist (Verhalten wie bisher). Sonst sind alle Spalten außer
+  // __select__ gruppierbar (Tims neue Anforderung „alle Listen frei
+  // gruppierbar").
+  function isColumnGroupable(colId: string): boolean {
+    if (colId === '__select__') return false;
+    if (groupableColumns && groupableColumns.length > 0) {
+      return groupableColumns.some((g) => g.id === colId);
+    }
+    return true;
+  }
+
+  function labelForGroupColumn(colId: string): string {
+    if (groupableColumns) {
+      const found = groupableColumns.find((g) => g.id === colId);
+      if (found) return found.label;
+    }
+    // Fallback: Header-Text aus der ColumnDef ziehen.
+    const col = table.getAllLeafColumns().find((c) => c.id === colId);
+    if (col && typeof col.columnDef.header === 'string') {
+      return col.columnDef.header;
+    }
+    return colId;
+  }
+
+  function onDropZoneDragOver(e: React.DragEvent<HTMLDivElement>) {
+    // Nur reagieren, wenn auch wirklich ein Group-Drag im Gange ist.
+    // (text/group-col kann nicht in DragEnter zuverlässig gelesen werden,
+    // aber `types` enthält den Eintrag schon zum Drag-Start.)
+    if (!e.dataTransfer.types.includes(GROUP_DRAG_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!dropZoneHover) setDropZoneHover(true);
+  }
+
+  function onDropZoneDragLeave() {
+    setDropZoneHover(false);
+  }
+
+  function onDropZoneDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDropZoneHover(false);
+    setDraggingCol(null);
+    if (!onGroupingChange) return;
+    const colId = e.dataTransfer.getData(GROUP_DRAG_MIME);
+    if (!colId) return;
+    if (!isColumnGroupable(colId)) return;
+    // Doppelte Gruppierung verhindern: wenn Column schon in `grouping`,
+    // einfach ignorieren — kein Re-Add an anderer Stelle.
+    if (grouping.includes(colId)) return;
+    onGroupingChange([...grouping, colId]);
+  }
+
+  function removeGrouping(colId: string) {
+    if (!onGroupingChange) return;
+    onGroupingChange(grouping.filter((g) => g !== colId));
+  }
+
+  // Toggle-Logik für Sortierung einer Gruppen-Spalte:
+  //   keine → asc → desc → keine
+  // Multi-Sort wird nicht angefasst — die Gruppen-Spalte ist eigener Eintrag
+  // im sorting-State.
+  function toggleGroupSort(colId: string) {
+    const current = sorting.find((s) => s.id === colId);
+    let next: SortingState;
+    if (!current) {
+      next = [...sorting, { id: colId, desc: false }];
+    } else if (current.desc === false) {
+      next = sorting.map((s) =>
+        s.id === colId ? { id: colId, desc: true } : s,
+      );
+    } else {
+      next = sorting.filter((s) => s.id !== colId);
+    }
+    onSortingChange(next);
+  }
+
   return (
     <div>
+      {onGroupingChange && (
+        <div
+          onDragOver={onDropZoneDragOver}
+          onDragEnter={onDropZoneDragOver}
+          onDragLeave={onDropZoneDragLeave}
+          onDrop={onDropZoneDrop}
+          className={`mb-2 flex min-h-[40px] flex-wrap items-center gap-2 rounded-lg border-2 border-dashed px-3 py-1.5 transition-colors ${
+            dropZoneHover
+              ? 'border-emerald-400/70 bg-emerald-500/10'
+              : grouping.length > 0
+                ? 'border-zinc-700 bg-zinc-900/60'
+                : 'border-zinc-800 bg-zinc-900/30'
+          }`}
+          data-testid="power-listen-drop-zone"
+        >
+          <Pin
+            className={`h-3.5 w-3.5 shrink-0 ${
+              dropZoneHover
+                ? 'text-emerald-300'
+                : grouping.length > 0
+                  ? 'text-emerald-400/80'
+                  : 'text-zinc-500'
+            }`}
+            aria-hidden
+          />
+          {grouping.length === 0 ? (
+            <span className="text-xs text-zinc-500">
+              Spalten hier ablegen zum Gruppieren …
+            </span>
+          ) : (
+            <>
+              {grouping.map((colId, idx) => {
+                const label = labelForGroupColumn(colId);
+                const sortEntry = sorting.find((s) => s.id === colId);
+                const SortIcon =
+                  sortEntry === undefined
+                    ? ArrowUpDown
+                    : sortEntry.desc
+                      ? ArrowDown
+                      : ArrowUp;
+                return (
+                  <span
+                    key={colId}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 py-0.5 pl-2 pr-1 text-xs text-emerald-200"
+                  >
+                    <span className="font-mono text-[10px] text-emerald-400/70">
+                      {idx + 1}.
+                    </span>
+                    <span className="font-medium">{label}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupSort(colId)}
+                      className="rounded p-0.5 text-emerald-300 hover:bg-emerald-500/20"
+                      title="Gruppen-Sortierung umschalten (asc → desc → keine)"
+                      aria-label={`Sortierung für ${label} umschalten`}
+                    >
+                      <SortIcon className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeGrouping(colId)}
+                      className="rounded p-0.5 text-emerald-300 hover:bg-red-500/20 hover:text-red-300"
+                      title="Gruppierung entfernen"
+                      aria-label={`Gruppierung nach ${label} entfernen`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+              <span className="text-xs text-zinc-500">
+                weitere Spalten hier ablegen …
+              </span>
+            </>
+          )}
+        </div>
+      )}
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <div className="flex items-center gap-2">{toolbarLeft}</div>
         <div className="relative min-w-[18rem] max-w-md flex-1">
