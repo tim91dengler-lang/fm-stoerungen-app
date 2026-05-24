@@ -342,6 +342,29 @@ SYSTEM_AUSWAHLLISTEN_SEED: dict[str, dict[str, Any]] = {
             ("ebo", "EBO / GLT", 4, "orange", True),
         ],
     },
+    "projekttyp": {
+        "label": "Projekttyp",
+        "beschreibung": "Art des Projekts (Wartung, Sanierung, Neubau …)",
+        "ist_system": False,
+        "werte": [
+            ("wartung", "Wartung", 0, "blue", True),
+            ("sanierung", "Sanierung", 1, "amber", True),
+            ("neubau", "Neubau", 2, "emerald", True),
+            ("begehung", "Begehung", 3, "violet", True),
+            ("bauprojekt", "Bauprojekt", 4, "orange", True),
+        ],
+    },
+    "projektstatus": {
+        "label": "Projekt-Status",
+        "beschreibung": "Status-Werte für Projekte",
+        "ist_system": True,
+        "werte": [
+            ("geplant", "Geplant", 0, "slate", True),
+            ("aktiv", "Aktiv", 1, "blue", True),
+            ("pausiert", "Pausiert", 2, "amber", True),
+            ("abgeschlossen", "Abgeschlossen", 3, "emerald", True),
+        ],
+    },
 }
 
 

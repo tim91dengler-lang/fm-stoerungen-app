@@ -11,6 +11,7 @@ from fm_api.models import (
     AuswahllistenWert,
     GeschaeftsPartner,
     Objekt,
+    Projekt,
     Ticket,
     User,
 )
@@ -72,7 +73,7 @@ _TICKET_LOAD_OPTIONS = (
     selectinload(Ticket.einheit),
     selectinload(Ticket.partner),
     selectinload(Ticket.tickettyp),
-    selectinload(Ticket.projekt),
+    selectinload(Ticket.projekt).selectinload(Projekt.status_wert),
     selectinload(Ticket.quelle_wert),
     selectinload(Ticket.wartet_grund_wert),
     selectinload(Ticket.wartet_nachunternehmer),
