@@ -1,24 +1,36 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type GroupingState,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from '@tanstack/react-table';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { adresseApi, objektApi, partnerApi } from '../api/endpoints';
 import type { ObjektCreate, ObjektRead, PartnerTyp } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { TextFilter } from '../core/liste/columnFilters';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
   visibility: VisibilityState;
   columnOrder: string[];
+  columnFilters: ColumnFiltersState;
+  grouping: GroupingState;
 }
 
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
   columnOrder: ['name', 'adresse', 'partner', '__actions__'],
+  columnFilters: [],
+  grouping: [],
 };
 
 const PARTNER_TYPEN: PartnerTyp[] = [
@@ -49,6 +61,8 @@ export function ObjektePage() {
   const [form, setForm] = useState<ObjektCreate>(EMPTY_FORM);
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkConfirm, setBulkConfirm] = useState<ObjektRead[] | null>(null);
 
   const qc = useQueryClient();
 
@@ -89,6 +103,17 @@ export function ObjektePage() {
   const deleteMut = useMutation({
     mutationFn: (id: string) => objektApi.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['objekte'] }),
+  });
+
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => objektApi.remove(id)));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['objekte'] });
+      setRowSelection({});
+      setBulkConfirm(null);
+    },
   });
 
   function openCreate() {
@@ -148,6 +173,7 @@ export function ObjektePage() {
         id: 'name',
         accessorKey: 'name',
         header: 'Name',
+        filterFn: 'includesString',
         cell: (ctx) => (
           <Link
             to={`/stammdaten/objekte/${ctx.row.original.id}`}
@@ -164,6 +190,7 @@ export function ObjektePage() {
             ? `${row.adresse.strasse} ${row.adresse.hausnummer ?? ''} ${row.adresse.plz} ${row.adresse.ort}`
             : '',
         header: 'Adresse',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const a = ctx.row.original.adresse;
           if (!a) return <span className="text-zinc-500">—</span>;
@@ -179,6 +206,7 @@ export function ObjektePage() {
         id: 'partner',
         accessorFn: (row) => row.partner_links.map((l) => l.partner_name).join(' '),
         header: 'Partner',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const links = ctx.row.original.partner_links;
           if (links.length === 0) return <span className="text-zinc-500">—</span>;
@@ -194,6 +222,7 @@ export function ObjektePage() {
         header: '',
         enableSorting: false,
         enableColumnFilter: false,
+        enableGrouping: false,
         cell: (ctx) => (
           <div className="flex justify-end gap-1">
             <button
@@ -206,10 +235,7 @@ export function ObjektePage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Objekt "${ctx.row.original.name}" löschen?`))
-                  deleteMut.mutate(ctx.row.original.id);
-              }}
+              onClick={() => setBulkConfirm([ctx.row.original])}
               className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
               title="Löschen"
             >
@@ -219,9 +245,19 @@ export function ObjektePage() {
         ),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  function confirmBulkDelete() {
+    if (!bulkConfirm) return;
+    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
+      deleteMut.mutate(bulkConfirm[0].id, {
+        onSuccess: () => setBulkConfirm(null),
+      });
+    } else {
+      bulkDeleteMut.mutate(bulkConfirm.map((o) => o.id));
+    }
+  }
 
   return (
     <div className="space-y-4 px-4 py-6 lg:px-8">
@@ -251,15 +287,33 @@ export function ObjektePage() {
         onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
-        columnFilters={[]}
-        onColumnFiltersChange={() => {}}
+        columnFilters={config.columnFilters}
+        onColumnFiltersChange={(f) =>
+          setConfig((p) => ({ ...p, columnFilters: f }))
+        }
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        grouping={config.grouping}
+        onGroupingChange={(g) => setConfig((p) => ({ ...p, grouping: g }))}
         filterRenderers={{
           name: TextFilter,
           adresse: TextFilter,
           partner: TextFilter,
         }}
+        enableRowSelection
+        getRowId={(o) => o.id}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        bulkActions={(selected) => (
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
+        )}
         count={{
           filtered: listQuery.data?.items.length ?? 0,
           total: listQuery.data?.total ?? 0,
@@ -278,6 +332,31 @@ export function ObjektePage() {
         searchPlaceholder="Suche in Objekten …"
         showFooter
         itemLabel={{ singular: 'Objekt', plural: 'Objekte' }}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirm !== null}
+        title={
+          bulkConfirm && bulkConfirm.length === 1
+            ? 'Objekt löschen?'
+            : `${bulkConfirm?.length ?? 0} Objekte löschen?`
+        }
+        message={
+          bulkConfirm && bulkConfirm.length === 1 ? (
+            <span>
+              Objekt <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen?
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </span>
+          ) : (
+            <span>
+              {bulkConfirm?.length ?? 0} ausgewählte Objekte werden
+              unwiderruflich gelöscht.
+            </span>
+          )
+        }
+        busy={deleteMut.isPending || bulkDeleteMut.isPending}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {showModal && (

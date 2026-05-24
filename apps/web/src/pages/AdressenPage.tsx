@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  type GroupingState,
+  type RowSelectionState,
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
@@ -17,24 +19,23 @@ import { AdressSuggestCombobox } from '../components/AdressSuggestCombobox';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { TextFilter } from '../core/liste/columnFilters';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
   visibility: VisibilityState;
   columnOrder: string[];
+  columnFilters: ColumnFiltersState;
+  grouping: GroupingState;
 }
 
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'strasse', desc: false }],
   visibility: {},
   columnOrder: ['strasse', 'plz_ort', 'land', 'geocode', '__actions__'],
+  columnFilters: [],
+  grouping: [],
 };
-
-// Stabile Konstanten — verhindern, dass bei jedem Render neue
-// Array/Function-Identitäten an PowerListenView gegeben werden, was
-// einen TanStack-Table-Loop triggert.
-const EMPTY_FILTERS: ColumnFiltersState = [];
-const NOOP_FILTER_CHANGE = (): void => undefined;
 
 const EMPTY_FORM: AdresseCreate = {
   strasse: '',
@@ -54,6 +55,8 @@ export function AdressenPage() {
   const [suggestQuery, setSuggestQuery] = useState('');
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkConfirm, setBulkConfirm] = useState<AdresseRead[] | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -81,6 +84,17 @@ export function AdressenPage() {
   const deleteMut = useMutation({
     mutationFn: (id: string) => adresseApi.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['adressen'] }),
+  });
+
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => adresseApi.remove(id)));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['adressen'] });
+      setRowSelection({});
+      setBulkConfirm(null);
+    },
   });
 
   function openCreate() {
@@ -144,6 +158,7 @@ export function AdressenPage() {
         id: 'strasse',
         accessorFn: (row) => `${row.strasse} ${row.hausnummer ?? ''}`.trim(),
         header: 'Straße',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const a = ctx.row.original;
           return (
@@ -164,12 +179,14 @@ export function AdressenPage() {
         id: 'plz_ort',
         accessorFn: (row) => `${row.plz} ${row.ort}`,
         header: 'PLZ / Ort',
+        filterFn: 'includesString',
         cell: (ctx) => `${ctx.row.original.plz} ${ctx.row.original.ort}`,
       },
       {
         id: 'land',
         accessorKey: 'land',
         header: 'Land',
+        filterFn: 'includesString',
         cell: (ctx) => (
           <span className="font-mono text-xs uppercase">{ctx.row.original.land}</span>
         ),
@@ -178,6 +195,7 @@ export function AdressenPage() {
         id: 'geocode',
         accessorFn: (row) => (row.latitude && row.longitude ? 'ja' : 'nein'),
         header: 'Geocode',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const a = ctx.row.original;
           return a.latitude && a.longitude ? (
@@ -194,6 +212,7 @@ export function AdressenPage() {
         header: '',
         enableSorting: false,
         enableColumnFilter: false,
+        enableGrouping: false,
         cell: (ctx) => (
           <div className="flex justify-end gap-1">
             <button
@@ -206,10 +225,7 @@ export function AdressenPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Adresse "${ctx.row.original.strasse}" löschen?`))
-                  deleteMut.mutate(ctx.row.original.id);
-              }}
+              onClick={() => setBulkConfirm([ctx.row.original])}
               className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
               title="Löschen"
             >
@@ -219,10 +235,19 @@ export function AdressenPage() {
         ),
       },
     ],
-    // openEdit + deleteMut are stable enough; columns rebuild on every render is fine
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  function confirmBulkDelete() {
+    if (!bulkConfirm) return;
+    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
+      deleteMut.mutate(bulkConfirm[0].id, {
+        onSuccess: () => setBulkConfirm(null),
+      });
+    } else {
+      bulkDeleteMut.mutate(bulkConfirm.map((a) => a.id));
+    }
+  }
 
   return (
     <div className="space-y-4 px-4 py-6 lg:px-8">
@@ -252,15 +277,34 @@ export function AdressenPage() {
         onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
-        columnFilters={EMPTY_FILTERS}
-        onColumnFiltersChange={NOOP_FILTER_CHANGE}
+        columnFilters={config.columnFilters}
+        onColumnFiltersChange={(f) =>
+          setConfig((p) => ({ ...p, columnFilters: f }))
+        }
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        grouping={config.grouping}
+        onGroupingChange={(g) => setConfig((p) => ({ ...p, grouping: g }))}
         filterRenderers={{
           strasse: TextFilter,
           plz_ort: TextFilter,
           land: TextFilter,
+          geocode: TextFilter,
         }}
+        enableRowSelection
+        getRowId={(a) => a.id}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        bulkActions={(selected) => (
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
+        )}
         count={{
           filtered: listQuery.data?.items.length ?? 0,
           total: listQuery.data?.total ?? 0,
@@ -279,6 +323,31 @@ export function AdressenPage() {
         searchPlaceholder="Suche in Straße, PLZ, Ort …"
         showFooter
         itemLabel={{ singular: 'Adresse', plural: 'Adressen' }}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirm !== null}
+        title={
+          bulkConfirm && bulkConfirm.length === 1
+            ? 'Adresse löschen?'
+            : `${bulkConfirm?.length ?? 0} Adressen löschen?`
+        }
+        message={
+          bulkConfirm && bulkConfirm.length === 1 ? (
+            <span>
+              Adresse <strong>{bulkConfirm[0]?.strasse}</strong> wirklich
+              löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+            </span>
+          ) : (
+            <span>
+              {bulkConfirm?.length ?? 0} ausgewählte Adressen werden
+              unwiderruflich gelöscht.
+            </span>
+          )
+        }
+        busy={deleteMut.isPending || bulkDeleteMut.isPending}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {showModal && (
