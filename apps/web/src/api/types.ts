@@ -593,42 +593,71 @@ export type TickettypUpdate = Partial<Omit<TickettypCreate, 'key'>>;
 
 // ---------------------------------------------------------------- Projekte
 
-export type ProjektStatus =
+/**
+ * F2-Migration: status und projekttyp sind jetzt FKs auf Auswahllisten-Werte.
+ * Werte werden aus den Auswahllisten `projektstatus` und `projekttyp`
+ * dynamisch geladen — `ProjektStatusSlug` listet nur die System-Seeds für
+ * Default-Auswahl und Bulk-Aktionen.
+ */
+export type ProjektStatusSlug =
   | 'geplant'
-  | 'laufend'
-  | 'abgeschlossen'
-  | 'storniert';
+  | 'aktiv'
+  | 'pausiert'
+  | 'abgeschlossen';
 
 export interface ProjektRead {
   id: UUID;
   mandant_id: UUID;
   name: string;
   beschreibung: string | null;
-  objekt_id: UUID | null;
-  verantwortlich_user_id: UUID | null;
+  projekttyp: AuswahlWertRef;
+  status: AuswahlWertRef;
   verantwortlich: UserRef | null;
   start_am: string | null;
   ende_am: string | null;
-  status: ProjektStatus;
   notizen: string | null;
+  objekte: ObjektRef[];
   ticket_count: number;
   created_at: string;
   updated_at: string;
 }
 
-export interface ProjektWriteBase {
+export interface ProjektCreate {
   name: string;
   beschreibung?: string | null;
-  objekt_id?: UUID | null;
+  projekttyp_slug: string;
+  status_slug?: string;
   verantwortlich_user_id?: UUID | null;
   start_am?: string | null;
   ende_am?: string | null;
-  status?: ProjektStatus;
   notizen?: string | null;
+  objekt_ids?: UUID[];
 }
 
-export type ProjektCreate = ProjektWriteBase;
-export type ProjektUpdate = Partial<ProjektWriteBase>;
+export interface ProjektUpdate {
+  name?: string;
+  beschreibung?: string | null;
+  projekttyp_slug?: string;
+  status_slug?: string;
+  verantwortlich_user_id?: UUID | null;
+  start_am?: string | null;
+  ende_am?: string | null;
+  notizen?: string | null;
+  objekt_ids?: UUID[];
+}
+
+export interface ProjektListFilters {
+  search?: string;
+  status?: string[];
+  projekttyp?: string[];
+  include_deleted?: boolean;
+}
+
+export interface ProjektTicketsParams {
+  include_deleted?: boolean;
+  limit?: number;
+  offset?: number;
+}
 
 // ---------------------------------------------------------------- Notifications
 

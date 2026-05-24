@@ -10,26 +10,25 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import {
+  Building2,
   Calendar,
-  CheckCircle2,
-  Clock,
   FolderKanban,
   Pencil,
   Plus,
   Trash2,
-  XCircle,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { objektApi, projektApi, userApi } from '../api/endpoints';
+import { auswahllistenApi, projektApi, userApi } from '../api/endpoints';
 import type {
+  AuswahllistenWertRead,
   ProjektCreate,
   ProjektRead,
-  ProjektStatus,
 } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import { ProjektModal } from '../components/ProjektModal';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -42,78 +41,137 @@ interface ViewConfig {
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
-  columnOrder: ['name', 'status', 'verantwortlich', 'zeitraum', 'ticket_count', '__actions__'],
+  columnOrder: [
+    'name',
+    'projekttyp',
+    'status',
+    'verantwortlich',
+    'zeitraum',
+    'objekte',
+    'ticket_count',
+    '__actions__',
+  ],
   columnFilters: [],
   grouping: [],
 };
 
-const STATUS_LABEL: Record<ProjektStatus, string> = {
-  geplant: 'Geplant',
-  laufend: 'Laufend',
-  abgeschlossen: 'Abgeschlossen',
-  storniert: 'Storniert',
+/**
+ * Default farbe for an AuswahlWertRef when the seed has no color.
+ * Status-Slugs aus Seed: geplant, aktiv, pausiert, abgeschlossen.
+ */
+const STATUS_FALLBACK_COLOR: Record<string, string> = {
+  geplant: 'sky',
+  aktiv: 'emerald',
+  pausiert: 'amber',
+  abgeschlossen: 'zinc',
 };
 
-const STATUS_COLOR: Record<ProjektStatus, string> = {
-  geplant: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  laufend: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  abgeschlossen: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  storniert: 'bg-red-500/15 text-red-300 border-red-500/30',
-};
+function colorClasses(farbe: string | null): string {
+  switch (farbe) {
+    case 'emerald':
+      return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+    case 'sky':
+    case 'blue':
+      return 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+    case 'amber':
+      return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+    case 'red':
+      return 'bg-red-500/15 text-red-300 border-red-500/30';
+    case 'violet':
+    case 'purple':
+      return 'bg-violet-500/15 text-violet-300 border-violet-500/30';
+    case 'zinc':
+    default:
+      return 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30';
+  }
+}
 
-const STATUS_ICON: Record<ProjektStatus, typeof Calendar> = {
-  geplant: Calendar,
-  laufend: Clock,
-  abgeschlossen: CheckCircle2,
-  storniert: XCircle,
-};
+function statusColorClasses(key: string, farbe: string | null): string {
+  const resolved = farbe ?? STATUS_FALLBACK_COLOR[key] ?? null;
+  return colorClasses(resolved);
+}
 
-const EMPTY_FORM: ProjektCreate = {
-  name: '',
-  beschreibung: '',
-  objekt_id: null,
-  verantwortlich_user_id: null,
-  start_am: null,
-  ende_am: null,
-  status: 'geplant',
-  notizen: '',
-};
+interface PillProps {
+  label: string;
+  farbe: string | null;
+}
+
+function Pill({ label, farbe }: PillProps) {
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+        colorClasses(farbe),
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function StatusPill({
+  keyValue,
+  label,
+  farbe,
+}: {
+  keyValue: string;
+  label: string;
+  farbe: string | null;
+}) {
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+        statusColorClasses(keyValue, farbe),
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function activeWerte(liste: { werte: AuswahllistenWertRead[] } | undefined) {
+  if (!liste) return [];
+  return [...liste.werte]
+    .filter((w) => w.ist_aktiv)
+    .sort((a, b) => a.reihenfolge - b.reihenfolge);
+}
 
 export function ProjektePage() {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ProjektStatus[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<ProjektCreate>(EMPTY_FORM);
+  const [editing, setEditing] = useState<ProjektRead | null>(null);
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<ProjektRead[] | null>(null);
   const [bulkStatusModal, setBulkStatusModal] = useState<{
     rows: ProjektRead[];
-    status: ProjektStatus;
+    statusSlug: string;
   } | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
-    queryKey: ['projekte', statusFilter],
-    queryFn: () =>
-      projektApi.list({
-        status: statusFilter.length > 0 ? statusFilter : undefined,
-      }),
+    queryKey: ['projekte'],
+    queryFn: () => projektApi.list(),
   });
 
-  const objekteQuery = useQuery({
-    queryKey: ['objekte-for-projekt'],
-    queryFn: () => objektApi.list({ limit: 500 }),
+  const { data: auswahllisten } = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
     staleTime: 60_000,
   });
 
   const usersQuery = useQuery({
-    queryKey: ['users-for-projekt'],
+    queryKey: ['users-for-projekt-filter'],
     queryFn: () => userApi.list({ limit: 200 }),
     staleTime: 60_000,
   });
+
+  const projekttypListe = auswahllisten?.find((l) => l.key === 'projekttyp');
+  const statusListe = auswahllisten?.find((l) => l.key === 'projektstatus');
+  const projekttypOptions = activeWerte(projekttypListe);
+  const statusOptions = activeWerte(statusListe);
 
   const filtered = useMemo(() => {
     const items = listQuery.data ?? [];
@@ -122,7 +180,11 @@ export function ProjektePage() {
     return items.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
-        (p.beschreibung ?? '').toLowerCase().includes(q),
+        (p.beschreibung ?? '').toLowerCase().includes(q) ||
+        p.projekttyp.label.toLowerCase().includes(q) ||
+        p.status.label.toLowerCase().includes(q) ||
+        (p.verantwortlich?.full_name ?? '').toLowerCase().includes(q) ||
+        p.objekte.some((o) => o.name.toLowerCase().includes(q)),
     );
   }, [listQuery.data, search]);
 
@@ -131,7 +193,7 @@ export function ProjektePage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projekte'] });
       setShowModal(false);
-      setForm(EMPTY_FORM);
+      setEditing(null);
     },
   });
 
@@ -141,8 +203,7 @@ export function ProjektePage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projekte'] });
       setShowModal(false);
-      setEditingId(null);
-      setForm(EMPTY_FORM);
+      setEditing(null);
     },
   });
 
@@ -163,9 +224,11 @@ export function ProjektePage() {
   });
 
   const bulkStatusMut = useMutation({
-    mutationFn: async (vars: { ids: string[]; status: ProjektStatus }) => {
+    mutationFn: async (vars: { ids: string[]; statusSlug: string }) => {
       await Promise.all(
-        vars.ids.map((id) => projektApi.update(id, { status: vars.status })),
+        vars.ids.map((id) =>
+          projektApi.update(id, { status_slug: vars.statusSlug }),
+        ),
       );
     },
     onSuccess: () => {
@@ -176,35 +239,18 @@ export function ProjektePage() {
   });
 
   function openCreate() {
-    setEditingId(null);
-    setForm(EMPTY_FORM);
+    setEditing(null);
     setShowModal(true);
   }
 
   function openEdit(p: ProjektRead) {
-    setEditingId(p.id);
-    setForm({
-      name: p.name,
-      beschreibung: p.beschreibung ?? '',
-      objekt_id: p.objekt_id,
-      verantwortlich_user_id: p.verantwortlich_user_id,
-      start_am: p.start_am,
-      ende_am: p.ende_am,
-      status: p.status,
-      notizen: p.notizen ?? '',
-    });
+    setEditing(p);
     setShowModal(true);
   }
 
-  function submit() {
-    if (editingId) update.mutate({ id: editingId, payload: form });
-    else create.mutate(form);
-  }
-
-  function toggleStatusFilter(s: ProjektStatus) {
-    setStatusFilter((prev) =>
-      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
-    );
+  function handleModalSubmit(payload: ProjektCreate) {
+    if (editing) update.mutate({ id: editing.id, payload });
+    else create.mutate(payload);
   }
 
   const columns = useMemo<ColumnDef<ProjektRead>[]>(
@@ -219,45 +265,51 @@ export function ProjektePage() {
           return (
             <div>
               <Link
-                to={`/tickets?projekt_id=${p.id}`}
+                to={`/projekte/${p.id}`}
                 className="font-medium text-zinc-100 hover:text-emerald-300"
               >
                 {p.name}
               </Link>
               {p.beschreibung && (
-                <div className="text-xs text-zinc-500 line-clamp-1">{p.beschreibung}</div>
+                <div className="text-xs text-zinc-500 line-clamp-1">
+                  {p.beschreibung}
+                </div>
               )}
             </div>
           );
         },
       },
       {
+        id: 'projekttyp',
+        accessorFn: (row) => row.projekttyp.key,
+        header: 'Projekttyp',
+        filterFn: 'arrIncludesSome',
+        cell: (ctx) => {
+          const t = ctx.row.original.projekttyp;
+          return <Pill label={t.label} farbe={t.farbe} />;
+        },
+      },
+      {
         id: 'status',
-        accessorKey: 'status',
+        accessorFn: (row) => row.status.key,
         header: 'Status',
         filterFn: 'arrIncludesSome',
         cell: (ctx) => {
           const s = ctx.row.original.status;
-          const Icon = STATUS_ICON[s];
           return (
-            <span
-              className={clsx(
-                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                STATUS_COLOR[s],
-              )}
-            >
-              <Icon className="h-3 w-3" /> {STATUS_LABEL[s]}
-            </span>
+            <StatusPill keyValue={s.key} label={s.label} farbe={s.farbe} />
           );
         },
       },
       {
         id: 'verantwortlich',
-        accessorFn: (row) => row.verantwortlich?.full_name ?? '',
+        accessorFn: (row) => row.verantwortlich?.id ?? '',
         header: 'Verantwortlich',
-        filterFn: 'includesString',
+        filterFn: 'arrIncludesSome',
         cell: (ctx) =>
-          ctx.row.original.verantwortlich?.full_name ?? <span className="text-zinc-500">—</span>,
+          ctx.row.original.verantwortlich?.full_name ?? (
+            <span className="text-zinc-500">—</span>
+          ),
       },
       {
         id: 'zeitraum',
@@ -266,11 +318,40 @@ export function ProjektePage() {
         filterFn: 'includesString',
         cell: (ctx) => {
           const p = ctx.row.original;
-          if (!p.start_am && !p.ende_am) return <span className="text-zinc-500">—</span>;
+          if (!p.start_am && !p.ende_am)
+            return <span className="text-zinc-500">—</span>;
           return (
             <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
               <Calendar className="h-3 w-3" />
               {p.start_am ?? '?'} → {p.ende_am ?? '?'}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'objekte',
+        accessorFn: (row) =>
+          row.objekte.map((o) => o.name).join(' '),
+        header: 'Objekte',
+        filterFn: 'includesString',
+        cell: (ctx) => {
+          const objekte = ctx.row.original.objekte;
+          if (objekte.length === 0)
+            return <span className="text-zinc-500">—</span>;
+          const first = objekte[0]!;
+          const titleText = objekte.map((o) => o.name).join(', ');
+          return (
+            <span
+              className="inline-flex items-center gap-1 text-xs text-zinc-300"
+              title={titleText}
+            >
+              <Building2 className="h-3 w-3 text-emerald-400" />
+              {first.name}
+              {objekte.length > 1 && (
+                <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                  +{objekte.length - 1}
+                </span>
+              )}
             </span>
           );
         },
@@ -327,6 +408,24 @@ export function ProjektePage() {
     }
   }
 
+  // Filter-Optionen pro Auswahllisten-Spalte
+  const projekttypFilterOptions = useMemo(
+    () => projekttypOptions.map((w) => ({ value: w.key, label: w.label })),
+    [projekttypOptions],
+  );
+  const statusFilterOptions = useMemo(
+    () => statusOptions.map((w) => ({ value: w.key, label: w.label })),
+    [statusOptions],
+  );
+  const verantwortlichFilterOptions = useMemo(
+    () =>
+      (usersQuery.data?.items ?? []).map((u) => ({
+        value: u.id,
+        label: u.full_name,
+      })),
+    [usersQuery.data],
+  );
+
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
       {/* Header */}
@@ -336,7 +435,8 @@ export function ProjektePage() {
             <FolderKanban className="h-5 w-5 text-emerald-400" /> Projekte
           </h1>
           <p className="mt-0.5 text-sm text-zinc-500">
-            Bündel zusammengehöriger Tickets mit Verantwortlichem & Zeitraum
+            Bündel zusammengehöriger Tickets mit Verantwortlichem, Status und
+            Objekten
           </p>
         </div>
         <button
@@ -346,24 +446,6 @@ export function ProjektePage() {
         >
           <Plus className="h-4 w-4" /> Neues Projekt
         </button>
-      </div>
-
-      <div className="flex items-center gap-1">
-        {(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => toggleStatusFilter(s)}
-            className={clsx(
-              'rounded-md border px-2 py-1 text-xs',
-              statusFilter.includes(s)
-                ? STATUS_COLOR[s]
-                : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800',
-            )}
-          >
-            {STATUS_LABEL[s]}
-          </button>
-        ))}
       </div>
 
       <PowerListenView<ProjektRead>
@@ -386,15 +468,16 @@ export function ProjektePage() {
         onGroupingChange={(g) => setConfig((p) => ({ ...p, grouping: g }))}
         filterRenderers={{
           name: TextFilter,
-          verantwortlich: TextFilter,
+          zeitraum: TextFilter,
+          objekte: TextFilter,
+          projekttyp: (props) => (
+            <SelectFilter {...props} options={projekttypFilterOptions} />
+          ),
           status: (props) => (
-            <SelectFilter
-              {...props}
-              options={(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => ({
-                value: s,
-                label: STATUS_LABEL[s],
-              }))}
-            />
+            <SelectFilter {...props} options={statusFilterOptions} />
+          ),
+          verantwortlich: (props) => (
+            <SelectFilter {...props} options={verantwortlichFilterOptions} />
           ),
         }}
         enableRowSelection
@@ -406,9 +489,12 @@ export function ProjektePage() {
             <button
               type="button"
               onClick={() =>
-                setBulkStatusModal({ rows: selected, status: 'laufend' })
+                setBulkStatusModal({
+                  rows: selected,
+                  statusSlug: statusOptions[0]?.key ?? 'geplant',
+                })
               }
-              disabled={bulkStatusMut.isPending}
+              disabled={bulkStatusMut.isPending || statusOptions.length === 0}
               className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
             >
               Status setzen ({selected.length})
@@ -487,25 +573,26 @@ export function ProjektePage() {
               Neuer Status für die ausgewählten Projekte:
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              {(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => {
-                const Icon = STATUS_ICON[s];
-                const active = bulkStatusModal.status === s;
+              {statusOptions.map((w) => {
+                const active = bulkStatusModal.statusSlug === w.key;
                 return (
                   <button
-                    key={s}
+                    key={w.id}
                     type="button"
                     onClick={() =>
-                      setBulkStatusModal({ ...bulkStatusModal, status: s })
+                      setBulkStatusModal({
+                        ...bulkStatusModal,
+                        statusSlug: w.key,
+                      })
                     }
                     className={clsx(
                       'flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
                       active
-                        ? STATUS_COLOR[s]
+                        ? statusColorClasses(w.key, w.farbe)
                         : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800',
                     )}
                   >
-                    <Icon className="h-4 w-4" />
-                    {STATUS_LABEL[s]}
+                    {w.label}
                   </button>
                 );
               })}
@@ -524,7 +611,7 @@ export function ProjektePage() {
                 onClick={() =>
                   bulkStatusMut.mutate({
                     ids: bulkStatusModal.rows.map((p) => p.id),
-                    status: bulkStatusModal.status,
+                    statusSlug: bulkStatusModal.statusSlug,
                   })
                 }
                 disabled={bulkStatusMut.isPending}
@@ -537,141 +624,16 @@ export function ProjektePage() {
         </div>
       )}
 
-      {/* Modal */}
-      {showModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="w-full max-w-xl rounded-xl bg-zinc-900 p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="mb-4 text-lg font-semibold text-zinc-100">
-              {editingId ? 'Projekt bearbeiten' : 'Neues Projekt'}
-            </h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm text-zinc-300">Name *</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-zinc-300">Beschreibung</label>
-                <textarea
-                  rows={2}
-                  value={form.beschreibung ?? ''}
-                  onChange={(e) => setForm({ ...form, beschreibung: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-zinc-300">Objekt</label>
-                  <select
-                    value={form.objekt_id ?? ''}
-                    onChange={(e) => setForm({ ...form, objekt_id: e.target.value || null })}
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  >
-                    <option value="">— (keins) —</option>
-                    {objekteQuery.data?.items.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-zinc-300">Verantwortlich</label>
-                  <select
-                    value={form.verantwortlich_user_id ?? ''}
-                    onChange={(e) =>
-                      setForm({ ...form, verantwortlich_user_id: e.target.value || null })
-                    }
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  >
-                    <option value="">— (keiner) —</option>
-                    {usersQuery.data?.items.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm text-zinc-300">Start</label>
-                  <input
-                    type="date"
-                    value={form.start_am ?? ''}
-                    onChange={(e) => setForm({ ...form, start_am: e.target.value || null })}
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-zinc-300">Ende</label>
-                  <input
-                    type="date"
-                    value={form.ende_am ?? ''}
-                    onChange={(e) => setForm({ ...form, ende_am: e.target.value || null })}
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-zinc-300">Status</label>
-                  <select
-                    value={form.status ?? 'geplant'}
-                    onChange={(e) =>
-                      setForm({ ...form, status: e.target.value as ProjektStatus })
-                    }
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                  >
-                    {(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm text-zinc-300">Notizen</label>
-                <textarea
-                  rows={3}
-                  value={form.notizen ?? ''}
-                  onChange={(e) => setForm({ ...form, notizen: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-                />
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                onClick={submit}
-                disabled={!form.name.trim() || create.isPending || update.isPending}
-                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
-              >
-                {editingId ? 'Speichern' : 'Anlegen'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProjektModal
+        open={showModal}
+        initial={editing}
+        onClose={() => {
+          setShowModal(false);
+          setEditing(null);
+        }}
+        onSubmit={handleModalSubmit}
+        isPending={create.isPending || update.isPending}
+      />
     </div>
   );
 }

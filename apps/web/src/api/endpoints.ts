@@ -38,8 +38,9 @@ import type {
   PartnerRead,
   PartnerUpdate,
   ProjektCreate,
+  ProjektListFilters,
   ProjektRead,
-  ProjektStatus,
+  ProjektTicketsParams,
   ProjektUpdate,
   StockwerkCreate,
   StockwerkRead,
@@ -271,13 +272,7 @@ export const fehlercodeApi = {
 };
 
 export const projektApi = {
-  list: (
-    params: {
-      search?: string;
-      status?: ProjektStatus[];
-      include_deleted?: boolean;
-    } = {},
-  ) =>
+  list: (params: ProjektListFilters = {}) =>
     api
       .get<ProjektRead[]>('/projekte', { params })
       .then((r) => r.data),
@@ -289,6 +284,10 @@ export const projektApi = {
     api.patch<ProjektRead>(`/projekte/${id}`, payload).then((r) => r.data),
   remove: (id: UUID) =>
     api.delete<void>(`/projekte/${id}`).then(() => undefined),
+  getTickets: (id: UUID, params: ProjektTicketsParams = {}) =>
+    api
+      .get<PaginatedResponse<TicketRead>>(`/projekte/${id}/tickets`, { params })
+      .then((r) => r.data),
 };
 
 export const objektstrukturApi = {

@@ -14,6 +14,7 @@ import { MobileDemoPage } from './pages/MobileDemoPage';
 import { ObjektDetailPage } from './pages/ObjektDetailPage';
 import { ObjektePage } from './pages/ObjektePage';
 import { PartnerPage } from './pages/PartnerPage';
+import { ProjektDetailPage } from './pages/ProjektDetailPage';
 import { ProjektePage } from './pages/ProjektePage';
 import { TicketsListePage } from './pages/TicketsListePage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
           { path: '/kanban', element: <KanbanPage /> },
           { path: '/wartungen', element: <WartungenPage /> },
           { path: '/projekte', element: <ProjektePage /> },
+          { path: '/projekte/:id', element: <ProjektDetailPage /> },
           { path: '/dokumente', element: <DokumentePage /> },
           { path: '/mobile-demo', element: <MobileDemoPage /> },
           { path: '/stammdaten/adressen', element: <AdressenPage /> },

@@ -52,6 +52,8 @@ type Form = z.infer<typeof schema>;
 interface Props {
   onClose: () => void;
   onCreated: () => void;
+  /** Pre-fill the projekt-Select when the modal is opened from a Projekt-Detail context. */
+  defaultProjektId?: string | null;
 }
 
 const TYP_ICONS = {
@@ -89,7 +91,11 @@ function buildFelderMap(typ: TickettypRead | null): Map<string, TickettypFeldRea
   return m;
 }
 
-export function TicketErfassenModal({ onClose, onCreated }: Props) {
+export function TicketErfassenModal({
+  onClose,
+  onCreated,
+  defaultProjektId = null,
+}: Props) {
   const { data: tickettypen = [] } = useQuery({
     queryKey: ['tickettypen'],
     queryFn: () => tickettypApi.list(),
@@ -112,7 +118,8 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
   });
   const { data: projekte } = useQuery({
     queryKey: ['projekte-active'],
-    queryFn: () => projektApi.list({ status: ['geplant', 'laufend'] }),
+    // F2: status-slugs aus Auswahlliste `projektstatus` — Seed: geplant, aktiv, pausiert, abgeschlossen
+    queryFn: () => projektApi.list({ status: ['geplant', 'aktiv'] }),
     staleTime: 60_000,
   });
   const { data: anlagen } = useQuery({
@@ -158,7 +165,7 @@ export function TicketErfassenModal({ onClose, onCreated }: Props) {
       stockwerk_id: null,
       einheit_id: null,
       partner_id: null,
-      projekt_id: null,
+      projekt_id: defaultProjektId,
       anlage_id: null,
       fehlercode_id: null,
       zugewiesen_an_id: null,
