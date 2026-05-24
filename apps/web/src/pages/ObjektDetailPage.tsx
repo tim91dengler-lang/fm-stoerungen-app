@@ -33,7 +33,7 @@ import type {
 import { HausModal } from '../components/HausModal';
 import { StockwerkModal } from '../components/StockwerkModal';
 import { EinheitModal } from '../components/EinheitModal';
-import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 const AUSRICHTUNG_LABEL: Record<Ausrichtung, string> = {
   nord: '⬆ Nord',
@@ -509,13 +509,13 @@ export function ObjektDetailPage() {
         open={confirmState.mode === 'open'}
         title={confirmState.mode === 'open' ? confirmState.title : ''}
         message={confirmState.mode === 'open' ? confirmState.message : ''}
-        variant="danger"
+        tone="danger"
         confirmLabel="Löschen"
         onConfirm={() => {
           if (confirmState.mode === 'open') confirmState.onConfirm();
         }}
         onCancel={() => setConfirmState({ mode: 'closed' })}
-        isPending={confirmIsPending}
+        busy={confirmIsPending}
       />
     </div>
   );
