@@ -40,6 +40,7 @@ from fm_api.models import (
     ObjektStockwerk,
     PartnerTyp,
     Projekt,
+    ProjektObjektLink,
     Role,
     StockwerkAusrichtung,
     StockwerkEinheit,
@@ -283,29 +284,53 @@ async def main() -> int:
             .all()
         }
 
+        # ---- Projekt-Auswahlwerte vorab auflösen ---------------------------
+        async def aw(key: str, wert: str) -> UUID:
+            return await _get_auswahlwert_id(db, m_id, key, wert)
+
+        ptyp_sanierung = await aw("projekttyp", "sanierung")
+        ptyp_wartung = await aw("projekttyp", "wartung")
+        ptyp_begehung = await aw("projekttyp", "begehung")
+        pstatus_aktiv = await aw("projektstatus", "aktiv")
+        pstatus_geplant = await aw("projektstatus", "geplant")
+
         # ---- Projekte ------------------------------------------------------
-        proj_data = [
+        # Tupel: (name, beschreibung, [objekte], verantwortlich, start, ende,
+        #        projekttyp_id, status_id)
+        proj_data: list[tuple[str, str, list[Objekt], User, date, date, UUID, UUID]] = [
             (
                 "Sanierung 2. OG Marktplatz",
                 "Komplette Sanierung Büroflächen 2. OG",
-                obj_marktplatz,
+                [obj_marktplatz],
                 tech_users[0],
                 date.today() - timedelta(days=20),
                 date.today() + timedelta(days=60),
-                "laufend",
+                ptyp_sanierung,
+                pstatus_aktiv,
             ),
             (
                 "Heizungs-Modernisierung Wohnpark",
                 "Austausch der Heizanlage in beiden Häusern",
-                obj_heilbronner,
+                [obj_heilbronner],
                 tech_users[1],
                 date.today() + timedelta(days=30),
                 date.today() + timedelta(days=180),
-                "geplant",
+                ptyp_wartung,
+                pstatus_geplant,
+            ),
+            (
+                "Begehungs-Kampagne Stuttgart",
+                "Halbjährliche Begehung aller Objekte in Stuttgart-Mitte",
+                [obj_marktplatz, obj_koenig, obj_heilbronner],
+                tech_users[0],
+                date.today() + timedelta(days=14),
+                date.today() + timedelta(days=21),
+                ptyp_begehung,
+                pstatus_geplant,
             ),
         ]
         projekte: dict[str, Projekt] = {}
-        for name, beschr, obj, verant, start, ende, status in proj_data:
+        for name, beschr, objekte_for_proj, verant, start, ende, ptyp_id, pstatus_id in proj_data:
             proj: Projekt | None = (
                 await db.execute(
                     select(Projekt).where(Projekt.mandant_id == m_id, Projekt.name == name)
@@ -316,21 +341,27 @@ async def main() -> int:
                     mandant_id=m_id,
                     name=name,
                     beschreibung=beschr,
-                    objekt_id=obj.id,
+                    projekttyp_id=ptyp_id,
+                    status_id=pstatus_id,
                     verantwortlich_user_id=verant.id,
                     start_am=start,
                     ende_am=ende,
-                    status=status,
                 )
                 db.add(proj)
                 await db.flush()
-                print(f"[mockup-seed] projekt {name}")
+                for obj in objekte_for_proj:
+                    db.add(
+                        ProjektObjektLink(
+                            projekt_id=proj.id,
+                            objekt_id=obj.id,
+                            mandant_id=m_id,
+                        )
+                    )
+                await db.flush()
+                print(f"[mockup-seed] projekt {name} mit {len(objekte_for_proj)} Objekt(en)")
             projekte[name] = proj
 
         # ---- Auswahlwert-IDs laden -----------------------------------------
-        async def aw(key: str, wert: str) -> UUID:
-            return await _get_auswahlwert_id(db, m_id, key, wert)
-
         s_neu = await aw("ticket_status", "neu")
         s_pruefung = await aw("ticket_status", "pruefung")
         s_bearb = await aw("ticket_status", "bearbeitung")

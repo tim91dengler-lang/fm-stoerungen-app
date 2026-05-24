@@ -255,7 +255,11 @@ class TicketRead(TimestampedRead):
             )
             if t.tickettyp
             else None,
-            projekt=ProjektRefMini(id=t.projekt.id, name=t.projekt.name, status=t.projekt.status)
+            projekt=ProjektRefMini(
+                id=t.projekt.id,
+                name=t.projekt.name,
+                status=t.projekt.status_wert.key,
+            )
             if t.projekt
             else None,
             anlage=AnlageRef(

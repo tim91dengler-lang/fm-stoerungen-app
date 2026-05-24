@@ -17,7 +17,12 @@ from fm_api.models.objektstruktur import (
     StockwerkMieter,
 )
 from fm_api.models.partner import GeschaeftsPartner, PartnerTyp
-from fm_api.models.projekt import Projekt, ProjektStatusSlug
+from fm_api.models.projekt import (
+    Projekt,
+    ProjektObjektLink,
+    ProjektStatusSlug,
+    ProjekttypSlug,
+)
 from fm_api.models.role import Role
 from fm_api.models.ticket import Ticket, TicketPrioritaetSlug, TicketStatusSlug
 from fm_api.models.ticket_message import TicketMessage
@@ -46,7 +51,9 @@ __all__ = [
     "ObjektStockwerk",
     "PartnerTyp",
     "Projekt",
+    "ProjektObjektLink",
     "ProjektStatusSlug",
+    "ProjekttypSlug",
     "Role",
     "StockwerkAusrichtung",
     "StockwerkEinheit",
