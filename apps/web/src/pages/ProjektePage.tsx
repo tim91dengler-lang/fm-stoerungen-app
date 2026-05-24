@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type GroupingState,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from '@tanstack/react-table';
 import {
   Calendar,
   CheckCircle2,
@@ -22,17 +29,22 @@ import type {
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
   visibility: VisibilityState;
   columnOrder: string[];
+  columnFilters: ColumnFiltersState;
+  grouping: GroupingState;
 }
 
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
   columnOrder: ['name', 'status', 'verantwortlich', 'zeitraum', 'ticket_count', '__actions__'],
+  columnFilters: [],
+  grouping: [],
 };
 
 const STATUS_LABEL: Record<ProjektStatus, string> = {
@@ -75,6 +87,12 @@ export function ProjektePage() {
   const [form, setForm] = useState<ProjektCreate>(EMPTY_FORM);
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkConfirm, setBulkConfirm] = useState<ProjektRead[] | null>(null);
+  const [bulkStatusModal, setBulkStatusModal] = useState<{
+    rows: ProjektRead[];
+    status: ProjektStatus;
+  } | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -133,6 +151,30 @@ export function ProjektePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projekte'] }),
   });
 
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => projektApi.remove(id)));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projekte'] });
+      setRowSelection({});
+      setBulkConfirm(null);
+    },
+  });
+
+  const bulkStatusMut = useMutation({
+    mutationFn: async (vars: { ids: string[]; status: ProjektStatus }) => {
+      await Promise.all(
+        vars.ids.map((id) => projektApi.update(id, { status: vars.status })),
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projekte'] });
+      setRowSelection({});
+      setBulkStatusModal(null);
+    },
+  });
+
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -171,6 +213,7 @@ export function ProjektePage() {
         id: 'name',
         accessorKey: 'name',
         header: 'Projekt',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const p = ctx.row.original;
           return (
@@ -192,6 +235,7 @@ export function ProjektePage() {
         id: 'status',
         accessorKey: 'status',
         header: 'Status',
+        filterFn: 'arrIncludesSome',
         cell: (ctx) => {
           const s = ctx.row.original.status;
           const Icon = STATUS_ICON[s];
@@ -211,6 +255,7 @@ export function ProjektePage() {
         id: 'verantwortlich',
         accessorFn: (row) => row.verantwortlich?.full_name ?? '',
         header: 'Verantwortlich',
+        filterFn: 'includesString',
         cell: (ctx) =>
           ctx.row.original.verantwortlich?.full_name ?? <span className="text-zinc-500">—</span>,
       },
@@ -218,6 +263,7 @@ export function ProjektePage() {
         id: 'zeitraum',
         accessorFn: (row) => `${row.start_am ?? ''} ${row.ende_am ?? ''}`,
         header: 'Zeitraum',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const p = ctx.row.original;
           if (!p.start_am && !p.ende_am) return <span className="text-zinc-500">—</span>;
@@ -244,6 +290,7 @@ export function ProjektePage() {
         header: '',
         enableSorting: false,
         enableColumnFilter: false,
+        enableGrouping: false,
         cell: (ctx) => (
           <div className="flex justify-end gap-1">
             <button
@@ -256,10 +303,7 @@ export function ProjektePage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Projekt "${ctx.row.original.name}" wirklich löschen?`))
-                  remove.mutate(ctx.row.original.id);
-              }}
+              onClick={() => setBulkConfirm([ctx.row.original])}
               className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
               title="Löschen"
             >
@@ -269,9 +313,19 @@ export function ProjektePage() {
         ),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  function confirmBulkDelete() {
+    if (!bulkConfirm) return;
+    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
+      remove.mutate(bulkConfirm[0].id, {
+        onSuccess: () => setBulkConfirm(null),
+      });
+    } else {
+      bulkDeleteMut.mutate(bulkConfirm.map((p) => p.id));
+    }
+  }
 
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
@@ -322,10 +376,14 @@ export function ProjektePage() {
         onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
-        columnFilters={[]}
-        onColumnFiltersChange={() => {}}
+        columnFilters={config.columnFilters}
+        onColumnFiltersChange={(f) =>
+          setConfig((p) => ({ ...p, columnFilters: f }))
+        }
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        grouping={config.grouping}
+        onGroupingChange={(g) => setConfig((p) => ({ ...p, grouping: g }))}
         filterRenderers={{
           name: TextFilter,
           verantwortlich: TextFilter,
@@ -339,6 +397,32 @@ export function ProjektePage() {
             />
           ),
         }}
+        enableRowSelection
+        getRowId={(p) => p.id}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        bulkActions={(selected) => (
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                setBulkStatusModal({ rows: selected, status: 'laufend' })
+              }
+              disabled={bulkStatusMut.isPending}
+              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+            >
+              Status setzen ({selected.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkConfirm(selected)}
+              disabled={bulkDeleteMut.isPending}
+              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              Löschen ({selected.length})
+            </button>
+          </>
+        )}
         count={{
           filtered: filtered.length,
           total: listQuery.data?.length ?? 0,
@@ -358,6 +442,100 @@ export function ProjektePage() {
         showFooter
         itemLabel={{ singular: 'Projekt', plural: 'Projekte' }}
       />
+
+      <ConfirmDialog
+        open={bulkConfirm !== null}
+        title={
+          bulkConfirm && bulkConfirm.length === 1
+            ? 'Projekt löschen?'
+            : `${bulkConfirm?.length ?? 0} Projekte löschen?`
+        }
+        message={
+          bulkConfirm && bulkConfirm.length === 1 ? (
+            <span>
+              Projekt <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen?
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </span>
+          ) : (
+            <span>
+              {bulkConfirm?.length ?? 0} ausgewählte Projekte werden
+              unwiderruflich gelöscht.
+            </span>
+          )
+        }
+        busy={remove.isPending || bulkDeleteMut.isPending}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
+      />
+
+      {bulkStatusModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/70 p-4"
+          onClick={() => !bulkStatusMut.isPending && setBulkStatusModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-semibold text-zinc-100">
+              Status für {bulkStatusModal.rows.length} Projekt
+              {bulkStatusModal.rows.length === 1 ? '' : 'e'} setzen
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Neuer Status für die ausgewählten Projekte:
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {(Object.keys(STATUS_LABEL) as ProjektStatus[]).map((s) => {
+                const Icon = STATUS_ICON[s];
+                const active = bulkStatusModal.status === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() =>
+                      setBulkStatusModal({ ...bulkStatusModal, status: s })
+                    }
+                    className={clsx(
+                      'flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
+                      active
+                        ? STATUS_COLOR[s]
+                        : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {STATUS_LABEL[s]}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBulkStatusModal(null)}
+                disabled={bulkStatusMut.isPending}
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  bulkStatusMut.mutate({
+                    ids: bulkStatusModal.rows.map((p) => p.id),
+                    status: bulkStatusModal.status,
+                  })
+                }
+                disabled={bulkStatusMut.isPending}
+                className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {bulkStatusMut.isPending ? 'Setze …' : 'Status setzen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (

@@ -1,6 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type GroupingState,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from '@tanstack/react-table';
 import {
   Download,
   FileBox,
@@ -17,17 +24,22 @@ import type { DokumentRead } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { TextFilter } from '../core/liste/columnFilters';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
   visibility: VisibilityState;
   columnOrder: string[];
+  columnFilters: ColumnFiltersState;
+  grouping: GroupingState;
 }
 
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
   columnOrder: ['name', 'kategorie', 'size', 'hochgeladen', 'links', '__actions__'],
+  columnFilters: [],
+  grouping: [],
 };
 
 function fileIcon(mime: string) {
@@ -47,6 +59,8 @@ export function DokumentePage() {
   const [dragOver, setDragOver] = useState(false);
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkConfirm, setBulkConfirm] = useState<DokumentRead[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
@@ -78,6 +92,17 @@ export function DokumentePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['dokumente'] }),
   });
 
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => dokumentApi.remove(id)));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['dokumente'] });
+      setRowSelection({});
+      setBulkConfirm(null);
+    },
+  });
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragOver(false);
@@ -103,6 +128,7 @@ export function DokumentePage() {
         id: 'name',
         accessorKey: 'name',
         header: 'Name',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const d = ctx.row.original;
           const Icon = fileIcon(d.mime_type);
@@ -121,6 +147,7 @@ export function DokumentePage() {
         id: 'kategorie',
         accessorKey: 'kategorie',
         header: 'Kategorie',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const k = ctx.row.original.kategorie;
           if (!k) return <span className="text-zinc-500">—</span>;
@@ -143,6 +170,7 @@ export function DokumentePage() {
         id: 'hochgeladen',
         accessorFn: (row) => row.hochgeladen_von?.full_name ?? '',
         header: 'Hochgeladen',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const d = ctx.row.original;
           return (
@@ -181,6 +209,7 @@ export function DokumentePage() {
         header: '',
         enableSorting: false,
         enableColumnFilter: false,
+        enableGrouping: false,
         cell: (ctx) => (
           <div className="flex justify-end gap-1">
             <button
@@ -193,10 +222,7 @@ export function DokumentePage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`"${ctx.row.original.name}" löschen?`))
-                  remove.mutate(ctx.row.original.id);
-              }}
+              onClick={() => setBulkConfirm([ctx.row.original])}
               className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
               title="Löschen"
             >
@@ -206,9 +232,19 @@ export function DokumentePage() {
         ),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  function confirmBulkDelete() {
+    if (!bulkConfirm) return;
+    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
+      remove.mutate(bulkConfirm[0].id, {
+        onSuccess: () => setBulkConfirm(null),
+      });
+    } else {
+      bulkDeleteMut.mutate(bulkConfirm.map((d) => d.id));
+    }
+  }
 
   return (
     <div className="space-y-6 px-4 py-6 lg:px-8">
@@ -278,15 +314,33 @@ export function DokumentePage() {
         onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
-        columnFilters={[]}
-        onColumnFiltersChange={() => {}}
+        columnFilters={config.columnFilters}
+        onColumnFiltersChange={(f) =>
+          setConfig((p) => ({ ...p, columnFilters: f }))
+        }
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        grouping={config.grouping}
+        onGroupingChange={(g) => setConfig((p) => ({ ...p, grouping: g }))}
         filterRenderers={{
           name: TextFilter,
           kategorie: TextFilter,
           hochgeladen: TextFilter,
         }}
+        enableRowSelection
+        getRowId={(d) => d.id}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        bulkActions={(selected) => (
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
+        )}
         count={{
           filtered: filtered.length,
           total: listQuery.data?.length ?? 0,
@@ -305,6 +359,31 @@ export function DokumentePage() {
         searchPlaceholder="Suche in Dokumenten …"
         showFooter
         itemLabel={{ singular: 'Dokument', plural: 'Dokumente' }}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirm !== null}
+        title={
+          bulkConfirm && bulkConfirm.length === 1
+            ? 'Dokument löschen?'
+            : `${bulkConfirm?.length ?? 0} Dokumente löschen?`
+        }
+        message={
+          bulkConfirm && bulkConfirm.length === 1 ? (
+            <span>
+              Dokument <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen?
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </span>
+          ) : (
+            <span>
+              {bulkConfirm?.length ?? 0} ausgewählte Dokumente werden
+              unwiderruflich gelöscht.
+            </span>
+          )
+        }
+        busy={remove.isPending || bulkDeleteMut.isPending}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
     </div>
   );

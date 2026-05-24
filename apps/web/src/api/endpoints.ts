@@ -72,6 +72,7 @@ export const userApi = {
     api
       .get<PaginatedResponse<UserRead>>('/users', { params })
       .then((r) => r.data),
+  remove: (id: string) => api.delete<void>(`/users/${id}`).then(() => undefined),
 };
 
 export const ticketApi = {

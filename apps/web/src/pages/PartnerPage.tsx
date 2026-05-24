@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, type SortingState, type VisibilityState } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type GroupingState,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from '@tanstack/react-table';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { adresseApi, partnerApi } from '../api/endpoints';
 import type {
@@ -11,17 +18,22 @@ import type {
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
   visibility: VisibilityState;
   columnOrder: string[];
+  columnFilters: ColumnFiltersState;
+  grouping: GroupingState;
 }
 
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
   columnOrder: ['name', 'typen', 'ansprechpartner', 'kontakt', '__actions__'],
+  columnFilters: [],
+  grouping: [],
 };
 
 const PARTNER_TYPEN: PartnerTyp[] = [
@@ -56,6 +68,8 @@ export function PartnerPage() {
   const [form, setForm] = useState<PartnerCreate>(EMPTY_FORM);
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkConfirm, setBulkConfirm] = useState<PartnerRead[] | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -94,6 +108,17 @@ export function PartnerPage() {
   const deleteMut = useMutation({
     mutationFn: (id: string) => partnerApi.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['partner'] }),
+  });
+
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => partnerApi.remove(id)));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['partner'] });
+      setRowSelection({});
+      setBulkConfirm(null);
+    },
   });
 
   function openCreate() {
@@ -156,6 +181,7 @@ export function PartnerPage() {
         id: 'name',
         accessorKey: 'name',
         header: 'Name',
+        filterFn: 'includesString',
         cell: (ctx) => (
           <span
             className="cursor-pointer font-medium text-zinc-100 hover:text-emerald-300"
@@ -167,8 +193,10 @@ export function PartnerPage() {
       },
       {
         id: 'typen',
-        accessorFn: (row) => row.typen.join(' '),
+        accessorFn: (row) => row.typen,
         header: 'Typen',
+        // Multi-select filter against array column needs arrIncludesSome.
+        filterFn: 'arrIncludesSome',
         cell: (ctx) => (
           <div className="flex flex-wrap gap-1">
             {ctx.row.original.typen.map((t) => (
@@ -186,12 +214,14 @@ export function PartnerPage() {
         id: 'ansprechpartner',
         accessorKey: 'ansprechpartner',
         header: 'Ansprechpartner',
+        filterFn: 'includesString',
         cell: (ctx) => ctx.row.original.ansprechpartner ?? <span className="text-zinc-500">—</span>,
       },
       {
         id: 'kontakt',
         accessorFn: (row) => `${row.email ?? ''} ${row.telefon ?? ''}`.trim(),
         header: 'Kontakt',
+        filterFn: 'includesString',
         cell: (ctx) => {
           const p = ctx.row.original;
           return (
@@ -207,6 +237,7 @@ export function PartnerPage() {
         header: '',
         enableSorting: false,
         enableColumnFilter: false,
+        enableGrouping: false,
         cell: (ctx) => (
           <div className="flex justify-end gap-1">
             <button
@@ -219,10 +250,7 @@ export function PartnerPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Partner "${ctx.row.original.name}" löschen?`))
-                  deleteMut.mutate(ctx.row.original.id);
-              }}
+              onClick={() => setBulkConfirm([ctx.row.original])}
               className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
               title="Löschen"
             >
@@ -232,9 +260,19 @@ export function PartnerPage() {
         ),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  function confirmBulkDelete() {
+    if (!bulkConfirm) return;
+    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
+      deleteMut.mutate(bulkConfirm[0].id, {
+        onSuccess: () => setBulkConfirm(null),
+      });
+    } else {
+      bulkDeleteMut.mutate(bulkConfirm.map((p) => p.id));
+    }
+  }
 
   return (
     <div className="space-y-4 px-4 py-6 lg:px-8">
@@ -281,10 +319,14 @@ export function PartnerPage() {
         onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
-        columnFilters={[]}
-        onColumnFiltersChange={() => {}}
+        columnFilters={config.columnFilters}
+        onColumnFiltersChange={(f) =>
+          setConfig((p) => ({ ...p, columnFilters: f }))
+        }
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        grouping={config.grouping}
+        onGroupingChange={(g) => setConfig((p) => ({ ...p, grouping: g }))}
         filterRenderers={{
           name: TextFilter,
           ansprechpartner: TextFilter,
@@ -296,6 +338,20 @@ export function PartnerPage() {
             />
           ),
         }}
+        enableRowSelection
+        getRowId={(p) => p.id}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        bulkActions={(selected) => (
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
+        )}
         count={{
           filtered: listQuery.data?.items.length ?? 0,
           total: listQuery.data?.total ?? 0,
@@ -314,6 +370,31 @@ export function PartnerPage() {
         searchPlaceholder="Suche in Name, Ansprechpartner, E-Mail …"
         showFooter
         itemLabel={{ singular: 'Partner', plural: 'Partner' }}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirm !== null}
+        title={
+          bulkConfirm && bulkConfirm.length === 1
+            ? 'Partner löschen?'
+            : `${bulkConfirm?.length ?? 0} Partner löschen?`
+        }
+        message={
+          bulkConfirm && bulkConfirm.length === 1 ? (
+            <span>
+              Partner <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen?
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </span>
+          ) : (
+            <span>
+              {bulkConfirm?.length ?? 0} ausgewählte Partner werden
+              unwiderruflich gelöscht.
+            </span>
+          )
+        }
+        busy={deleteMut.isPending || bulkDeleteMut.isPending}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
 

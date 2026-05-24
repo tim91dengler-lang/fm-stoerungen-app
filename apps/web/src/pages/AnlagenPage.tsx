@@ -1,16 +1,30 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type GroupingState,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from '@tanstack/react-table';
+import {
   Activity,
   Droplets,
+  Pencil,
   Plus,
   Thermometer,
+  Trash2,
   Wind,
   Wrench,
   Zap,
 } from 'lucide-react';
 import { anlageApi, auswahllistenApi, objektApi } from '../api/endpoints';
 import type { AnlageCreate, AnlageRead } from '../api/types';
+import { PowerListenView } from '../core/liste/PowerListenView';
+import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
+import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 const ICON_MAP: Record<string, typeof Activity> = {
   Wind,
@@ -37,11 +51,38 @@ const EMPTY_FORM: AnlageCreate = {
   reihenfolge: 0,
 };
 
+interface ViewConfig {
+  sorting: SortingState;
+  visibility: VisibilityState;
+  columnOrder: string[];
+  columnFilters: ColumnFiltersState;
+  grouping: GroupingState;
+}
+
+const DEFAULT_CONFIG: ViewConfig = {
+  sorting: [{ id: 'bezeichnung', desc: false }],
+  visibility: {},
+  columnOrder: [
+    'bezeichnung',
+    'kategorie',
+    'objekt',
+    'aktiv',
+    'beschreibung',
+    '__actions__',
+  ],
+  columnFilters: [],
+  grouping: [],
+};
+
 export function AnlagenPage() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AnlageCreate>(EMPTY_FORM);
+  const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkConfirm, setBulkConfirm] = useState<AnlageRead[] | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -61,7 +102,9 @@ export function AnlagenPage() {
     staleTime: 60_000,
   });
 
-  const kategorienListe = auswahllistenQuery.data?.find((l) => l.key === 'ticket_kategorie');
+  const kategorienListe = auswahllistenQuery.data?.find(
+    (l) => l.key === 'ticket_kategorie',
+  );
 
   const create = useMutation({
     mutationFn: (payload: AnlageCreate) => anlageApi.create(payload),
@@ -83,16 +126,16 @@ export function AnlagenPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['anlagen'] }),
   });
 
-  const filtered = useMemo(() => {
-    const items = listQuery.data ?? [];
-    if (!search.trim()) return items;
-    const q = search.toLowerCase();
-    return items.filter(
-      (a) =>
-        a.bezeichnung.toLowerCase().includes(q) ||
-        (a.beschreibung ?? '').toLowerCase().includes(q),
-    );
-  }, [listQuery.data, search]);
+  const bulkDeleteMut = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => anlageApi.remove(id)));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['anlagen'] });
+      setRowSelection({});
+      setBulkConfirm(null);
+    },
+  });
 
   function openCreate() {
     setEditingId(null);
@@ -123,9 +166,134 @@ export function AnlagenPage() {
     else create.mutate(form);
   }
 
+  // Backend returns Array (not PaginatedResponse) for /anlagen.
+  // Global search is client-side; backend search param is also passed
+  // for server-side narrowing — both work together.
+  const data = listQuery.data ?? [];
+
+  const columns = useMemo<ColumnDef<AnlageRead>[]>(
+    () => [
+      {
+        id: 'bezeichnung',
+        accessorKey: 'bezeichnung',
+        header: 'Bezeichnung',
+        filterFn: 'includesString',
+        cell: (ctx) => {
+          const a = ctx.row.original;
+          const Icon = iconFor(a.icon_name);
+          return (
+            <button
+              type="button"
+              onClick={() => openEdit(a)}
+              className="flex items-center gap-2 text-left"
+            >
+              <Icon className="h-4 w-4 shrink-0 text-emerald-300" />
+              <span className="font-medium text-zinc-100 hover:text-emerald-300">
+                {a.bezeichnung}
+              </span>
+            </button>
+          );
+        },
+      },
+      {
+        id: 'kategorie',
+        accessorFn: (row) => row.kategorie?.label ?? '',
+        header: 'Kategorie',
+        filterFn: 'includesString',
+        cell: (ctx) => {
+          const k = ctx.row.original.kategorie;
+          if (!k) return <span className="text-zinc-500">—</span>;
+          return (
+            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+              {k.label}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'objekt',
+        accessorFn: (row) => row.objekt?.name ?? '',
+        header: 'Objekt',
+        filterFn: 'includesString',
+        cell: (ctx) =>
+          ctx.row.original.objekt?.name ?? (
+            <span className="text-zinc-500">—</span>
+          ),
+      },
+      {
+        id: 'aktiv',
+        accessorFn: (row) => (row.aktiv ? 'aktiv' : 'inaktiv'),
+        header: 'Status',
+        filterFn: 'arrIncludesSome',
+        cell: (ctx) =>
+          ctx.row.original.aktiv ? (
+            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
+              aktiv
+            </span>
+          ) : (
+            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
+              inaktiv
+            </span>
+          ),
+      },
+      {
+        id: 'beschreibung',
+        accessorKey: 'beschreibung',
+        header: 'Beschreibung',
+        filterFn: 'includesString',
+        cell: (ctx) => {
+          const b = ctx.row.original.beschreibung;
+          if (!b) return <span className="text-zinc-500">—</span>;
+          return (
+            <span className="line-clamp-1 text-xs text-zinc-400">{b}</span>
+          );
+        },
+      },
+      {
+        id: '__actions__',
+        header: '',
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableGrouping: false,
+        cell: (ctx) => (
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => openEdit(ctx.row.original)}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              title="Bearbeiten"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkConfirm([ctx.row.original])}
+              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+              title="Löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
+
+  function confirmBulkDelete() {
+    if (!bulkConfirm) return;
+    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
+      remove.mutate(bulkConfirm[0].id, {
+        onSuccess: () => setBulkConfirm(null),
+      });
+    } else {
+      bulkDeleteMut.mutate(bulkConfirm.map((a) => a.id));
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-6">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-zinc-100">
             <Activity className="h-5 w-5 text-emerald-400" /> Anlagen
@@ -143,100 +311,97 @@ export function AnlagenPage() {
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-        <input
-          type="search"
-          placeholder="Suche in Bezeichnung, Beschreibung …"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100"
-        />
-      </div>
+      <PowerListenView<AnlageRead>
+        viewKey="anlagen"
+        columns={columns}
+        data={data}
+        search={search}
+        onSearchChange={setSearch}
+        visibility={config.visibility}
+        onVisibilityChange={(v) => setConfig((p) => ({ ...p, visibility: v }))}
+        sorting={config.sorting}
+        onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
+        columnFilters={config.columnFilters}
+        onColumnFiltersChange={(f) =>
+          setConfig((p) => ({ ...p, columnFilters: f }))
+        }
+        columnOrder={config.columnOrder}
+        onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
+        grouping={config.grouping}
+        onGroupingChange={(g) => setConfig((p) => ({ ...p, grouping: g }))}
+        filterRenderers={{
+          bezeichnung: TextFilter,
+          kategorie: TextFilter,
+          objekt: TextFilter,
+          beschreibung: TextFilter,
+          aktiv: (props) => (
+            <SelectFilter
+              {...props}
+              options={[
+                { value: 'aktiv', label: 'aktiv' },
+                { value: 'inaktiv', label: 'inaktiv' },
+              ]}
+            />
+          ),
+        }}
+        enableRowSelection
+        getRowId={(a) => a.id}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        bulkActions={(selected) => (
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
+        )}
+        count={{
+          filtered: data.length,
+          total: listQuery.data?.length ?? 0,
+        }}
+        toolbarLeft={
+          <SavedViewsMenu
+            viewKey="anlagen"
+            currentConfig={config as unknown as Record<string, unknown>}
+            onApply={(c) => {
+              setConfig({ ...DEFAULT_CONFIG, ...(c as Partial<ViewConfig>) });
+              setActiveViewId(null);
+            }}
+            activeId={activeViewId}
+          />
+        }
+        searchPlaceholder="Suche in Bezeichnung, Beschreibung …"
+        showFooter
+        itemLabel={{ singular: 'Anlage', plural: 'Anlagen' }}
+      />
 
-      {listQuery.isLoading && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Lade Anlagen …
-        </div>
-      )}
-      {!listQuery.isLoading && filtered.length === 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">
-          Keine Anlagen gefunden.
-        </div>
-      )}
-      {filtered.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
-          <table className="min-w-full divide-y divide-zinc-800 text-sm">
-            <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-400">
-              <tr>
-                <th className="px-4 py-2 font-medium">Anlage</th>
-                <th className="px-4 py-2 font-medium">Kategorie</th>
-                <th className="px-4 py-2 font-medium">Objekt</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/60">
-              {filtered.map((a) => {
-                const Icon = iconFor(a.icon_name);
-                return (
-                  <tr key={a.id} className="hover:bg-zinc-900/50">
-                    <td className="px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-emerald-300" />
-                        <div>
-                          <div className="font-medium text-zinc-100">{a.bezeichnung}</div>
-                          {a.beschreibung && (
-                            <div className="text-xs text-zinc-500">{a.beschreibung}</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-zinc-400">
-                      {a.kategorie ? (
-                        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs">
-                          {a.kategorie.label}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-zinc-400">{a.objekt?.name ?? '—'}</td>
-                    <td className="px-4 py-2">
-                      {a.aktiv ? (
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
-                          aktiv
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-                          inaktiv
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(a)}
-                        className="mr-2 text-xs font-medium text-emerald-300 hover:underline"
-                      >
-                        Bearbeiten
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Anlage "${a.bezeichnung}" löschen?`)) remove.mutate(a.id);
-                        }}
-                        className="text-xs font-medium text-red-400 hover:underline"
-                      >
-                        Löschen
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <ConfirmDialog
+        open={bulkConfirm !== null}
+        title={
+          bulkConfirm && bulkConfirm.length === 1
+            ? 'Anlage löschen?'
+            : `${bulkConfirm?.length ?? 0} Anlagen löschen?`
+        }
+        message={
+          bulkConfirm && bulkConfirm.length === 1 ? (
+            <span>
+              Anlage <strong>{bulkConfirm[0]?.bezeichnung}</strong> wirklich
+              löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+            </span>
+          ) : (
+            <span>
+              {bulkConfirm?.length ?? 0} ausgewählte Anlagen werden
+              unwiderruflich gelöscht.
+            </span>
+          )
+        }
+        busy={remove.isPending || bulkDeleteMut.isPending}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
+      />
 
       {showModal && (
         <div
@@ -254,32 +419,45 @@ export function AnlagenPage() {
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-zinc-300">Bezeichnung *</label>
+                <label className="block text-sm text-zinc-300">
+                  Bezeichnung *
+                </label>
                 <input
                   type="text"
                   value={form.bezeichnung}
-                  onChange={(e) => setForm({ ...form, bezeichnung: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, bezeichnung: e.target.value })
+                  }
                   placeholder="z. B. RLT-03 oder Heizkreis Süd"
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-300">Beschreibung</label>
+                <label className="block text-sm text-zinc-300">
+                  Beschreibung
+                </label>
                 <textarea
                   rows={2}
                   value={form.beschreibung ?? ''}
-                  onChange={(e) => setForm({ ...form, beschreibung: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, beschreibung: e.target.value })
+                  }
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-300">Kategorie</label>
+                  <label className="block text-sm text-zinc-300">
+                    Kategorie
+                  </label>
                   <select
                     value={form.kategorie_wert_id ?? ''}
                     onChange={(e) =>
-                      setForm({ ...form, kategorie_wert_id: e.target.value || null })
+                      setForm({
+                        ...form,
+                        kategorie_wert_id: e.target.value || null,
+                      })
                     }
                     className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   >
@@ -295,7 +473,9 @@ export function AnlagenPage() {
                   <label className="block text-sm text-zinc-300">Icon</label>
                   <select
                     value={form.icon_name ?? 'Activity'}
-                    onChange={(e) => setForm({ ...form, icon_name: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, icon_name: e.target.value })
+                    }
                     className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   >
                     {Object.keys(ICON_MAP).map((k) => (
@@ -310,7 +490,9 @@ export function AnlagenPage() {
                 <label className="block text-sm text-zinc-300">Objekt</label>
                 <select
                   value={form.objekt_id ?? ''}
-                  onChange={(e) => setForm({ ...form, objekt_id: e.target.value || null })}
+                  onChange={(e) =>
+                    setForm({ ...form, objekt_id: e.target.value || null })
+                  }
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                 >
                   <option value="">— (keins) —</option>
@@ -326,7 +508,9 @@ export function AnlagenPage() {
                   id="aktiv"
                   type="checkbox"
                   checked={form.aktiv ?? true}
-                  onChange={(e) => setForm({ ...form, aktiv: e.target.checked })}
+                  onChange={(e) =>
+                    setForm({ ...form, aktiv: e.target.checked })
+                  }
                   className="accent-emerald-500"
                 />
                 <label htmlFor="aktiv" className="text-sm text-zinc-300">
@@ -345,7 +529,11 @@ export function AnlagenPage() {
               <button
                 type="button"
                 onClick={submit}
-                disabled={!form.bezeichnung.trim() || create.isPending || update.isPending}
+                disabled={
+                  !form.bezeichnung.trim() ||
+                  create.isPending ||
+                  update.isPending
+                }
                 className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
               >
                 {editingId ? 'Speichern' : 'Anlegen'}
