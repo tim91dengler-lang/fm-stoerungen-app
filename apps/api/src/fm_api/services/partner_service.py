@@ -148,7 +148,7 @@ async def _check_circular_hierarchy(
         raise PartnerCircularHierarchyError("Partner kann sich nicht selbst als Mutter haben.")
     # Wandere die Vorfahren-Kette des neuen Parents hoch. Findet sich
     # partner_id darin, wäre ein Zirkel.
-    current = new_parent_id
+    current: UUID | None = new_parent_id
     visited: set[UUID] = set()
     while current is not None:
         if current in visited:
