@@ -288,9 +288,7 @@ async def delete_grundriss(
     current: CurrentUserDep,
 ) -> StockwerkRead:
     try:
-        s = await objektstruktur_service.delete_grundriss(
-            db, current.mandant_id, stockwerk_id
-        )
+        s = await objektstruktur_service.delete_grundriss(db, current.mandant_id, stockwerk_id)
     except StockwerkNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return _serialize_stockwerk(s)
