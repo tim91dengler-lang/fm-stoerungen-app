@@ -9,13 +9,18 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import { userApi } from '../api/endpoints';
-import type { UserRead } from '../api/types';
+import type { UserRead, UserUpdate } from '../api/types';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDateTime } from '../lib/format';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import {
+  MassEditModal,
+  type ColumnSpec,
+  type MassEditResult,
+} from '../core/liste/MassEditModal';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -40,7 +45,27 @@ export function UsersListePage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<UserRead[] | null>(null);
+  const [massEditRows, setMassEditRows] = useState<UserRead[] | null>(null);
   const qc = useQueryClient();
+
+  const massEditColumns: ColumnSpec[] = [
+    { id: 'is_active', label: 'Aktiv', type: 'boolean' },
+  ];
+
+  async function handleMassEdit(
+    rows: UserRead[],
+    columnId: string,
+    value: unknown,
+  ): Promise<MassEditResult> {
+    const payload: UserUpdate = { [columnId]: value } as UserUpdate;
+    const results = await Promise.allSettled(
+      rows.map((r) => userApi.update(r.id, payload)),
+    );
+    const ok = results.filter((x) => x.status === 'fulfilled').length;
+    qc.invalidateQueries({ queryKey: ['users'] });
+    setRowSelection({});
+    return { ok, failed: results.length - ok };
+  }
 
   const isAdmin = user?.roles.includes('admin') ?? false;
 
@@ -190,20 +215,38 @@ export function UsersListePage() {
           onRowSelectionChange={setRowSelection}
           bulkActions={(selected) => {
             const deletable = selfExcluded(selected);
+            // Mass-Edit also excludes the current user — they shouldn't
+            // accidentally toggle their own is_active off.
+            const editable = selfExcluded(selected);
             return (
-              <button
-                type="button"
-                onClick={() => setBulkConfirm(selected)}
-                disabled={bulkDeleteMut.isPending || deletable.length === 0}
-                className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                title={
-                  deletable.length === 0
-                    ? 'Du kannst dich nicht selbst löschen'
-                    : undefined
-                }
-              >
-                Löschen ({deletable.length})
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMassEditRows(editable)}
+                  disabled={editable.length === 0}
+                  className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
+                  title={
+                    editable.length === 0
+                      ? 'Du kannst dich nicht selbst bearbeiten'
+                      : undefined
+                  }
+                >
+                  Bearbeiten ({editable.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkConfirm(selected)}
+                  disabled={bulkDeleteMut.isPending || deletable.length === 0}
+                  className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                  title={
+                    deletable.length === 0
+                      ? 'Du kannst dich nicht selbst löschen'
+                      : undefined
+                  }
+                >
+                  Löschen ({deletable.length})
+                </button>
+              </>
             );
           }}
           count={{
@@ -226,6 +269,17 @@ export function UsersListePage() {
           itemLabel={{ singular: 'Benutzer', plural: 'Benutzer' }}
         />
       )}
+
+      <MassEditModal<UserRead>
+        open={massEditRows !== null}
+        selectedRows={massEditRows ?? []}
+        columns={massEditColumns}
+        itemLabel={{ singular: 'Benutzer', plural: 'Benutzer' }}
+        onClose={() => setMassEditRows(null)}
+        onSubmit={(col, val) =>
+          handleMassEdit(massEditRows ?? [], col, val)
+        }
+      />
 
       <ConfirmDialog
         open={bulkConfirm !== null}

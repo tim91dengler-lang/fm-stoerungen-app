@@ -23,11 +23,17 @@ import type {
   AuswahllistenWertRead,
   ProjektCreate,
   ProjektRead,
+  ProjektUpdate,
 } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import {
+  MassEditModal,
+  type ColumnSpec,
+  type MassEditResult,
+} from '../core/liste/MassEditModal';
 import { ProjektModal } from '../components/ProjektModal';
 
 interface ViewConfig {
@@ -145,6 +151,7 @@ export function ProjektePage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<ProjektRead[] | null>(null);
+  const [massEditRows, setMassEditRows] = useState<ProjektRead[] | null>(null);
   const [bulkStatusModal, setBulkStatusModal] = useState<{
     rows: ProjektRead[];
     statusSlug: string;
@@ -237,6 +244,47 @@ export function ProjektePage() {
       setBulkStatusModal(null);
     },
   });
+
+  // Mass-edit options: projektstatus / projekttyp send slugs (not UUIDs)
+  // — the backend payload uses `status_slug` / `projekttyp_slug`.
+  const statusSlugOptions = useMemo(
+    () => statusOptions.map((w) => ({ value: w.key, label: w.label })),
+    [statusOptions],
+  );
+  const projekttypSlugOptions = useMemo(
+    () => projekttypOptions.map((w) => ({ value: w.key, label: w.label })),
+    [projekttypOptions],
+  );
+
+  const massEditColumns: ColumnSpec[] = [
+    {
+      id: 'status_slug',
+      label: 'Status',
+      type: 'auswahl',
+      options: statusSlugOptions,
+    },
+    {
+      id: 'projekttyp_slug',
+      label: 'Projekttyp',
+      type: 'auswahl',
+      options: projekttypSlugOptions,
+    },
+  ];
+
+  async function handleMassEdit(
+    rows: ProjektRead[],
+    columnId: string,
+    value: unknown,
+  ): Promise<MassEditResult> {
+    const payload: ProjektUpdate = { [columnId]: value } as ProjektUpdate;
+    const results = await Promise.allSettled(
+      rows.map((r) => projektApi.update(r.id, payload)),
+    );
+    const ok = results.filter((x) => x.status === 'fulfilled').length;
+    qc.invalidateQueries({ queryKey: ['projekte'] });
+    setRowSelection({});
+    return { ok, failed: results.length - ok };
+  }
 
   function openCreate() {
     setEditing(null);
@@ -488,6 +536,13 @@ export function ProjektePage() {
           <>
             <button
               type="button"
+              onClick={() => setMassEditRows(selected)}
+              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10"
+            >
+              Bearbeiten ({selected.length})
+            </button>
+            <button
+              type="button"
               onClick={() =>
                 setBulkStatusModal({
                   rows: selected,
@@ -527,6 +582,17 @@ export function ProjektePage() {
         searchPlaceholder="Suche in Projekten …"
         showFooter
         itemLabel={{ singular: 'Projekt', plural: 'Projekte' }}
+      />
+
+      <MassEditModal<ProjektRead>
+        open={massEditRows !== null}
+        selectedRows={massEditRows ?? []}
+        columns={massEditColumns}
+        itemLabel={{ singular: 'Projekt', plural: 'Projekte' }}
+        onClose={() => setMassEditRows(null)}
+        onSubmit={(col, val) =>
+          handleMassEdit(massEditRows ?? [], col, val)
+        }
       />
 
       <ConfirmDialog

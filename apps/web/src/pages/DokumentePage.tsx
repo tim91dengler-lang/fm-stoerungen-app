@@ -20,11 +20,16 @@ import {
 import clsx from 'clsx';
 import { api } from '../api/client';
 import { dokumentApi } from '../api/endpoints';
-import type { DokumentRead } from '../api/types';
+import type { DokumentRead, DokumentUpdate } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import {
+  MassEditModal,
+  type ColumnSpec,
+  type MassEditResult,
+} from '../core/liste/MassEditModal';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -61,8 +66,31 @@ export function DokumentePage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<DokumentRead[] | null>(null);
+  const [massEditRows, setMassEditRows] = useState<DokumentRead[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  // Dokumente.kategorie is a free-text string (no auswahlliste exists yet).
+  // Beschreibung also free text.
+  const massEditColumns: ColumnSpec[] = [
+    { id: 'kategorie', label: 'Kategorie', type: 'text' },
+    { id: 'beschreibung', label: 'Beschreibung', type: 'text' },
+  ];
+
+  async function handleMassEdit(
+    rows: DokumentRead[],
+    columnId: string,
+    value: unknown,
+  ): Promise<MassEditResult> {
+    const payload: DokumentUpdate = { [columnId]: value } as DokumentUpdate;
+    const results = await Promise.allSettled(
+      rows.map((r) => dokumentApi.update(r.id, payload)),
+    );
+    const ok = results.filter((x) => x.status === 'fulfilled').length;
+    qc.invalidateQueries({ queryKey: ['dokumente'] });
+    setRowSelection({});
+    return { ok, failed: results.length - ok };
+  }
 
   const listQuery = useQuery({
     queryKey: ['dokumente'],
@@ -332,14 +360,23 @@ export function DokumentePage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
-          <button
-            type="button"
-            onClick={() => setBulkConfirm(selected)}
-            disabled={bulkDeleteMut.isPending}
-            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-          >
-            Löschen ({selected.length})
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setMassEditRows(selected)}
+              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10"
+            >
+              Bearbeiten ({selected.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkConfirm(selected)}
+              disabled={bulkDeleteMut.isPending}
+              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              Löschen ({selected.length})
+            </button>
+          </>
         )}
         count={{
           filtered: filtered.length,
@@ -359,6 +396,17 @@ export function DokumentePage() {
         searchPlaceholder="Suche in Dokumenten …"
         showFooter
         itemLabel={{ singular: 'Dokument', plural: 'Dokumente' }}
+      />
+
+      <MassEditModal<DokumentRead>
+        open={massEditRows !== null}
+        selectedRows={massEditRows ?? []}
+        columns={massEditColumns}
+        itemLabel={{ singular: 'Dokument', plural: 'Dokumente' }}
+        onClose={() => setMassEditRows(null)}
+        onSubmit={(col, val) =>
+          handleMassEdit(massEditRows ?? [], col, val)
+        }
       />
 
       <ConfirmDialog
