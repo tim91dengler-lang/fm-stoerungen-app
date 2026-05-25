@@ -1,4 +1,9 @@
 import { useMemo, useState } from 'react';
+import {
+  MassEditModal,
+  type ColumnSpec,
+  type MassEditResult,
+} from '../core/liste/MassEditModal';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
@@ -20,7 +25,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { anlageApi, auswahllistenApi, objektApi } from '../api/endpoints';
-import type { AnlageCreate, AnlageRead } from '../api/types';
+import type { AnlageCreate, AnlageRead, AnlageUpdate } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
@@ -83,6 +88,7 @@ export function AnlagenPage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<AnlageRead[] | null>(null);
+  const [massEditRows, setMassEditRows] = useState<AnlageRead[] | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -136,6 +142,43 @@ export function AnlagenPage() {
       setBulkConfirm(null);
     },
   });
+
+  // Mass-edit options for the kategorie column use UUID as value (not slug),
+  // because the backend payload expects `kategorie_wert_id` to be a UUID.
+  const kategorieOptions = useMemo(
+    () =>
+      (kategorienListe?.werte ?? [])
+        .filter((w) => w.ist_aktiv)
+        .sort((a, b) => a.reihenfolge - b.reihenfolge)
+        .map((w) => ({ value: w.id, label: w.label })),
+    [kategorienListe],
+  );
+
+  const massEditColumns: ColumnSpec[] = [
+    {
+      id: 'kategorie_wert_id',
+      label: 'Kategorie',
+      type: 'auswahl',
+      options: kategorieOptions,
+    },
+    { id: 'beschreibung', label: 'Beschreibung', type: 'text' },
+    { id: 'aktiv', label: 'Aktiv', type: 'boolean' },
+  ];
+
+  async function handleMassEdit(
+    rows: AnlageRead[],
+    columnId: string,
+    value: unknown,
+  ): Promise<MassEditResult> {
+    const payload: AnlageUpdate = { [columnId]: value } as AnlageUpdate;
+    const results = await Promise.allSettled(
+      rows.map((r) => anlageApi.update(r.id, payload)),
+    );
+    const ok = results.filter((x) => x.status === 'fulfilled').length;
+    qc.invalidateQueries({ queryKey: ['anlagen'] });
+    setRowSelection({});
+    return { ok, failed: results.length - ok };
+  }
 
   function openCreate() {
     setEditingId(null);
@@ -349,14 +392,23 @@ export function AnlagenPage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
-          <button
-            type="button"
-            onClick={() => setBulkConfirm(selected)}
-            disabled={bulkDeleteMut.isPending}
-            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-          >
-            Löschen ({selected.length})
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setMassEditRows(selected)}
+              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10"
+            >
+              Bearbeiten ({selected.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkConfirm(selected)}
+              disabled={bulkDeleteMut.isPending}
+              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              Löschen ({selected.length})
+            </button>
+          </>
         )}
         count={{
           filtered: data.length,
@@ -376,6 +428,17 @@ export function AnlagenPage() {
         searchPlaceholder="Suche in Bezeichnung, Beschreibung …"
         showFooter
         itemLabel={{ singular: 'Anlage', plural: 'Anlagen' }}
+      />
+
+      <MassEditModal<AnlageRead>
+        open={massEditRows !== null}
+        selectedRows={massEditRows ?? []}
+        columns={massEditColumns}
+        itemLabel={{ singular: 'Anlage', plural: 'Anlagen' }}
+        onClose={() => setMassEditRows(null)}
+        onSubmit={(col, val) =>
+          handleMassEdit(massEditRows ?? [], col, val)
+        }
       />
 
       <ConfirmDialog

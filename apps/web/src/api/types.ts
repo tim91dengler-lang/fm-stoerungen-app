@@ -32,6 +32,13 @@ export interface UserRead {
   updated_at: string;
 }
 
+export interface UserUpdate {
+  full_name?: string;
+  is_active?: boolean;
+  role_ids?: UUID[];
+  password?: string;
+}
+
 export interface UserRef {
   id: UUID;
   full_name: string;

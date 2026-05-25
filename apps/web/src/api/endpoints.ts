@@ -58,6 +58,7 @@ import type {
   TicketRead,
   TicketUpdate,
   UserRead,
+  UserUpdate,
   UUID,
 } from './types';
 
@@ -73,6 +74,8 @@ export const userApi = {
     api
       .get<PaginatedResponse<UserRead>>('/users', { params })
       .then((r) => r.data),
+  update: (id: string, payload: UserUpdate) =>
+    api.patch<UserRead>(`/users/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/users/${id}`).then(() => undefined),
 };
 
