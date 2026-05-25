@@ -5,6 +5,7 @@ import {
   Activity,
   AlertOctagon,
   Building2,
+  Columns3,
   FolderKanban,
   FileStack,
   Layers,
@@ -39,6 +40,7 @@ const navGroups: NavGroup[] = [
     label: 'Betrieb',
     items: [
       { to: '/tickets', label: 'Ticket-Pool', icon: <Ticket className="h-4 w-4" /> },
+      { to: '/kanban', label: 'Kanban', icon: <Columns3 className="h-4 w-4" /> },
       { to: '/wartungen', label: 'Wartungen', icon: <ListChecks className="h-4 w-4" /> },
       { to: '/projekte', label: 'Projekte', icon: <FolderKanban className="h-4 w-4" /> },
       { to: '/dokumente', label: 'Dokumente', icon: <FileStack className="h-4 w-4" /> },
