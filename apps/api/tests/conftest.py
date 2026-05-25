@@ -53,7 +53,8 @@ async def _prepare_schema():
         await conn.execute(
             text(
                 "CREATE TYPE partner_typ AS ENUM "
-                "('mieter','eigentuemer','auftraggeber','nachunternehmer')"
+                "('mieter','eigentuemer','auftraggeber','nachunternehmer',"
+                "'privatperson')"
             )
         )
         await conn.run_sync(Base.metadata.create_all)

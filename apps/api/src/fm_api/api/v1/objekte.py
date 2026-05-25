@@ -31,6 +31,7 @@ def _serialize_objekt(o: object) -> ObjektRead:
             "name": o.name,
             "adresse_id": o.adresse_id,
             "notiz": o.notiz,
+            "gesperrt": o.gesperrt,
             "adresse": o.adresse,
             "created_at": o.created_at,
             "updated_at": o.updated_at,
@@ -58,6 +59,7 @@ async def list_objekte(
     current: CurrentUserDep,
     search: str | None = Query(default=None, max_length=200),
     include_deleted: bool = Query(default=False),
+    gesperrt_filter: str = Query(default="aktiv", pattern="^(aktiv|gesperrt|alle)$"),
     limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> PaginatedResponse[ObjektRead]:
@@ -66,6 +68,7 @@ async def list_objekte(
         current.mandant_id,
         search=search,
         include_deleted=include_deleted,
+        gesperrt_filter=gesperrt_filter,
         limit=limit,
         offset=offset,
     )
@@ -151,3 +154,41 @@ async def delete_objekt(
     except ObjektNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return None
+
+
+@router.post(
+    "/{objekt_id}/sperren",
+    response_model=ObjektRead,
+    summary="Objekt sperren (Soft-Sperre, R6c-Konvention)",
+)
+async def sperren_objekt(
+    objekt_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> ObjektRead:
+    try:
+        objekt = await objekt_service.sperren_objekt(
+            db, objekt_id, current.mandant_id, gesperrt=True
+        )
+    except ObjektNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _serialize_objekt(objekt)
+
+
+@router.post(
+    "/{objekt_id}/entsperren",
+    response_model=ObjektRead,
+    summary="Objekt entsperren",
+)
+async def entsperren_objekt(
+    objekt_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> ObjektRead:
+    try:
+        objekt = await objekt_service.sperren_objekt(
+            db, objekt_id, current.mandant_id, gesperrt=False
+        )
+    except ObjektNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _serialize_objekt(objekt)

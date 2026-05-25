@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +31,11 @@ class Objekt(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
     notiz: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Soft-Sperre nach R6c-Konvention; bestehende Verknüpfungen bleiben,
+    # neue Auswahl in Suchpickern wird unterdrückt.
+    gesperrt: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
 
     mandant: Mapped["Mandant"] = relationship(lazy="raise")
     adresse: Mapped["Adresse | None"] = relationship(lazy="raise")

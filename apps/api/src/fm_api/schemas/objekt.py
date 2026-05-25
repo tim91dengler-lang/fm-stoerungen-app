@@ -43,5 +43,6 @@ class ObjektRead(TimestampedRead, ObjektBase):
     model_config = ConfigDict(from_attributes=True)
 
     mandant_id: UUID
+    gesperrt: bool = False
     adresse: AdresseRead | None = None
     partner_links: list[ObjektPartnerLinkRead] = Field(default_factory=list)
