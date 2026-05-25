@@ -3,10 +3,13 @@ import {
   flexRender,
   getCoreRowModel,
   getExpandedRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   getFilteredRowModel,
   getGroupedRowModel,
   getSortedRowModel,
   useReactTable,
+  type Column,
   type ColumnDef,
   type ColumnFiltersState,
   type GroupingState,
@@ -15,6 +18,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
+import { comboboxFilterFn } from './columnFilters';
 import {
   ArrowDown,
   ArrowUp,
@@ -41,6 +45,13 @@ const stableSortedRowModel = getSortedRowModel();
 const stableFilteredRowModel = getFilteredRowModel();
 const stableGroupedRowModel = getGroupedRowModel();
 const stableExpandedRowModel = getExpandedRowModel();
+const stableFacetedRowModel = getFacetedRowModel();
+const stableFacetedUniqueValues = getFacetedUniqueValues();
+// Default-FilterFn für alle Spalten ohne explizite Angabe.
+// Das aktiviert den ComboboxFilter end-to-end (Pills + Free-Text).
+// Spalten, die `filterFn: 'includesString'` / `'arrIncludesSome'` explizit
+// setzen (Legacy: Pages mit TextFilter / SelectFilter), behalten ihr Verhalten.
+const stableDefaultColumn = { filterFn: comboboxFilterFn };
 
 export interface PowerListenViewProps<TData> {
   /** Eindeutiger View-Key (z. B. 'tickets', 'adressen') — wird für gespeicherte Ansichten verwendet. */
@@ -65,10 +76,19 @@ export interface PowerListenViewProps<TData> {
   toolbarLeft?: ReactNode;
   /** Total-Anzeige (z. B. "12 von 100 Treffer"). */
   count?: { filtered: number; total: number };
-  /** Pro Spalte ein optionaler Filter-Renderer; wird unter dem Header gerendert. */
+  /** Pro Spalte ein optionaler Filter-Renderer; wird unter dem Header gerendert.
+   *
+   * Renderer bekommen ergänzend das TanStack-`column` durchgereicht, damit
+   * der ComboboxFilter `column.getFacetedUniqueValues()` für seine Dropdown-
+   * Liste nutzen kann. Legacy-Renderer (TextFilter/SelectFilter) ignorieren
+   * das Feld einfach. */
   filterRenderers?: Record<
     string,
-    (props: { value: unknown; onChange: (v: unknown) => void }) => ReactNode
+    (props: {
+      value: unknown;
+      onChange: (v: unknown) => void;
+      column: Column<TData, unknown>;
+    }) => ReactNode
   >;
   /** Wenn gesetzt: Bulk-Select-Checkbox-Spalte wird gerendert + Toolbar-Banner bei Auswahl. */
   enableRowSelection?: boolean;
@@ -197,6 +217,7 @@ export function PowerListenView<TData>({
   const table = useReactTable<TData>({
     data,
     columns: allColumns,
+    defaultColumn: stableDefaultColumn,
     state: {
       sorting,
       columnVisibility: visibility,
@@ -216,6 +237,14 @@ export function PowerListenView<TData>({
     getSortedRowModel: stableSortedRowModel,
     getFilteredRowModel: stableFilteredRowModel,
     getExpandedRowModel: stableExpandedRowModel,
+    // Faceted-Row-Model: liefert pro Spalte distinct-Werte (für ComboboxFilter-
+    // Dropdown). Casts erforderlich, weil TanStack die Factory streng generisch
+    // an TData bindet; die Implementierung ist intern aber data-agnostic, wir
+    // halten die Factory daher als Modul-Konstante.
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    getFacetedRowModel: stableFacetedRowModel as any,
+    getFacetedUniqueValues: stableFacetedUniqueValues as any,
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     ...(groupingEnabled
       ? { getGroupedRowModel: stableGroupedRowModel }
       : {}),
@@ -380,85 +409,88 @@ export function PowerListenView<TData>({
     onSortingChange(next);
   }
 
+  // Drop-Zone wird zwischen Toolbar und Tabelle gerendert (nicht mehr oben).
+  // Extracted in eine Variable, damit JSX-Aufbau lesbar bleibt.
+  const dropZone = onGroupingChange ? (
+    <div
+      onDragOver={onDropZoneDragOver}
+      onDragEnter={onDropZoneDragOver}
+      onDragLeave={onDropZoneDragLeave}
+      onDrop={onDropZoneDrop}
+      className={`mb-2 flex min-h-[40px] flex-wrap items-center gap-2 rounded-lg border-2 border-dashed px-3 py-1.5 transition-colors ${
+        dropZoneHover
+          ? 'border-emerald-400/70 bg-emerald-500/10'
+          : grouping.length > 0
+            ? 'border-zinc-700 bg-zinc-900/60'
+            : 'border-zinc-800 bg-zinc-900/30'
+      }`}
+      data-testid="power-listen-drop-zone"
+    >
+      <Pin
+        className={`h-3.5 w-3.5 shrink-0 ${
+          dropZoneHover
+            ? 'text-emerald-300'
+            : grouping.length > 0
+              ? 'text-emerald-400/80'
+              : 'text-zinc-500'
+        }`}
+        aria-hidden
+      />
+      {grouping.length === 0 ? (
+        <span className="text-xs text-zinc-500">
+          Spalten hier ablegen zum Gruppieren …
+        </span>
+      ) : (
+        <>
+          {grouping.map((colId, idx) => {
+            const label = labelForGroupColumn(colId);
+            const sortEntry = sorting.find((s) => s.id === colId);
+            const SortIcon =
+              sortEntry === undefined
+                ? ArrowUpDown
+                : sortEntry.desc
+                  ? ArrowDown
+                  : ArrowUp;
+            return (
+              <span
+                key={colId}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 py-0.5 pl-2 pr-1 text-xs text-emerald-200"
+              >
+                <span className="font-mono text-[10px] text-emerald-400/70">
+                  {idx + 1}.
+                </span>
+                <span className="font-medium">{label}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleGroupSort(colId)}
+                  className="rounded p-0.5 text-emerald-300 hover:bg-emerald-500/20"
+                  title="Gruppen-Sortierung umschalten (asc → desc → keine)"
+                  aria-label={`Sortierung für ${label} umschalten`}
+                >
+                  <SortIcon className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeGrouping(colId)}
+                  className="rounded p-0.5 text-emerald-300 hover:bg-red-500/20 hover:text-red-300"
+                  title="Gruppierung entfernen"
+                  aria-label={`Gruppierung nach ${label} entfernen`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            );
+          })}
+          <span className="text-xs text-zinc-500">
+            weitere Spalten hier ablegen …
+          </span>
+        </>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div>
-      {onGroupingChange && (
-        <div
-          onDragOver={onDropZoneDragOver}
-          onDragEnter={onDropZoneDragOver}
-          onDragLeave={onDropZoneDragLeave}
-          onDrop={onDropZoneDrop}
-          className={`mb-2 flex min-h-[40px] flex-wrap items-center gap-2 rounded-lg border-2 border-dashed px-3 py-1.5 transition-colors ${
-            dropZoneHover
-              ? 'border-emerald-400/70 bg-emerald-500/10'
-              : grouping.length > 0
-                ? 'border-zinc-700 bg-zinc-900/60'
-                : 'border-zinc-800 bg-zinc-900/30'
-          }`}
-          data-testid="power-listen-drop-zone"
-        >
-          <Pin
-            className={`h-3.5 w-3.5 shrink-0 ${
-              dropZoneHover
-                ? 'text-emerald-300'
-                : grouping.length > 0
-                  ? 'text-emerald-400/80'
-                  : 'text-zinc-500'
-            }`}
-            aria-hidden
-          />
-          {grouping.length === 0 ? (
-            <span className="text-xs text-zinc-500">
-              Spalten hier ablegen zum Gruppieren …
-            </span>
-          ) : (
-            <>
-              {grouping.map((colId, idx) => {
-                const label = labelForGroupColumn(colId);
-                const sortEntry = sorting.find((s) => s.id === colId);
-                const SortIcon =
-                  sortEntry === undefined
-                    ? ArrowUpDown
-                    : sortEntry.desc
-                      ? ArrowDown
-                      : ArrowUp;
-                return (
-                  <span
-                    key={colId}
-                    className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 py-0.5 pl-2 pr-1 text-xs text-emerald-200"
-                  >
-                    <span className="font-mono text-[10px] text-emerald-400/70">
-                      {idx + 1}.
-                    </span>
-                    <span className="font-medium">{label}</span>
-                    <button
-                      type="button"
-                      onClick={() => toggleGroupSort(colId)}
-                      className="rounded p-0.5 text-emerald-300 hover:bg-emerald-500/20"
-                      title="Gruppen-Sortierung umschalten (asc → desc → keine)"
-                      aria-label={`Sortierung für ${label} umschalten`}
-                    >
-                      <SortIcon className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeGrouping(colId)}
-                      className="rounded p-0.5 text-emerald-300 hover:bg-red-500/20 hover:text-red-300"
-                      title="Gruppierung entfernen"
-                      aria-label={`Gruppierung nach ${label} entfernen`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                );
-              })}
-              <span className="text-xs text-zinc-500">
-                weitere Spalten hier ablegen …
-              </span>
-            </>
-          )}
-        </div>
-      )}
       <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
         <div className="flex items-center gap-2">{toolbarLeft}</div>
         <div className="relative min-w-[18rem] max-w-md flex-1">
@@ -625,6 +657,8 @@ export function PowerListenView<TData>({
         </div>
       )}
 
+      {dropZone}
+
       <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
         <table className="min-w-full divide-y divide-zinc-800 text-sm">
           <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-500">
@@ -691,6 +725,7 @@ export function PowerListenView<TData>({
                             {renderer({
                               value: header.column.getFilterValue(),
                               onChange: (v) => header.column.setFilterValue(v),
+                              column: header.column,
                             })}
                           </div>
                         );
