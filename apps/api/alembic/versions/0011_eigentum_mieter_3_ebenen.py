@@ -40,9 +40,7 @@ def upgrade() -> None:
         sa.Column("haus_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("partner_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.ForeignKeyConstraint(["haus_id"], ["haus.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("haus_id", "partner_id"),
     )
     op.create_table(
@@ -50,35 +48,23 @@ def upgrade() -> None:
         sa.Column("haus_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("partner_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.ForeignKeyConstraint(["haus_id"], ["haus.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("haus_id", "partner_id"),
     )
     op.create_table(
         "stockwerk_eigentuemer",
-        sa.Column(
-            "stockwerk_id", postgresql.UUID(as_uuid=True), nullable=False
-        ),
+        sa.Column("stockwerk_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("partner_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["stockwerk_id"], ["objekt_stockwerk.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["stockwerk_id"], ["objekt_stockwerk.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("stockwerk_id", "partner_id"),
     )
     op.create_table(
         "einheit_eigentuemer",
         sa.Column("einheit_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("partner_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["einheit_id"], ["stockwerk_einheit.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["einheit_id"], ["stockwerk_einheit.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["partner_id"], ["geschaeftspartner.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("einheit_id", "partner_id"),
     )
 
@@ -91,7 +77,7 @@ def upgrade() -> None:
         FROM objekt_stockwerk
         WHERE eigentuemer_partner_id IS NOT NULL
           AND deleted_at IS NULL
-        """  # noqa: S608
+        """
     )
     op.execute(
         """
@@ -100,7 +86,7 @@ def upgrade() -> None:
         FROM stockwerk_einheit
         WHERE eigentuemer_partner_id IS NOT NULL
           AND deleted_at IS NULL
-        """  # noqa: S608
+        """
     )
 
     # 3. Alte Single-FK-Spalten droppen.
@@ -140,7 +126,7 @@ def downgrade() -> None:
           ORDER BY einheit_id, partner_id
         ) ee
         WHERE se.id = ee.einheit_id
-        """  # noqa: S608
+        """
     )
     op.execute(
         """
@@ -152,7 +138,7 @@ def downgrade() -> None:
           ORDER BY stockwerk_id, partner_id
         ) se
         WHERE os.id = se.stockwerk_id
-        """  # noqa: S608
+        """
     )
 
     # Junction-Tabellen droppen.
