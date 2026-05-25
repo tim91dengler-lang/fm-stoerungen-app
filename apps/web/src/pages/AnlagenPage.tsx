@@ -1,9 +1,4 @@
 import { useMemo, useState } from 'react';
-import {
-  MassEditModal,
-  type ColumnSpec,
-  type MassEditResult,
-} from '../core/liste/MassEditModal';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
@@ -88,7 +83,6 @@ export function AnlagenPage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<AnlageRead[] | null>(null);
-  const [massEditRows, setMassEditRows] = useState<AnlageRead[] | null>(null);
   const qc = useQueryClient();
 
   const listQuery = useQuery({
@@ -154,29 +148,20 @@ export function AnlagenPage() {
     [kategorienListe],
   );
 
-  const massEditColumns: ColumnSpec[] = [
-    {
-      id: 'kategorie_wert_id',
-      label: 'Kategorie',
-      type: 'auswahl',
-      options: kategorieOptions,
-    },
-    { id: 'beschreibung', label: 'Beschreibung', type: 'text' },
-    { id: 'aktiv', label: 'Aktiv', type: 'boolean' },
-  ];
-
   async function handleMassEdit(
-    rows: AnlageRead[],
     columnId: string,
     value: unknown,
-  ): Promise<MassEditResult> {
-    const payload: AnlageUpdate = { [columnId]: value } as AnlageUpdate;
+    rows: AnlageRead[],
+  ): Promise<{ ok: number; failed: number }> {
+    // Map UI column id → backend field. Most columns are 1:1, kategorie
+    // is a FK and uses `kategorie_wert_id` server-side.
+    const field = columnId === 'kategorie' ? 'kategorie_wert_id' : columnId;
+    const payload: AnlageUpdate = { [field]: value } as AnlageUpdate;
     const results = await Promise.allSettled(
       rows.map((r) => anlageApi.update(r.id, payload)),
     );
     const ok = results.filter((x) => x.status === 'fulfilled').length;
     qc.invalidateQueries({ queryKey: ['anlagen'] });
-    setRowSelection({});
     return { ok, failed: results.length - ok };
   }
 
@@ -243,6 +228,12 @@ export function AnlagenPage() {
         accessorFn: (row) => row.kategorie?.label ?? '',
         header: 'Kategorie',
         filterFn: 'includesString',
+        meta: {
+          massEdit: {
+            type: 'auswahl' as const,
+            options: kategorieOptions,
+          },
+        },
         cell: (ctx) => {
           const k = ctx.row.original.kategorie;
           if (!k) return <span className="text-zinc-500">—</span>;
@@ -268,6 +259,7 @@ export function AnlagenPage() {
         accessorFn: (row) => (row.aktiv ? 'aktiv' : 'inaktiv'),
         header: 'Status',
         filterFn: 'arrIncludesSome',
+        meta: { massEdit: { type: 'boolean' as const } },
         cell: (ctx) =>
           ctx.row.original.aktiv ? (
             <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
@@ -320,7 +312,7 @@ export function AnlagenPage() {
         ),
       },
     ],
-    [],
+    [kategorieOptions],
   );
 
   function confirmBulkDelete() {
@@ -392,24 +384,16 @@ export function AnlagenPage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
-          <>
-            <button
-              type="button"
-              onClick={() => setMassEditRows(selected)}
-              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10"
-            >
-              Bearbeiten ({selected.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkConfirm(selected)}
-              disabled={bulkDeleteMut.isPending}
-              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-            >
-              Löschen ({selected.length})
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
         )}
+        onMassEdit={handleMassEdit}
         count={{
           filtered: data.length,
           total: listQuery.data?.length ?? 0,
@@ -428,17 +412,6 @@ export function AnlagenPage() {
         searchPlaceholder="Suche in Bezeichnung, Beschreibung …"
         showFooter
         itemLabel={{ singular: 'Anlage', plural: 'Anlagen' }}
-      />
-
-      <MassEditModal<AnlageRead>
-        open={massEditRows !== null}
-        selectedRows={massEditRows ?? []}
-        columns={massEditColumns}
-        itemLabel={{ singular: 'Anlage', plural: 'Anlagen' }}
-        onClose={() => setMassEditRows(null)}
-        onSubmit={(col, val) =>
-          handleMassEdit(massEditRows ?? [], col, val)
-        }
       />
 
       <ConfirmDialog
