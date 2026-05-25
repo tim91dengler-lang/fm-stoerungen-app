@@ -1,19 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Layers } from 'lucide-react';
 import type { Ausrichtung } from '../api/types';
-import { PartnerMultiSelect } from './PartnerMultiSelect';
-
-interface PartnerOption {
-  id: string;
-  name: string;
-  typen?: string[];
-}
 
 interface StockwerkFormValues {
   bezeichnung: string;
   ausrichtung: Ausrichtung | null;
-  eigentuemer_ids: string[];
-  mieter_ids: string[];
 }
 
 interface StockwerkModalProps {
@@ -22,11 +13,7 @@ interface StockwerkModalProps {
   initial?: {
     bezeichnung: string;
     ausrichtung: Ausrichtung | null;
-    eigentuemer_ids: string[];
-    mieter_ids: string[];
   } | null;
-  /** All known partners. */
-  partner: PartnerOption[];
   onClose: () => void;
   onSubmit: (values: StockwerkFormValues) => void;
   isPending?: boolean;
@@ -35,8 +22,6 @@ interface StockwerkModalProps {
 const EMPTY: StockwerkFormValues = {
   bezeichnung: '',
   ausrichtung: null,
-  eigentuemer_ids: [],
-  mieter_ids: [],
 };
 
 const AUSRICHTUNG_OPTIONS: Array<{ value: Ausrichtung | ''; label: string }> = [
@@ -50,7 +35,6 @@ const AUSRICHTUNG_OPTIONS: Array<{ value: Ausrichtung | ''; label: string }> = [
 export function StockwerkModal({
   open,
   initial,
-  partner,
   onClose,
   onSubmit,
   isPending = false,
@@ -64,8 +48,6 @@ export function StockwerkModal({
       setForm({
         bezeichnung: initial.bezeichnung,
         ausrichtung: initial.ausrichtung,
-        eigentuemer_ids: [...initial.eigentuemer_ids],
-        mieter_ids: [...initial.mieter_ids],
       });
     } else {
       setForm(EMPTY);
@@ -83,12 +65,7 @@ export function StockwerkModal({
       setError('Bezeichnung ist Pflicht.');
       return;
     }
-    onSubmit({
-      bezeichnung,
-      ausrichtung: form.ausrichtung,
-      eigentuemer_ids: form.eigentuemer_ids,
-      mieter_ids: form.mieter_ids,
-    });
+    onSubmit({ bezeichnung, ausrichtung: form.ausrichtung });
   }
 
   return (
@@ -166,27 +143,9 @@ export function StockwerkModal({
             </p>
           </div>
 
-          <PartnerMultiSelect
-            partner={partner}
-            selected={form.eigentuemer_ids}
-            onChange={(ids) => setForm((f) => ({ ...f, eigentuemer_ids: ids }))}
-            typFilter="eigentuemer"
-            roleLabel="Eigentümer"
-            tone="violet"
-            searchPlaceholder="Eigentümer suchen …"
-            emptyHint="Keine Partner mit Typ „Eigentümer&ldquo; angelegt. Lege Eigentümer unter Stammdaten → Partner an."
-          />
-
-          <PartnerMultiSelect
-            partner={partner}
-            selected={form.mieter_ids}
-            onChange={(ids) => setForm((f) => ({ ...f, mieter_ids: ids }))}
-            typFilter="mieter"
-            roleLabel="Mieter"
-            tone="amber"
-            searchPlaceholder="Mieter suchen …"
-            emptyHint="Keine Partner mit Typ „Mieter&ldquo; angelegt. Lege Mieter unter Stammdaten → Partner an."
-          />
+          <p className="text-[10px] text-zinc-500">
+            Eigentümer, Mieter und Grundriss werden im Detail-Panel rechts gepflegt.
+          </p>
 
           {error && (
             <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
