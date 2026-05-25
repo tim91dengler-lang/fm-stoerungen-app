@@ -1016,6 +1016,11 @@ function DetailPanel({
         value: e.groesse_qm != null ? `${e.groesse_qm} m²` : null,
       },
     ];
+    // Grundriss vom übergeordneten Stockwerk anzeigen (Vererbung, read-only)
+    if (entity.stockwerk.has_grundriss) {
+      showGrundriss = true;
+      stockwerkForGrundriss = entity.stockwerk;
+    }
   }
 
   const Icon = icon;
@@ -1091,10 +1096,20 @@ function DetailPanel({
         />
       </DetailSection>
 
-      {/* Grundriss (nur Stockwerk) */}
+      {/* Grundriss */}
       {showGrundriss && stockwerkForGrundriss && (
-        <DetailSection title="Grundriss">
-          <GrundrissPanel stockwerk={stockwerkForGrundriss} objektId={objektId} />
+        <DetailSection
+          title={
+            entity.type === 'einheit'
+              ? `Grundriss (aus Stockwerk „${entity.stockwerk.bezeichnung}")`
+              : 'Grundriss'
+          }
+        >
+          <GrundrissPanel
+            stockwerk={stockwerkForGrundriss}
+            objektId={objektId}
+            readOnly={entity.type === 'einheit'}
+          />
         </DetailSection>
       )}
 
@@ -1133,9 +1148,11 @@ function DetailSection({ title, icon: Icon, children }: DetailSectionProps) {
 function GrundrissPanel({
   stockwerk,
   objektId,
+  readOnly = false,
 }: {
   stockwerk: StockwerkRead;
   objektId: string;
+  readOnly?: boolean;
 }) {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1186,44 +1203,46 @@ function GrundrissPanel({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={upload.isPending}
-          className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-        >
-          <Upload className="h-3 w-3" />{' '}
-          {upload.isPending
-            ? 'lädt …'
-            : stockwerk.has_grundriss
-              ? 'Ersetzen'
-              : 'Hochladen'}
-        </button>
-        {stockwerk.has_grundriss && (
+      {!readOnly && (
+        <div className="mb-2 flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => setConfirmDelete(true)}
-            disabled={deleteGrundriss.isPending}
-            className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-            title="Grundriss entfernen"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={upload.isPending}
+            className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
           >
-            <Trash2 className="h-3 w-3" />{' '}
-            {deleteGrundriss.isPending ? 'lösche …' : 'Löschen'}
+            <Upload className="h-3 w-3" />{' '}
+            {upload.isPending
+              ? 'lädt …'
+              : stockwerk.has_grundriss
+                ? 'Ersetzen'
+                : 'Hochladen'}
           </button>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,application/pdf"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) upload.mutate(f);
-            e.target.value = '';
-          }}
-        />
-      </div>
+          {stockwerk.has_grundriss && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              disabled={deleteGrundriss.isPending}
+              className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+              title="Grundriss entfernen"
+            >
+              <Trash2 className="h-3 w-3" />{' '}
+              {deleteGrundriss.isPending ? 'lösche …' : 'Löschen'}
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) upload.mutate(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
+      )}
       {blobUrl ? (
         stockwerk.grundriss_mime === 'application/pdf' ? (
           <iframe
