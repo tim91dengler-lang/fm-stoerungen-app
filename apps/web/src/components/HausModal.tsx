@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Building2 } from 'lucide-react';
 import type { AdresseRead } from '../api/types';
+import { PartnerMultiSelect } from './PartnerMultiSelect';
+
+interface PartnerOption {
+  id: string;
+  name: string;
+  typen?: string[];
+}
 
 interface HausFormValues {
   bezeichnung: string;
   notiz: string;
   adresse_id: string | null;
+  eigentuemer_ids: string[];
+  mieter_ids: string[];
 }
 
 interface HausModalProps {
@@ -15,17 +24,27 @@ interface HausModalProps {
     bezeichnung: string;
     notiz: string | null;
     adresse_id: string | null;
+    eigentuemer_ids: string[];
+    mieter_ids: string[];
   } | null;
   /** Available addresses for the dropdown (loaded by parent page). */
   adressen: AdresseRead[];
   /** Address of the parent Objekt — used as default for new houses. */
   objektAdresseId?: string | null;
+  /** All known partners — modal filters internally by typen. */
+  partner: PartnerOption[];
   onClose: () => void;
   onSubmit: (values: HausFormValues) => void;
   isPending?: boolean;
 }
 
-const EMPTY: HausFormValues = { bezeichnung: '', notiz: '', adresse_id: null };
+const EMPTY: HausFormValues = {
+  bezeichnung: '',
+  notiz: '',
+  adresse_id: null,
+  eigentuemer_ids: [],
+  mieter_ids: [],
+};
 
 function formatAdresse(a: AdresseRead): string {
   return `${a.strasse}${a.hausnummer ? ' ' + a.hausnummer : ''}, ${a.plz} ${a.ort}`;
@@ -36,6 +55,7 @@ export function HausModal({
   initial,
   adressen,
   objektAdresseId = null,
+  partner,
   onClose,
   onSubmit,
   isPending = false,
@@ -52,6 +72,8 @@ export function HausModal({
         bezeichnung: initial.bezeichnung,
         notiz: initial.notiz ?? '',
         adresse_id: initial.adresse_id,
+        eigentuemer_ids: [...initial.eigentuemer_ids],
+        mieter_ids: [...initial.mieter_ids],
       });
     } else {
       setForm({ ...EMPTY, adresse_id: objektAdresseId });
@@ -73,6 +95,8 @@ export function HausModal({
       bezeichnung,
       notiz: form.notiz.trim(),
       adresse_id: form.adresse_id,
+      eigentuemer_ids: form.eigentuemer_ids,
+      mieter_ids: form.mieter_ids,
     });
   }
 
@@ -162,6 +186,28 @@ export function HausModal({
               className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
+
+          <PartnerMultiSelect
+            partner={partner}
+            selected={form.eigentuemer_ids}
+            onChange={(ids) => setForm((f) => ({ ...f, eigentuemer_ids: ids }))}
+            typFilter="eigentuemer"
+            roleLabel="Eigentümer"
+            tone="violet"
+            searchPlaceholder="Eigentümer suchen …"
+            emptyHint="Keine Partner mit Typ „Eigentümer&ldquo; angelegt. Lege Eigentümer unter Stammdaten → Partner an."
+          />
+
+          <PartnerMultiSelect
+            partner={partner}
+            selected={form.mieter_ids}
+            onChange={(ids) => setForm((f) => ({ ...f, mieter_ids: ids }))}
+            typFilter="mieter"
+            roleLabel="Mieter"
+            tone="amber"
+            searchPlaceholder="Mieter suchen …"
+            emptyHint="Keine Partner mit Typ „Mieter&ldquo; angelegt. Lege Mieter unter Stammdaten → Partner an."
+          />
 
           {error && (
             <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
