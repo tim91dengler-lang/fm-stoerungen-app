@@ -116,15 +116,17 @@ def upgrade() -> None:
 
     # 3. Audit-Trigger auf den R5b-Junction-Tabellen anlegen, falls noch nicht
     #    vorhanden. Migration 0011 hat sie nicht eingetragen.
+    #    asyncpg erlaubt nur ein Statement pro op.execute() → DROP und CREATE
+    #    in separaten Aufrufen.
     for table in (
         "haus_eigentuemer",
         "haus_mieter",
         "stockwerk_eigentuemer",
         "einheit_eigentuemer",
     ):
+        op.execute(f"DROP TRIGGER IF EXISTS audit_{table} ON {table};")
         op.execute(
             f"""
-            DROP TRIGGER IF EXISTS audit_{table} ON {table};
             CREATE TRIGGER audit_{table}
             AFTER INSERT OR UPDATE OR DELETE ON {table}
             FOR EACH ROW EXECUTE FUNCTION audit_trigger();
