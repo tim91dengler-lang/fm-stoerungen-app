@@ -71,6 +71,16 @@ class Haus(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         order_by="ObjektStockwerk.reihenfolge",
         lazy="selectin",
     )
+    eigentuemer_links: Mapped[list["HausEigentuemer"]] = relationship(
+        back_populates="haus",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    mieter_links: Mapped[list["HausMieter"]] = relationship(
+        back_populates="haus",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
 
 class ObjektStockwerk(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -93,16 +103,13 @@ class ObjektStockwerk(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     grundriss_storage_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     grundriss_mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    eigentuemer_partner_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("geschaeftspartner.id", ondelete="SET NULL"),
-        nullable=True,
-    )
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     haus: Mapped["Haus"] = relationship(back_populates="stockwerke", lazy="raise")
-    eigentuemer: Mapped["GeschaeftsPartner | None"] = relationship(
-        foreign_keys=[eigentuemer_partner_id], lazy="raise"
+    eigentuemer_links: Mapped[list["StockwerkEigentuemer"]] = relationship(
+        back_populates="stockwerk",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     einheiten: Mapped[list["StockwerkEinheit"]] = relationship(
         back_populates="stockwerk",
@@ -133,16 +140,13 @@ class StockwerkEinheit(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     bezeichnung: Mapped[str] = mapped_column(String(120), nullable=False)
     groesse_qm: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
-    eigentuemer_partner_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("geschaeftspartner.id", ondelete="SET NULL"),
-        nullable=True,
-    )
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     stockwerk: Mapped["ObjektStockwerk"] = relationship(back_populates="einheiten", lazy="raise")
-    eigentuemer: Mapped["GeschaeftsPartner | None"] = relationship(
-        foreign_keys=[eigentuemer_partner_id], lazy="raise"
+    eigentuemer_links: Mapped[list["EinheitEigentuemer"]] = relationship(
+        back_populates="einheit",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     mieter_links: Mapped[list["EinheitMieter"]] = relationship(
         back_populates="einheit",
@@ -186,4 +190,88 @@ class StockwerkMieter(Base):
     )
 
     stockwerk: Mapped["ObjektStockwerk"] = relationship(back_populates="mieter_links", lazy="raise")
+    partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
+
+
+# ---------------------------------------------------------------------------
+# R5b — m:n Eigentümer/Mieter auf allen 3 Ebenen (Tim 2026-05-25):
+# WEG-Fälle möglich (mehrere Eigentümer), Haus bekommt eigene Mieter/Eigentümer-
+# Relation (z. B. Gewerbeobjekt komplett vermietet).
+# Naming-Konvention: <ebene>_<rolle> mit composite PK (parent_id, partner_id).
+# ---------------------------------------------------------------------------
+
+
+class HausEigentuemer(Base):
+    __tablename__ = "haus_eigentuemer"
+
+    haus_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("haus.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    partner_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("geschaeftspartner.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    haus: Mapped["Haus"] = relationship(back_populates="eigentuemer_links", lazy="raise")
+    partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
+
+
+class HausMieter(Base):
+    __tablename__ = "haus_mieter"
+
+    haus_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("haus.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    partner_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("geschaeftspartner.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    haus: Mapped["Haus"] = relationship(back_populates="mieter_links", lazy="raise")
+    partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
+
+
+class StockwerkEigentuemer(Base):
+    __tablename__ = "stockwerk_eigentuemer"
+
+    stockwerk_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("objekt_stockwerk.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    partner_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("geschaeftspartner.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    stockwerk: Mapped["ObjektStockwerk"] = relationship(
+        back_populates="eigentuemer_links", lazy="raise"
+    )
+    partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
+
+
+class EinheitEigentuemer(Base):
+    __tablename__ = "einheit_eigentuemer"
+
+    einheit_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("stockwerk_einheit.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    partner_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("geschaeftspartner.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    einheit: Mapped["StockwerkEinheit"] = relationship(
+        back_populates="eigentuemer_links", lazy="raise"
+    )
     partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")

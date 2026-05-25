@@ -9,10 +9,14 @@ from fm_api.models.mandant import Mandant
 from fm_api.models.notification import Notification, NotificationTyp
 from fm_api.models.objekt import Objekt, ObjektPartner
 from fm_api.models.objektstruktur import (
+    EinheitEigentuemer,
     EinheitMieter,
     Haus,
+    HausEigentuemer,
+    HausMieter,
     ObjektStockwerk,
     StockwerkAusrichtung,
+    StockwerkEigentuemer,
     StockwerkEinheit,
     StockwerkMieter,
 )
@@ -38,11 +42,14 @@ __all__ = [
     "Dokument",
     "DokumentLink",
     "DokumentTarget",
+    "EinheitEigentuemer",
     "EinheitMieter",
     "Fehlercode",
     "GeschaeftsPartner",
     "GespeicherteAnsicht",
     "Haus",
+    "HausEigentuemer",
+    "HausMieter",
     "Mandant",
     "Notification",
     "NotificationTyp",
@@ -56,6 +63,7 @@ __all__ = [
     "ProjekttypSlug",
     "Role",
     "StockwerkAusrichtung",
+    "StockwerkEigentuemer",
     "StockwerkEinheit",
     "StockwerkMieter",
     "SystemAudit",

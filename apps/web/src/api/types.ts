@@ -481,7 +481,7 @@ export interface EinheitRead {
   bezeichnung: string;
   groesse_qm: number | null;
   reihenfolge: number;
-  eigentuemer: PartnerMini | null;
+  eigentuemer: PartnerMini[];
   mieter: PartnerMini[];
   created_at: string;
   updated_at: string;
@@ -490,8 +490,8 @@ export interface EinheitRead {
 export interface EinheitWriteBase {
   bezeichnung: string;
   groesse_qm?: number | null;
-  eigentuemer_partner_id?: UUID | null;
   reihenfolge?: number;
+  eigentuemer_ids?: UUID[];
   mieter_ids?: UUID[];
 }
 
@@ -506,7 +506,7 @@ export interface StockwerkRead {
   reihenfolge: number;
   has_grundriss: boolean;
   grundriss_mime: string | null;
-  eigentuemer: PartnerMini | null;
+  eigentuemer: PartnerMini[];
   mieter: PartnerMini[];
   einheiten: EinheitRead[];
   created_at: string;
@@ -516,8 +516,8 @@ export interface StockwerkRead {
 export interface StockwerkWriteBase {
   bezeichnung: string;
   ausrichtung?: Ausrichtung | null;
-  eigentuemer_partner_id?: UUID | null;
   reihenfolge?: number;
+  eigentuemer_ids?: UUID[];
   mieter_ids?: UUID[];
 }
 
@@ -531,6 +531,8 @@ export interface HausRead {
   notiz: string | null;
   reihenfolge: number;
   adresse: AdresseRead | null;
+  eigentuemer: PartnerMini[];
+  mieter: PartnerMini[];
   stockwerke: StockwerkRead[];
   created_at: string;
   updated_at: string;
@@ -541,6 +543,8 @@ export interface HausWriteBase {
   adresse_id?: UUID | null;
   notiz?: string | null;
   reihenfolge?: number;
+  eigentuemer_ids?: UUID[];
+  mieter_ids?: UUID[];
 }
 
 export type HausCreate = HausWriteBase;
