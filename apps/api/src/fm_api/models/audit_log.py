@@ -30,7 +30,7 @@ class SystemAudit(Base):
     )
     aktor_rolle_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     tabelle: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    datensatz_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    datensatz_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     aktion: Mapped[str] = mapped_column(String(16), nullable=False)
     vorher: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     nachher: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
