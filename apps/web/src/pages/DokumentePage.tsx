@@ -9,12 +9,10 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import {
-  Download,
   FileBox,
   FileText,
   Image as ImageIcon,
   Plus,
-  Trash2,
   UploadCloud,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -37,7 +35,7 @@ interface ViewConfig {
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
-  columnOrder: ['name', 'kategorie', 'size', 'hochgeladen', 'links', '__actions__'],
+  columnOrder: ['name', 'kategorie', 'size', 'hochgeladen', 'links'],
   columnFilters: [],
   grouping: [],
 };
@@ -147,13 +145,20 @@ export function DokumentePage() {
           const d = ctx.row.original;
           const Icon = fileIcon(d.mime_type);
           return (
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => download(d)}
+              className="flex items-center gap-2 text-left hover:text-emerald-300"
+              title="Herunterladen"
+            >
               <Icon className="h-4 w-4 text-zinc-500" />
               <div className="min-w-0">
-                <div className="truncate font-medium text-zinc-200">{d.name}</div>
+                <div className="truncate font-medium text-zinc-200 hover:text-emerald-300">
+                  {d.name}
+                </div>
                 <div className="truncate text-xs text-zinc-500">{d.filename}</div>
               </div>
-            </div>
+            </button>
           );
         },
       },
@@ -217,33 +222,6 @@ export function DokumentePage() {
             </div>
           );
         },
-      },
-      {
-        id: '__actions__',
-        header: '',
-        enableSorting: false,
-        enableColumnFilter: false,
-        enableGrouping: false,
-        cell: (ctx) => (
-          <div className="flex justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => download(ctx.row.original)}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              title="Herunterladen"
-            >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkConfirm([ctx.row.original])}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-              title="Löschen"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ),
       },
     ],
     [],
@@ -345,6 +323,9 @@ export function DokumentePage() {
         getRowId={(d) => d.id}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        rowActions={{
+          onDelete: (rows) => setBulkConfirm(rows),
+        }}
         bulkActions={(selected) => (
           <button
             type="button"

@@ -43,6 +43,7 @@ import { KpiCards, type KpiItem } from '../components/KpiCards';
 import { TicketDetailPanel } from '../components/TicketDetailPanel';
 import { InitialAvatar } from '../components/InitialAvatar';
 import { iconForKategorie } from '../lib/kategorieIcon';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import {
@@ -176,7 +177,7 @@ function buildColumns(
           </button>
         );
       },
-      filterFn: 'includesString',
+      // filterFn weggelassen → comboboxFilterFn (Pills + Suche)
     },
     {
       id: 'status',
@@ -206,7 +207,7 @@ function buildColumns(
       accessorFn: (r) => r.kategorie?.label ?? '',
       header: 'Kategorie',
       cell: ({ row }) => row.original.kategorie?.label ?? '—',
-      filterFn: 'includesString',
+      // filterFn weggelassen → comboboxFilterFn (Pills + Suche)
       meta: {
         massEdit: {
           type: 'auswahl' as const,
@@ -228,7 +229,7 @@ function buildColumns(
           </div>
         );
       },
-      filterFn: 'includesString',
+      // filterFn weggelassen → nutzt comboboxFilterFn (Pills + Suche) aus defaultColumn
       meta: {
         massEdit: {
           type: 'combobox' as const,
@@ -251,7 +252,7 @@ function buildColumns(
           </div>
         );
       },
-      filterFn: 'includesString',
+      // filterFn weggelassen → comboboxFilterFn aus defaultColumn (Pills + Suche)
       meta: {
         massEdit: {
           type: 'combobox' as const,
@@ -278,7 +279,7 @@ function buildColumns(
           </div>
         );
       },
-      filterFn: 'includesString',
+      // filterFn weggelassen → comboboxFilterFn aus defaultColumn
       meta: {
         massEdit: {
           type: 'combobox' as const,
@@ -321,6 +322,9 @@ export function TicketsListePage() {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const filterPanelRef = useRef<HTMLDivElement>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<TicketRead[] | null>(
+    null,
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const openTicketId = searchParams.get('ticket');
 
@@ -609,14 +613,14 @@ export function TicketsListePage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         onMassEdit={handleMassEdit}
+        rowActions={{
+          onEdit: (row) => openTicket(row.id),
+          onDelete: (rows) => setBulkDeleteConfirm(rows),
+        }}
         bulkActions={(selected) => (
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`${selected.length} Tickets wirklich löschen?`)) {
-                bulkDelete.mutate(selected.map((t) => t.id));
-              }
-            }}
+            onClick={() => setBulkDeleteConfirm(selected)}
             disabled={bulkDelete.isPending}
             className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
           >
@@ -742,6 +746,30 @@ export function TicketsListePage() {
       )}
 
       <TicketDetailPanel ticketId={openTicketId} onClose={closeTicket} />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirm !== null}
+        title={
+          bulkDeleteConfirm && bulkDeleteConfirm.length === 1
+            ? 'Ticket löschen?'
+            : `${bulkDeleteConfirm?.length ?? 0} Tickets löschen?`
+        }
+        message={
+          bulkDeleteConfirm && bulkDeleteConfirm.length === 1
+            ? `Ticket #${bulkDeleteConfirm[0]?.nummer} „${bulkDeleteConfirm[0]?.titel}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`
+            : `${bulkDeleteConfirm?.length ?? 0} ausgewählte Tickets werden unwiderruflich gelöscht.`
+        }
+        tone="danger"
+        confirmLabel="Löschen"
+        busy={bulkDelete.isPending}
+        onConfirm={() => {
+          if (!bulkDeleteConfirm) return;
+          bulkDelete.mutate(bulkDeleteConfirm.map((t) => t.id), {
+            onSuccess: () => setBulkDeleteConfirm(null),
+          });
+        }}
+        onCancel={() => setBulkDeleteConfirm(null)}
+      />
     </div>
   );
 }

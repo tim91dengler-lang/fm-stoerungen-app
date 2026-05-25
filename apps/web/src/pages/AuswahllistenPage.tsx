@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { auswahllistenApi } from '../api/endpoints';
-import type { AuswahllisteRead, AuswahllistenWertCreate } from '../api/types';
+import type {
+  AuswahllisteRead,
+  AuswahllistenWertCreate,
+  AuswahllistenWertRead,
+} from '../api/types';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 export function AuswahllistenPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCreateListe, setShowCreateListe] = useState(false);
   const [newListeKey, setNewListeKey] = useState('');
   const [newListeLabel, setNewListeLabel] = useState('');
+  const [deleteListeConfirm, setDeleteListeConfirm] =
+    useState<AuswahllisteRead | null>(null);
 
   const qc = useQueryClient();
   const listenQuery = useQuery({
@@ -87,15 +94,7 @@ export function AuswahllistenPage() {
           {selected ? (
             <ListeDetail
               liste={selected}
-              onDelete={() => {
-                if (
-                  confirm(
-                    `Liste "${selected.label}" wirklich löschen? (Werte werden ebenfalls entfernt.)`,
-                  )
-                ) {
-                  deleteListe.mutate(selected.id);
-                }
-              }}
+              onDelete={() => setDeleteListeConfirm(selected)}
             />
           ) : (
             <div className="p-8 text-center text-sm text-zinc-500">
@@ -167,6 +166,27 @@ export function AuswahllistenPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteListeConfirm !== null}
+        title="Liste löschen?"
+        message={
+          deleteListeConfirm
+            ? `Liste „${deleteListeConfirm.label}" wirklich löschen? Alle Werte werden ebenfalls entfernt.`
+            : ''
+        }
+        tone="danger"
+        confirmLabel="Löschen"
+        busy={deleteListe.isPending}
+        onConfirm={() => {
+          if (deleteListeConfirm) {
+            deleteListe.mutate(deleteListeConfirm.id, {
+              onSuccess: () => setDeleteListeConfirm(null),
+            });
+          }
+        }}
+        onCancel={() => setDeleteListeConfirm(null)}
+      />
     </div>
   );
 }
@@ -181,6 +201,8 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
   const [newKey, setNewKey] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [newFarbe, setNewFarbe] = useState('slate');
+  const [deleteWertConfirm, setDeleteWertConfirm] =
+    useState<AuswahllistenWertRead | null>(null);
 
   const addWert = useMutation({
     mutationFn: (payload: AuswahllistenWertCreate) =>
@@ -241,11 +263,7 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
             {!w.ist_system && (
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`Wert "${w.label}" löschen?`)) {
-                    removeWert.mutate(w.id);
-                  }
-                }}
+                onClick={() => setDeleteWertConfirm(w)}
                 className="text-xs text-red-400 hover:underline"
               >
                 Löschen
@@ -313,6 +331,27 @@ function ListeDetail({ liste, onDelete }: DetailProps) {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteWertConfirm !== null}
+        title="Wert löschen?"
+        message={
+          deleteWertConfirm
+            ? `Wert „${deleteWertConfirm.label}" wirklich löschen?`
+            : ''
+        }
+        tone="danger"
+        confirmLabel="Löschen"
+        busy={removeWert.isPending}
+        onConfirm={() => {
+          if (deleteWertConfirm) {
+            removeWert.mutate(deleteWertConfirm.id, {
+              onSuccess: () => setDeleteWertConfirm(null),
+            });
+          }
+        }}
+        onCancel={() => setDeleteWertConfirm(null)}
+      />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { AlertOctagon, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertOctagon, Plus } from 'lucide-react';
 import {
   anlageApi,
   auswahllistenApi,
@@ -58,7 +58,6 @@ const DEFAULT_CONFIG: ViewConfig = {
     'quelle',
     'nutzung_count',
     'aktiv',
-    '__actions__',
   ],
   columnFilters: [],
   grouping: [],
@@ -322,44 +321,6 @@ export function FehlercodesPage() {
             </span>
           ),
       },
-      {
-        id: '__actions__',
-        header: '',
-        enableSorting: false,
-        enableColumnFilter: false,
-        enableGrouping: false,
-        cell: (ctx) => (
-          <div className="flex justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => openEdit(ctx.row.original)}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              title="Bearbeiten"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const f = ctx.row.original;
-                if (f.nutzung_count > 0) {
-                  setBlockedNote(
-                    `Fehlercode "${f.code}" wird von ${f.nutzung_count} Ticket${
-                      f.nutzung_count === 1 ? '' : 's'
-                    } referenziert. Bitte zuerst deaktivieren statt löschen.`,
-                  );
-                  return;
-                }
-                setBulkConfirm([f]);
-              }}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-              title="Löschen"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ),
-      },
     ],
     [kategorieOptions, prioOptions],
   );
@@ -449,6 +410,21 @@ export function FehlercodesPage() {
         getRowId={(f) => f.id}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        rowActions={{
+          onEdit: openEdit,
+          onDelete: (rows) => {
+            const blocked = rows.find((f) => f.nutzung_count > 0);
+            if (blocked) {
+              setBlockedNote(
+                `Fehlercode "${blocked.code}" wird von ${blocked.nutzung_count} Ticket${
+                  blocked.nutzung_count === 1 ? '' : 's'
+                } referenziert. Bitte zuerst deaktivieren statt löschen.`,
+              );
+              return;
+            }
+            setBulkConfirm(rows);
+          },
+        }}
         bulkActions={(selected) => (
           <button
             type="button"

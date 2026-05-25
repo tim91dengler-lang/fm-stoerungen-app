@@ -203,6 +203,17 @@ export function UsersListePage() {
           getRowId={(u) => u.id}
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
+          rowActions={
+            isAdmin
+              ? {
+                  onDelete: (rows) => {
+                    const deletable = selfExcluded(rows);
+                    if (deletable.length === 0) return; // self-only → noop
+                    setBulkConfirm(deletable);
+                  },
+                }
+              : undefined
+          }
           bulkActions={(selected) => {
             const deletable = selfExcluded(selected);
             return (

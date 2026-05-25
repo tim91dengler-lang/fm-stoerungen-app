@@ -28,8 +28,10 @@ import {
   ChevronRight,
   Columns3,
   Layers,
+  Pencil,
   Pin,
   Search,
+  Trash2,
   X,
 } from 'lucide-react';
 
@@ -123,6 +125,23 @@ export interface PowerListenViewProps<TData> {
    * PATCH-Calls auf die ausgewählten Rows.
    */
   onMassEdit?: (columnId: string, value: unknown, selectedRows: TData[]) => Promise<{ ok: number; failed: number }> | void;
+  /**
+   * Standard-Aktions-Spalte (Tim R6b-Konvention).
+   *
+   * Wenn gesetzt, fügt PowerListenView eine fixe Aktions-Spalte direkt nach
+   * der Select-Spalte ein (immer links, nicht verschiebbar, nicht filterbar).
+   *
+   * - `onEdit(row)` öffnet den Edit-Flow der Page (typisch: Edit-Modal)
+   * - `onDelete(rows)` bekommt eine Liste von zu löschenden Rows. PowerListenView
+   *   übergibt single-row Klicks ebenfalls als 1-elementiges Array, damit der
+   *   gleiche ConfirmDialog für Single + Bulk verwendet werden kann.
+   *
+   * Pages bauen damit KEINE eigene `__actions__`-Spalte mehr.
+   */
+  rowActions?: {
+    onEdit?: (row: TData) => void;
+    onDelete?: (rows: TData[]) => void;
+  };
 }
 
 /** Spec für eine spalten-spezifische Mass-Edit-Eingabe.
@@ -173,6 +192,7 @@ export function PowerListenView<TData>({
   showFooter = false,
   itemLabel,
   onMassEdit,
+  rowActions,
 }: PowerListenViewProps<TData>) {
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
@@ -190,33 +210,75 @@ export function PowerListenView<TData>({
   const columnPickerRef = useRef<HTMLDivElement>(null);
   const groupPickerRef = useRef<HTMLDivElement>(null);
 
-  // Bei enableRowSelection eine Spezial-Spalte für Checkbox vorne dranhängen
+  // Spezial-Spalten vorne anhängen (Tim R6b-Konvention):
+  //   [__select__]  ← bei enableRowSelection, Mehrfachauswahl
+  //   [__actions__] ← bei rowActions, Edit + Delete fest links
+  //   …normale Spalten
+  // Beide non-draggable, non-orderable, non-filterable, non-hideable.
   const allColumns = useMemo<ColumnDef<TData>[]>(() => {
-    if (!enableRowSelection) return columns;
-    const selectCol: ColumnDef<TData> = {
-      id: '__select__',
-      enableSorting: false,
-      enableColumnFilter: false,
-      enableHiding: false,
-      header: ({ table }) => (
-        <input
-          type="checkbox"
-          checked={table.getIsAllPageRowsSelected()}
-          onChange={table.getToggleAllPageRowsSelectedHandler()}
-          aria-label="Alle auswählen"
-        />
-      ),
-      cell: ({ row }) => (
-        <input
-          type="checkbox"
-          checked={row.getIsSelected()}
-          onChange={row.getToggleSelectedHandler()}
-          aria-label="Zeile auswählen"
-        />
-      ),
-    };
-    return [selectCol, ...columns];
-  }, [columns, enableRowSelection]);
+    const prefix: ColumnDef<TData>[] = [];
+    if (enableRowSelection) {
+      prefix.push({
+        id: '__select__',
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableHiding: false,
+        header: ({ table }) => (
+          <input
+            type="checkbox"
+            checked={table.getIsAllPageRowsSelected()}
+            onChange={table.getToggleAllPageRowsSelectedHandler()}
+            aria-label="Alle auswählen"
+          />
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            aria-label="Zeile auswählen"
+          />
+        ),
+      });
+    }
+    if (rowActions?.onEdit || rowActions?.onDelete) {
+      prefix.push({
+        id: '__actions__',
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableHiding: false,
+        enableGrouping: false,
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex items-center gap-0.5">
+            {rowActions.onEdit && (
+              <button
+                type="button"
+                onClick={() => rowActions.onEdit?.(row.original)}
+                className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                title="Bearbeiten"
+                aria-label="Bearbeiten"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {rowActions.onDelete && (
+              <button
+                type="button"
+                onClick={() => rowActions.onDelete?.([row.original])}
+                className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+                title="Löschen"
+                aria-label="Löschen"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        ),
+      });
+    }
+    return [...prefix, ...columns];
+  }, [columns, enableRowSelection, rowActions]);
 
   // Dropdown beim Außerhalb-Klick schließen
   useEffect(() => {
@@ -253,20 +315,23 @@ export function PowerListenView<TData>({
   // Re-Renders pro Mount und Total-Block des Mainthreads.
   const groupingEnabled = onGroupingChange !== undefined;
 
-  // __select__-Spalte ist hartcodiert ganz links: wenn die Page einen
-  // columnOrder gibt, der __select__ nicht enthält (üblich, weil Pages die
-  // Spalte nicht selbst kennen), prepend wir sie hier. So bleibt die
-  // Mehrfachauswahl-Spalte immer als erste sichtbar — sie kann auch nicht
-  // per Drag-Reorder verschoben werden (siehe onDrop unten).
+  // __select__ + __actions__ sind hartcodiert ganz links: wenn die Page einen
+  // columnOrder gibt, der diese Spezial-Spalten nicht enthält (üblich, weil
+  // Pages die nicht selbst kennen), prepend wir sie hier. So bleibt das
+  // [Select] [Edit/Delete] Layout immer als erstes sichtbar — beide sind auch
+  // nicht per Drag-Reorder verschiebbar (siehe onDrop unten).
+  const hasActions = !!(rowActions?.onEdit || rowActions?.onDelete);
   const effectiveColumnOrder = useMemo(() => {
-    if (!enableRowSelection) {
-      return columnOrder.length > 0 ? columnOrder : undefined;
-    }
     if (columnOrder.length === 0) return undefined;
-    return columnOrder.includes('__select__')
-      ? columnOrder
-      : ['__select__', ...columnOrder];
-  }, [columnOrder, enableRowSelection]);
+    const order = [...columnOrder];
+    if (hasActions && !order.includes('__actions__')) {
+      order.unshift('__actions__');
+    }
+    if (enableRowSelection && !order.includes('__select__')) {
+      order.unshift('__select__');
+    }
+    return order;
+  }, [columnOrder, enableRowSelection, hasActions]);
 
   const table = useReactTable<TData>({
     data,
@@ -344,7 +409,6 @@ export function PowerListenView<TData>({
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
-  const hasColumnFilters = (columnFilters ?? []).length > 0;
   const selectedRows = enableRowSelection
     ? table.getSelectedRowModel().rows.map((r) => r.original)
     : [];
@@ -368,8 +432,9 @@ export function PowerListenView<TData>({
     const sourceColId = e.dataTransfer.getData('text/plain') || draggingCol;
     setDraggingCol(null);
     if (!sourceColId || sourceColId === targetColId) return;
-    // __select__-Spalte bleibt immer vorne
+    // __select__ und __actions__ bleiben immer vorne (Tim R6b-Konvention)
     if (sourceColId === '__select__' || targetColId === '__select__') return;
+    if (sourceColId === '__actions__' || targetColId === '__actions__') return;
 
     const currentOrder =
       columnOrder.length > 0
@@ -391,7 +456,7 @@ export function PowerListenView<TData>({
   // __select__ gruppierbar (Tims neue Anforderung „alle Listen frei
   // gruppierbar").
   function isColumnGroupable(colId: string): boolean {
-    if (colId === '__select__') return false;
+    if (colId === '__select__' || colId === '__actions__') return false;
     if (groupableColumns && groupableColumns.length > 0) {
       return groupableColumns.some((g) => g.id === colId);
     }
@@ -565,13 +630,13 @@ export function PowerListenView<TData>({
             className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
           >
             <Columns3 className="h-3.5 w-3.5" />
-            Spalten ({visibleLeafColumns.filter((c) => c.id !== '__select__').length})
+            Spalten ({visibleLeafColumns.filter((c) => c.id !== '__select__' && c.id !== '__actions__').length})
           </button>
           {showColumnPicker && (
             <div className="absolute right-0 z-30 mt-1 w-56 rounded-md border border-zinc-800 bg-zinc-900 p-2 shadow-2xl">
               {table
                 .getAllLeafColumns()
-                .filter((col) => col.id !== '__select__')
+                .filter((col) => col.id !== '__select__' && col.id !== '__actions__')
                 .map((col) => (
                   <label
                     key={col.id}
@@ -662,25 +727,10 @@ export function PowerListenView<TData>({
             )}
           </div>
         )}
-        {sorting.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onSortingChange([])}
-            className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
-            title="Sortierung zurücksetzen"
-          >
-            Sort zurück
-          </button>
-        )}
-        {hasColumnFilters && (
-          <button
-            type="button"
-            onClick={() => onColumnFiltersChange([])}
-            className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20"
-          >
-            Spalten-Filter zurücksetzen
-          </button>
-        )}
+        {/* Sort + Spalten-Filter werden direkt an der jeweiligen Spalte
+            zurückgesetzt (Klick auf den Sortier-Indikator bzw. „X" am
+            Filter). Tim R6b-Konvention: keine hartcodierten Reset-Buttons
+            in der Toolbar. */}
         <div className="ml-auto flex items-center gap-2">
           {count && (
             <span className="text-xs text-zinc-500">
@@ -726,7 +776,7 @@ export function PowerListenView<TData>({
                   // Drag-Reorder ist nur für sortable/reorderable Spalten aktiv.
                   // Der frühere Mainthread-Freeze kam NICHT vom HTML5-draggable,
                   // sondern vom TanStack-Table-Grouping-Loop (jetzt gefixt).
-                  const isDraggable = colId !== '__select__';
+                  const isDraggable = colId !== '__select__' && colId !== '__actions__';
                   return (
                     <th
                       key={header.id}
