@@ -146,7 +146,7 @@ export function EinheitModal({
                 setForm((f) => ({ ...f, bezeichnung: e.target.value }))
               }
               placeholder="z. B. EG-01, Wohnung 3"
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
@@ -167,7 +167,7 @@ export function EinheitModal({
                 }))
               }
               placeholder="optional"
-              className="w-32 rounded-md border border-zinc-700 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+              className="w-32 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
@@ -204,7 +204,7 @@ export function EinheitModal({
                 value={mieterSearch}
                 onChange={(e) => setMieterSearch(e.target.value)}
                 placeholder="Mieter suchen …"
-                className="w-full rounded-md border border-zinc-700 bg-zinc-950/40 py-1.5 pl-7 pr-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded-md border border-zinc-700 bg-zinc-950 py-1.5 pl-7 pr-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
               />
             </div>
 

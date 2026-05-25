@@ -116,7 +116,7 @@ export function SavedViewsMenu({
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="z. B. Offene Heizungs-Tickets"
-                className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
               />
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -131,7 +131,7 @@ export function SavedViewsMenu({
               <button
                 type="button"
                 onClick={() => setShowSaveDialog(false)}
-                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm"
+                className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
               >
                 Abbrechen
               </button>
