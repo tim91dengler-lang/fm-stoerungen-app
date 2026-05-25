@@ -97,7 +97,7 @@ export function HausModal({
                 setForm((f) => ({ ...f, bezeichnung: e.target.value }))
               }
               placeholder="z. B. Haus A"
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
@@ -110,7 +110,7 @@ export function HausModal({
               onChange={(e) => setForm((f) => ({ ...f, notiz: e.target.value }))}
               rows={2}
               placeholder="optional"
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 

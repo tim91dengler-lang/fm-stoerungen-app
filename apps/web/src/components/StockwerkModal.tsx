@@ -105,7 +105,7 @@ export function StockwerkModal({
                 setForm((f) => ({ ...f, bezeichnung: e.target.value }))
               }
               placeholder="z. B. EG, 1. OG"
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
@@ -124,7 +124,7 @@ export function StockwerkModal({
                       : (e.target.value as Ausrichtung),
                 }))
               }
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
             >
               {AUSRICHTUNG_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
