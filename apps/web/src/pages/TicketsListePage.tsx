@@ -521,17 +521,9 @@ export function TicketsListePage() {
     ];
   }, [kpiQuery.data]);
 
-  const bulkErledigt = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(
-        ids.map((id) => ticketApi.update(id, { status: 'erledigt' })),
-      );
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tickets'] });
-      setRowSelection({});
-    },
-  });
+  // bulkErledigt entfernt (R5a, Tim 2026-05-25): die Funktion ist redundant zu
+  // Inline-Mass-Edit auf der Status-Spalte. User können dort jeden Status
+  // setzen, nicht nur 'erledigt' — ein dedizierter Bulk-Button ist überflüssig.
 
   const bulkDelete = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -618,30 +610,18 @@ export function TicketsListePage() {
         onRowSelectionChange={setRowSelection}
         onMassEdit={handleMassEdit}
         bulkActions={(selected) => (
-          <>
-            <button
-              type="button"
-              onClick={() => bulkErledigt.mutate(selected.map((t) => t.id))}
-              disabled={bulkErledigt.isPending}
-              className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
-            >
-              Auf „erledigt&quot; setzen
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  confirm(`${selected.length} Tickets wirklich löschen?`)
-                ) {
-                  bulkDelete.mutate(selected.map((t) => t.id));
-                }
-              }}
-              disabled={bulkDelete.isPending}
-              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-            >
-              Löschen
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm(`${selected.length} Tickets wirklich löschen?`)) {
+                bulkDelete.mutate(selected.map((t) => t.id));
+              }
+            }}
+            disabled={bulkDelete.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
         )}
         count={
           ticketsQuery.data

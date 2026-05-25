@@ -19,6 +19,7 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import { comboboxFilterFn } from './columnFilters';
+import { ConfirmDialog } from './ConfirmDialog';
 import {
   ArrowDown,
   ArrowUp,
@@ -179,6 +180,13 @@ export function PowerListenView<TData>({
   const [dropZoneHover, setDropZoneHover] = useState(false);
   const [massEditStatus, setMassEditStatus] = useState<string | null>(null);
   const [massEditBusy, setMassEditBusy] = useState<string | null>(null);
+  const [massEditConfirm, setMassEditConfirm] = useState<{
+    colId: string;
+    value: unknown;
+    columnLabel: string;
+    valueLabel: string;
+    count: number;
+  } | null>(null);
   const columnPickerRef = useRef<HTMLDivElement>(null);
   const groupPickerRef = useRef<HTMLDivElement>(null);
 
@@ -813,27 +821,34 @@ export function PowerListenView<TData>({
                     return <th key={`mass-${colId}`} className="px-3 py-2" />;
                   }
                   const busy = massEditBusy === colId;
-                  const handleApply = async (value: unknown) => {
+                  // Klick auf Anwenden → erst Confirm-Dialog zeigen.
+                  // Bei Confirm bleibt die eigentliche Mutation in `runMassEdit`.
+                  const handleApply = (value: unknown) => {
                     if (busy) return;
-                    setMassEditBusy(colId);
-                    setMassEditStatus(null);
-                    try {
-                      const res = await onMassEdit(colId, value, selectedRows);
-                      if (res) {
-                        setMassEditStatus(
-                          `${res.ok}/${res.ok + res.failed} aktualisiert`,
-                        );
-                      } else {
-                        setMassEditStatus(`${selectedRows.length} aktualisiert`);
-                      }
-                    } catch (e) {
-                      setMassEditStatus(
-                        `Fehler: ${(e as Error).message ?? 'unbekannt'}`,
-                      );
-                    } finally {
-                      setMassEditBusy(null);
-                      setTimeout(() => setMassEditStatus(null), 3500);
+                    const columnLabel =
+                      typeof header.column.columnDef.header === 'string'
+                        ? header.column.columnDef.header
+                        : colId;
+                    // Lese-freundliches Label für den Wert (z. B. „aktiv" statt UUID).
+                    let valueLabel: string;
+                    if (value === null) {
+                      valueLabel = 'leer';
+                    } else if (typeof value === 'boolean') {
+                      valueLabel = value ? 'Ja' : 'Nein';
+                    } else if (spec.options) {
+                      valueLabel =
+                        spec.options.find((o) => o.value === value)?.label ??
+                        String(value);
+                    } else {
+                      valueLabel = String(value);
                     }
+                    setMassEditConfirm({
+                      colId,
+                      value,
+                      columnLabel,
+                      valueLabel,
+                      count: selectedRows.length,
+                    });
                   };
                   return (
                     <th
@@ -904,6 +919,59 @@ export function PowerListenView<TData>({
           {massEditStatus}
         </div>
       )}
+      {/* Sicherheits-Abfrage vor Mass-Edit (Tim R5: vor jedem Bulk-Update). */}
+      <ConfirmDialog
+        open={massEditConfirm !== null}
+        title="Massen-Änderung bestätigen"
+        tone="primary"
+        confirmLabel="Übernehmen"
+        cancelLabel="Abbrechen"
+        busy={massEditBusy !== null}
+        message={
+          massEditConfirm ? (
+            <div className="space-y-2 text-sm text-zinc-300">
+              <p>
+                Spalte <strong>{massEditConfirm.columnLabel}</strong> für{' '}
+                <strong>{massEditConfirm.count}</strong> Datensätze auf{' '}
+                <strong className="text-emerald-300">
+                  „{massEditConfirm.valueLabel}&ldquo;
+                </strong>{' '}
+                setzen?
+              </p>
+              <p className="text-xs text-zinc-500">
+                Diese Änderung wirkt auf alle ausgewählten Zeilen gleichzeitig.
+              </p>
+            </div>
+          ) : (
+            ''
+          )
+        }
+        onConfirm={async () => {
+          if (!massEditConfirm) return;
+          const { colId, value } = massEditConfirm;
+          setMassEditBusy(colId);
+          setMassEditStatus(null);
+          try {
+            const res = await onMassEdit?.(colId, value, selectedRows);
+            if (res) {
+              setMassEditStatus(
+                `${res.ok}/${res.ok + res.failed} aktualisiert`,
+              );
+            } else {
+              setMassEditStatus(`${selectedRows.length} aktualisiert`);
+            }
+          } catch (e) {
+            setMassEditStatus(
+              `Fehler: ${(e as Error).message ?? 'unbekannt'}`,
+            );
+          } finally {
+            setMassEditBusy(null);
+            setMassEditConfirm(null);
+            setTimeout(() => setMassEditStatus(null), 3500);
+          }
+        }}
+        onCancel={() => setMassEditConfirm(null)}
+      />
     </div>
   );
 }
