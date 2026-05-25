@@ -20,7 +20,12 @@ from fm_api.models.objektstruktur import (
     StockwerkEinheit,
     StockwerkMieter,
 )
-from fm_api.models.partner import GeschaeftsPartner, PartnerTyp
+from fm_api.models.partner import (
+    GeschaeftsPartner,
+    PartnerAdresse,
+    PartnerKontakt,
+    PartnerTyp,
+)
 from fm_api.models.projekt import (
     Projekt,
     ProjektObjektLink,
@@ -56,6 +61,8 @@ __all__ = [
     "Objekt",
     "ObjektPartner",
     "ObjektStockwerk",
+    "PartnerAdresse",
+    "PartnerKontakt",
     "PartnerTyp",
     "Projekt",
     "ProjektObjektLink",

@@ -30,12 +30,17 @@ async def list_objekte(
     *,
     search: str | None = None,
     include_deleted: bool = False,
+    gesperrt_filter: str = "aktiv",  # 'aktiv' | 'gesperrt' | 'alle'
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Objekt], int]:
     base = select(Objekt).where(Objekt.mandant_id == mandant_id)
     if not include_deleted:
         base = base.where(Objekt.deleted_at.is_(None))
+    if gesperrt_filter == "aktiv":
+        base = base.where(Objekt.gesperrt.is_(False))
+    elif gesperrt_filter == "gesperrt":
+        base = base.where(Objekt.gesperrt.is_(True))
     if search:
         like = f"%{search.lower()}%"
         base = base.where(or_(func.lower(Objekt.name).like(like)))
@@ -167,3 +172,23 @@ async def soft_delete_objekt(db: AsyncSession, objekt_id: UUID, mandant_id: UUID
     objekt = await get_objekt(db, objekt_id, mandant_id)
     objekt.deleted_at = datetime.now(UTC)
     await db.flush()
+
+
+async def sperren_objekt(
+    db: AsyncSession,
+    objekt_id: UUID,
+    mandant_id: UUID,
+    *,
+    gesperrt: bool = True,
+) -> Objekt:
+    """Soft-Sperre eines Objekts (R6c-Konvention).
+
+    Bestehende Verknüpfungen (Tickets, Häuser, Stockwerke, Einheiten) bleiben
+    unverändert. Gesperrte Objekte tauchen per Default nicht mehr in der Liste
+    auf und sind in Such-Pickern (Ticket-Anlage etc.) ausgeblendet.
+    """
+    objekt = await get_objekt(db, objekt_id, mandant_id)
+    objekt.gesperrt = gesperrt
+    await db.flush()
+    db.expunge(objekt)
+    return await get_objekt(db, objekt_id, mandant_id)
