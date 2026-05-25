@@ -277,6 +277,25 @@ async def stream_grundriss(
     )
 
 
+@router.delete(
+    "/stockwerke/{stockwerk_id}/grundriss",
+    response_model=StockwerkRead,
+    summary="Grundriss entfernen",
+)
+async def delete_grundriss(
+    stockwerk_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> StockwerkRead:
+    try:
+        s = await objektstruktur_service.delete_grundriss(
+            db, current.mandant_id, stockwerk_id
+        )
+    except StockwerkNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _serialize_stockwerk(s)
+
+
 # -------- Einheit ---------------------------------------------------------
 
 

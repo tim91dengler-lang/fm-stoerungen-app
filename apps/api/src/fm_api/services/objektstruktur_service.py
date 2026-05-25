@@ -298,6 +298,29 @@ def read_grundriss_bytes(stockwerk: ObjektStockwerk) -> bytes:
     return abs_path.read_bytes()
 
 
+async def delete_grundriss(
+    db: AsyncSession,
+    mandant_id: UUID,
+    stockwerk_id: UUID,
+) -> ObjektStockwerk:
+    """Remove the grundriss file from disk and clear the DB-fields.
+    Idempotent: no-op when no grundriss is set.
+    """
+    sw = await get_stockwerk(db, mandant_id, stockwerk_id)
+    if sw.grundriss_storage_path:
+        abs_path = _upload_root() / sw.grundriss_storage_path
+        try:
+            abs_path.unlink(missing_ok=True)
+        except OSError:
+            # Disk-failure ist nicht fatal — DB-Felder werden trotzdem geleert,
+            # damit der Eintrag im UI verschwindet und neu hochgeladen werden kann.
+            pass
+        sw.grundriss_storage_path = None
+        sw.grundriss_mime = None
+        await db.flush()
+    return await get_stockwerk(db, mandant_id, stockwerk_id)
+
+
 # -------- Einheit ---------------------------------------------------------
 
 
