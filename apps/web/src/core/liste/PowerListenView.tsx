@@ -112,6 +112,27 @@ export interface PowerListenViewProps<TData> {
   showFooter?: boolean;
   /** Singular/Plural-Bezeichnung für die Footer-Anzeige. */
   itemLabel?: { singular: string; plural: string };
+  /** Inline-Mass-Edit pro Spalte. Wird gerendert wenn ≥1 Row selected ist.
+   *
+   * Pages markieren editierbare Spalten in `columns[i].meta.massEdit`:
+   *   meta: { massEdit: { type: 'text' | 'auswahl' | 'boolean'; options?: SelectOption[] } }
+   *
+   * PowerListenView rendert zwischen Filter-Zeile und Daten eine zusätzliche
+   * Edit-Zeile mit passendem Input pro Spalte. `onMassEdit` macht die
+   * PATCH-Calls auf die ausgewählten Rows.
+   */
+  onMassEdit?: (columnId: string, value: unknown, selectedRows: TData[]) => Promise<{ ok: number; failed: number }> | void;
+}
+
+/** Spec für eine spalten-spezifische Mass-Edit-Eingabe.
+ *  Liegt in `column.columnDef.meta.massEdit` der einzelnen Spalte.
+ */
+export interface MassEditSpec {
+  type: 'text' | 'auswahl' | 'boolean';
+  /** Wenn type='auswahl': die Auswahlmöglichkeiten als Slug→Label-Liste. */
+  options?: Array<{ value: string; label: string }>;
+  /** Optionaler Helper-Text unter dem Input (z. B. „setzt für alle Auswahl"). */
+  hint?: string;
 }
 
 export function PowerListenView<TData>({
@@ -143,11 +164,14 @@ export function PowerListenView<TData>({
   filterButton,
   showFooter = false,
   itemLabel,
+  onMassEdit,
 }: PowerListenViewProps<TData>) {
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [draggingCol, setDraggingCol] = useState<string | null>(null);
   const [dropZoneHover, setDropZoneHover] = useState(false);
+  const [massEditStatus, setMassEditStatus] = useState<string | null>(null);
+  const [massEditBusy, setMassEditBusy] = useState<string | null>(null);
   const columnPickerRef = useRef<HTMLDivElement>(null);
   const groupPickerRef = useRef<HTMLDivElement>(null);
 
@@ -409,20 +433,20 @@ export function PowerListenView<TData>({
     onSortingChange(next);
   }
 
-  // Drop-Zone wird zwischen Toolbar und Tabelle gerendert (nicht mehr oben).
-  // Extracted in eine Variable, damit JSX-Aufbau lesbar bleibt.
+  // Drop-Zone wird als Sektion innerhalb des Block-Containers gerendert
+  // (direkt vor der Tabelle). Border-Bottom trennt sie visuell vom Header.
   const dropZone = onGroupingChange ? (
     <div
       onDragOver={onDropZoneDragOver}
       onDragEnter={onDropZoneDragOver}
       onDragLeave={onDropZoneDragLeave}
       onDrop={onDropZoneDrop}
-      className={`mb-2 flex min-h-[40px] flex-wrap items-center gap-2 rounded-lg border-2 border-dashed px-3 py-1.5 transition-colors ${
+      className={`flex min-h-[36px] flex-wrap items-center gap-2 border-b px-3 py-1.5 transition-colors ${
         dropZoneHover
           ? 'border-emerald-400/70 bg-emerald-500/10'
           : grouping.length > 0
-            ? 'border-zinc-700 bg-zinc-900/60'
-            : 'border-zinc-800 bg-zinc-900/30'
+            ? 'border-zinc-800 bg-zinc-900/40'
+            : 'border-zinc-800 bg-zinc-950/30'
       }`}
       data-testid="power-listen-drop-zone"
     >
@@ -490,8 +514,8 @@ export function PowerListenView<TData>({
   ) : null;
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+    <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-3 py-2.5">
         <div className="flex items-center gap-2">{toolbarLeft}</div>
         <div className="relative min-w-[18rem] max-w-md flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -640,7 +664,7 @@ export function PowerListenView<TData>({
       </div>
 
       {enableRowSelection && selectedRows.length > 0 && (
-        <div className="mb-3 flex items-center justify-between rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+        <div className="flex items-center justify-between border-b border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
           <span>
             <strong>{selectedRows.length}</strong> ausgewählt
             <button
@@ -659,7 +683,7 @@ export function PowerListenView<TData>({
 
       {dropZone}
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
+      <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-zinc-800 text-sm">
           <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-500">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -735,6 +759,75 @@ export function PowerListenView<TData>({
                 })}
               </tr>
             ))}
+            {/* Inline-Mass-Edit-Zeile — sichtbar wenn ≥1 Row markiert,
+                onMassEdit-Callback vorhanden und mindestens eine Spalte
+                `meta.massEdit` definiert. Pro Spalte mit `meta.massEdit`
+                wird ein passendes Eingabe-Element gerendert. */}
+            {enableRowSelection &&
+              selectedRows.length > 0 &&
+              onMassEdit &&
+              table.getAllLeafColumns().some((c) => {
+                const m = (c.columnDef.meta ?? {}) as { massEdit?: MassEditSpec };
+                return m.massEdit !== undefined;
+              }) && (
+              <tr className="border-t border-emerald-500/20 bg-emerald-500/5">
+                {table.getHeaderGroups()[0]?.headers.map((header) => {
+                  const colId = header.column.id;
+                  if (colId === '__select__') {
+                    return (
+                      <th
+                        key={`mass-${colId}`}
+                        className="px-3 py-2 align-middle text-[10px] font-medium uppercase tracking-wide text-emerald-300"
+                      >
+                        bearbeiten
+                      </th>
+                    );
+                  }
+                  const meta = (header.column.columnDef.meta ?? {}) as {
+                    massEdit?: MassEditSpec;
+                  };
+                  const spec = meta.massEdit;
+                  if (!spec) {
+                    return <th key={`mass-${colId}`} className="px-3 py-2" />;
+                  }
+                  const busy = massEditBusy === colId;
+                  const handleApply = async (value: unknown) => {
+                    if (busy) return;
+                    setMassEditBusy(colId);
+                    setMassEditStatus(null);
+                    try {
+                      const res = await onMassEdit(colId, value, selectedRows);
+                      if (res) {
+                        setMassEditStatus(
+                          `${res.ok}/${res.ok + res.failed} aktualisiert`,
+                        );
+                      } else {
+                        setMassEditStatus(`${selectedRows.length} aktualisiert`);
+                      }
+                    } catch (e) {
+                      setMassEditStatus(
+                        `Fehler: ${(e as Error).message ?? 'unbekannt'}`,
+                      );
+                    } finally {
+                      setMassEditBusy(null);
+                      setTimeout(() => setMassEditStatus(null), 3500);
+                    }
+                  };
+                  return (
+                    <th
+                      key={`mass-${colId}`}
+                      className="px-2 py-1 align-top font-normal normal-case"
+                    >
+                      <MassEditCell
+                        spec={spec}
+                        busy={busy}
+                        onApply={handleApply}
+                      />
+                    </th>
+                  );
+                })}
+              </tr>
+            )}
           </thead>
           <tbody>
             {table.getRowModel().rows.length === 0 && (
@@ -784,6 +877,103 @@ export function PowerListenView<TData>({
           />
         )}
       </div>
+      {massEditStatus && (
+        <div className="pointer-events-none fixed bottom-6 right-6 z-50 rounded-md border border-emerald-500/40 bg-zinc-900 px-4 py-2 text-sm text-emerald-200 shadow-2xl">
+          {massEditStatus}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Inline-Cell für Mass-Edit pro Spalte.
+ *  Type 'text' rendert ein Input mit Enter-zum-Anwenden + Apply-Button.
+ *  Type 'auswahl' rendert ein Select; Selection triggert sofort apply.
+ *  Type 'boolean' rendert zwei Buttons (Ja/Nein).
+ */
+function MassEditCell({
+  spec,
+  busy,
+  onApply,
+}: {
+  spec: MassEditSpec;
+  busy: boolean;
+  onApply: (value: unknown) => void;
+}) {
+  const [textValue, setTextValue] = useState('');
+  if (spec.type === 'auswahl') {
+    return (
+      <select
+        disabled={busy}
+        defaultValue=""
+        onChange={(e) => {
+          if (e.target.value === '') return;
+          onApply(e.target.value);
+          e.target.value = '';
+        }}
+        className="w-full rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-xs text-zinc-100 focus:border-emerald-500/50 focus:outline-none disabled:opacity-60"
+      >
+        <option value="">{busy ? 'wende an …' : 'setzen auf …'}</option>
+        {spec.options?.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (spec.type === 'boolean') {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onApply(true)}
+          className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+        >
+          Ja
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onApply(false)}
+          className="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+        >
+          Nein
+        </button>
+      </div>
+    );
+  }
+  // 'text' (default)
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="text"
+        value={textValue}
+        disabled={busy}
+        placeholder={busy ? '…' : 'neuer Wert'}
+        onChange={(e) => setTextValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && textValue !== '') {
+            onApply(textValue);
+            setTextValue('');
+          }
+        }}
+        className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none disabled:opacity-60"
+      />
+      <button
+        type="button"
+        disabled={busy || textValue === ''}
+        onClick={() => {
+          if (textValue === '') return;
+          onApply(textValue);
+          setTextValue('');
+        }}
+        className="rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
+        title="Anwenden (oder Enter)"
+      >
+        ↵
+      </button>
     </div>
   );
 }

@@ -24,11 +24,6 @@ import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
-import {
-  MassEditModal,
-  type ColumnSpec,
-  type MassEditResult,
-} from '../core/liste/MassEditModal';
 
 const EMPTY_FORM: FehlercodeCreate = {
   code: '',
@@ -78,9 +73,6 @@ export function FehlercodesPage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<FehlercodeRead[] | null>(null);
-  const [massEditRows, setMassEditRows] = useState<FehlercodeRead[] | null>(
-    null,
-  );
   const [blockedNote, setBlockedNote] = useState<string | null>(null);
   const qc = useQueryClient();
 
@@ -159,34 +151,24 @@ export function FehlercodesPage() {
     [prioListe],
   );
 
-  const massEditColumns: ColumnSpec[] = [
-    {
-      id: 'kategorie_wert_id',
-      label: 'Kategorie',
-      type: 'auswahl',
-      options: kategorieOptions,
-    },
-    {
-      id: 'prio_default_wert_id',
-      label: 'Priorität (Default)',
-      type: 'auswahl',
-      options: prioOptions,
-    },
-    { id: 'aktiv', label: 'Aktiv', type: 'boolean' },
-  ];
-
   async function handleMassEdit(
-    rows: FehlercodeRead[],
     columnId: string,
     value: unknown,
-  ): Promise<MassEditResult> {
-    const payload: FehlercodeUpdate = { [columnId]: value } as FehlercodeUpdate;
+    rows: FehlercodeRead[],
+  ): Promise<{ ok: number; failed: number }> {
+    // Map UI column ids → backend fields (FK columns use *_wert_id).
+    const field =
+      columnId === 'kategorie'
+        ? 'kategorie_wert_id'
+        : columnId === 'prio_default'
+          ? 'prio_default_wert_id'
+          : columnId;
+    const payload: FehlercodeUpdate = { [field]: value } as FehlercodeUpdate;
     const results = await Promise.allSettled(
       rows.map((r) => fehlercodeApi.update(r.id, payload)),
     );
     const ok = results.filter((x) => x.status === 'fulfilled').length;
     qc.invalidateQueries({ queryKey: ['fehlercodes'] });
-    setRowSelection({});
     return { ok, failed: results.length - ok };
   }
 
@@ -265,6 +247,9 @@ export function FehlercodesPage() {
         accessorFn: (row) => row.kategorie?.label ?? '',
         header: 'Kategorie',
         filterFn: 'includesString',
+        meta: {
+          massEdit: { type: 'auswahl' as const, options: kategorieOptions },
+        },
         cell: (ctx) => {
           const k = ctx.row.original.kategorie;
           if (!k) return <span className="text-zinc-500">—</span>;
@@ -280,6 +265,9 @@ export function FehlercodesPage() {
         accessorFn: (row) => row.prio_default?.label ?? '',
         header: 'Priorität (Default)',
         filterFn: 'includesString',
+        meta: {
+          massEdit: { type: 'auswahl' as const, options: prioOptions },
+        },
         cell: (ctx) => {
           const p = ctx.row.original.prio_default;
           if (!p) return <span className="text-zinc-500">—</span>;
@@ -373,7 +361,7 @@ export function FehlercodesPage() {
         ),
       },
     ],
-    [],
+    [kategorieOptions, prioOptions],
   );
 
   function confirmBulkDelete() {
@@ -462,24 +450,16 @@ export function FehlercodesPage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
-          <>
-            <button
-              type="button"
-              onClick={() => setMassEditRows(selected)}
-              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10"
-            >
-              Bearbeiten ({selected.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkConfirm(selected)}
-              disabled={bulkDeleteMut.isPending}
-              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-            >
-              Löschen ({selected.length})
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
         )}
+        onMassEdit={handleMassEdit}
         count={{
           filtered: data.length,
           total: listQuery.data?.length ?? 0,
@@ -498,17 +478,6 @@ export function FehlercodesPage() {
         searchPlaceholder="Suche in Code, Titel, Beschreibung …"
         showFooter
         itemLabel={{ singular: 'Fehlercode', plural: 'Fehlercodes' }}
-      />
-
-      <MassEditModal<FehlercodeRead>
-        open={massEditRows !== null}
-        selectedRows={massEditRows ?? []}
-        columns={massEditColumns}
-        itemLabel={{ singular: 'Fehlercode', plural: 'Fehlercodes' }}
-        onClose={() => setMassEditRows(null)}
-        onSubmit={(col, val) =>
-          handleMassEdit(massEditRows ?? [], col, val)
-        }
       />
 
       <ConfirmDialog

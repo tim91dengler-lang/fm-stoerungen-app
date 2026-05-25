@@ -96,8 +96,11 @@ export const comboboxFilterFn = (
     !isComboboxValue(v) || (v.pills.length === 0 && v.text === '');
 
 interface ComboboxFilterProps extends RendererProps {
-  /** TanStack-Column-Object (wird von PowerListenView durchgereicht). */
-  column?: Column<unknown, unknown>;
+  /** TanStack-Column-Object (wird von PowerListenView durchgereicht).
+   *  Bewusst lose typisiert (`unknown` als Row-Type), damit der Filter
+   *  page-agnostic in `filterRenderers` einsetzbar ist. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  column?: Column<any, unknown>;
   /** Optionale vorgegebene Auswahlliste (Slug→Label). Wenn fehlt: distinct aus Rows. */
   options?: SelectOption[];
   /** Placeholder für das Input-Feld. */
@@ -107,11 +110,13 @@ interface ComboboxFilterProps extends RendererProps {
 /**
  * Standard-Filter für alle PowerListenView-Spalten.
  *
- * - Eingabefeld oben (free-text, Live-Suche).
- * - Selected Pills inline im Eingabefeld (mit ✕).
- * - ChevronDown-Icon rechts → klappt Dropdown auf.
- * - Dropdown zeigt distinct Werte der Spalte (aus options oder
- *   `column.getFacetedUniqueValues()`); klick → wird zur Pill.
+ * UX (Tim, Runde 3):
+ * - Slot in der Spalte ist kompakt + neutral: nur ChevronDown + optional „N"-Counter.
+ *   KEINE Pills oder Werte inline sichtbar.
+ * - Klick auf den Slot öffnet ein Dropdown mit:
+ *     • Such-Input oben (free-text, Live-Suche)
+ *     • Checkbox-Liste der distinct-Werte (aus options oder column.getFacetedUniqueValues)
+ *     • „Auswahl löschen"-Link wenn ≥1 ausgewählt
  * - Dropdown schließt bei Click-Outside.
  */
 export function ComboboxFilter({
@@ -129,6 +134,8 @@ export function ComboboxFilter({
     ? value
     : { pills: [], text: '' };
 
+  const activeCount = current.pills.length + (current.text !== '' ? 1 : 0);
+
   // Close on outside click
   useEffect(() => {
     if (!open) return;
@@ -143,37 +150,31 @@ export function ComboboxFilter({
 
   // Distinct values for the dropdown list. Prefer explicit `options` (with
   // labels) over rows-derived faceted values.
+  // WICHTIG: bereits ausgewählte Pills bleiben sichtbar (mit ✓), nicht
+  // rausfiltern — sonst können sie nicht mehr entfernt werden.
   const dropdownItems = useMemo<SelectOption[]>(() => {
+    const lcText = current.text.toLowerCase();
     if (options && options.length > 0) {
-      // Filter out already-selected pills + apply free-text live-search.
       return options.filter(
         (o) =>
-          !current.pills.includes(o.value) &&
-          (current.text === '' ||
-            o.label.toLowerCase().includes(current.text.toLowerCase()) ||
-            o.value.toLowerCase().includes(current.text.toLowerCase())),
+          current.text === '' ||
+          o.label.toLowerCase().includes(lcText) ||
+          o.value.toLowerCase().includes(lcText),
       );
     }
     if (!column) return [];
-    // Fallback: distinct values from currently visible rows.
     const faceted = column.getFacetedUniqueValues?.();
     if (!faceted) return [];
     const items: SelectOption[] = [];
     for (const [raw] of faceted) {
       const val = raw === null || raw === undefined ? '' : String(raw);
       if (val === '') continue;
-      if (current.pills.includes(val)) continue;
-      if (
-        current.text !== '' &&
-        !val.toLowerCase().includes(current.text.toLowerCase())
-      ) {
-        continue;
-      }
+      if (current.text !== '' && !val.toLowerCase().includes(lcText)) continue;
       items.push({ value: val, label: val });
     }
     items.sort((a, b) => a.label.localeCompare(b.label, 'de'));
     return items;
-  }, [column, options, current.pills, current.text]);
+  }, [column, options, current.text]);
 
   function emit(next: ComboboxFilterValue) {
     if (next.pills.length === 0 && next.text === '') {
@@ -183,28 +184,20 @@ export function ComboboxFilter({
     }
   }
 
-  function addPill(v: string) {
-    if (current.pills.includes(v)) return;
-    emit({ pills: [...current.pills, v], text: '' });
-    // Re-focus the input so the user can keep typing / picking.
-    inputRef.current?.focus();
-  }
-
-  function removePill(v: string) {
-    emit({ pills: current.pills.filter((p) => p !== v), text: current.text });
+  function togglePill(v: string) {
+    const has = current.pills.includes(v);
+    const nextPills = has
+      ? current.pills.filter((p) => p !== v)
+      : [...current.pills, v];
+    emit({ pills: nextPills, text: current.text });
   }
 
   function setText(t: string) {
     emit({ pills: current.pills, text: t });
   }
 
-  // Labels for pills: if we have `options`, map value→label. Otherwise show value.
-  function labelFor(v: string): string {
-    if (options) {
-      const found = options.find((o) => o.value === v);
-      if (found) return found.label;
-    }
-    return v;
+  function clearAll() {
+    emit({ pills: [], text: '' });
   }
 
   return (
@@ -213,88 +206,103 @@ export function ComboboxFilter({
       className="relative w-full"
       onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className={`flex w-full items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-normal normal-case ${
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className={`flex w-full items-center justify-between gap-1 rounded border px-2 py-0.5 text-xs font-normal normal-case ${
           open
             ? 'border-emerald-500/50 bg-zinc-950 ring-1 ring-emerald-500/40'
-            : 'border-zinc-700 bg-zinc-950'
+            : activeCount > 0
+              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+              : 'border-zinc-700 bg-zinc-950 text-zinc-500'
         }`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        <Search className="h-3 w-3 shrink-0 text-zinc-600" aria-hidden />
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-          {current.pills.map((p) => (
-            <span
-              key={p}
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300"
-            >
-              <span className="max-w-[8rem] truncate">{labelFor(p)}</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removePill(p);
-                }}
-                className="rounded p-0.5 hover:bg-emerald-500/30"
-                title="Entfernen"
-                aria-label={`Filter „${labelFor(p)}" entfernen`}
-              >
-                <X className="h-2.5 w-2.5" />
-              </button>
-            </span>
-          ))}
-          <input
-            ref={inputRef}
-            type="text"
-            value={current.text}
-            onChange={(e) => {
-              setText(e.target.value);
-              if (!open) setOpen(true);
-            }}
-            onFocus={() => setOpen(true)}
-            placeholder={current.pills.length === 0 ? placeholder : ''}
-            className="min-w-[3rem] flex-1 bg-transparent text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen((v) => !v);
-            if (!open) inputRef.current?.focus();
-          }}
-          className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-          title={open ? 'Liste schließen' : 'Liste öffnen'}
-          aria-label="Auswahlliste öffnen"
-        >
-          <ChevronDown
-            className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
-          />
-        </button>
-      </div>
+        <span className="truncate">
+          {activeCount === 0
+            ? placeholder
+            : `${activeCount} ausgewählt`}
+        </span>
+        <ChevronDown
+          className={`h-3 w-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
+      </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-2xl">
-          {dropdownItems.length === 0 ? (
-            <div className="px-2 py-1 text-[11px] text-zinc-500">
-              {current.text !== '' || current.pills.length > 0
-                ? 'Keine weiteren Treffer'
-                : 'Keine Werte verfügbar'}
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 w-max min-w-full max-w-sm overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-2xl">
+          <div className="border-b border-zinc-800 p-1">
+            <div className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5">
+              <Search className="h-3 w-3 shrink-0 text-zinc-600" aria-hidden />
+              <input
+                ref={inputRef}
+                type="text"
+                value={current.text}
+                onChange={(e) => setText(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="filtern oder tippen …"
+                autoFocus
+                className="min-w-0 flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
+              />
+              {activeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearAll();
+                  }}
+                  className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+                  title="Filter löschen"
+                  aria-label="Alle Filter löschen"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
-          ) : (
-            dropdownItems.slice(0, 50).map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                onMouseDown={(e) => {
-                  // Use mousedown so click-outside doesn't fire before us.
-                  e.preventDefault();
-                  addPill(o.value);
-                }}
-                className="block w-full truncate px-2 py-1 text-left text-xs text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-200"
-              >
-                {o.label}
-              </button>
-            ))
-          )}
+          </div>
+          <div className="max-h-60 overflow-y-auto py-1">
+            {dropdownItems.length === 0 ? (
+              <div className="px-2 py-1 text-[11px] text-zinc-500">
+                {current.text !== ''
+                  ? 'Keine Treffer'
+                  : 'Keine Werte verfügbar'}
+              </div>
+            ) : (
+              dropdownItems.slice(0, 100).map((o) => {
+                const checked = current.pills.includes(o.value);
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      togglePill(o.value);
+                    }}
+                    className={`flex w-full items-center gap-2 truncate px-2 py-1 text-left text-xs ${
+                      checked
+                        ? 'bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25'
+                        : 'text-zinc-200 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
+                        checked
+                          ? 'border-emerald-400 bg-emerald-500 text-zinc-950'
+                          : 'border-zinc-600'
+                      }`}
+                      aria-hidden
+                    >
+                      {checked ? '✓' : ''}
+                    </span>
+                    <span className="truncate">{o.label}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -306,24 +314,14 @@ export function ComboboxFilter({
 // ---------------------------------------------------------------------------
 
 /**
- * TextFilter — kompatibel zu bestehender Page-Verwendung.
+ * TextFilter — Alias auf ComboboxFilter (Runde 3, Tim wollte einheitliches
+ * Pattern überall: compact Slot + Dropdown statt freies Text-Input).
  *
- * Old shape: filter value is a plain string used with TanStack `includesString`.
- * Pages that still import `TextFilter` keep working unchanged. Für neue Pages
- * bitte `ComboboxFilter` nutzen.
+ * Pages, die explizit `TextFilter` importieren, bekommen jetzt das neue
+ * Pattern automatisch. Der Free-Text-Anteil bleibt erhalten — er steht
+ * im Dropdown-Such-Input, nicht mehr direkt in der Spalte.
  */
-export function TextFilter({ value, onChange }: RendererProps): ReactNode {
-  return (
-    <input
-      type="text"
-      value={(value as string) ?? ''}
-      onChange={(e) => onChange(e.target.value || undefined)}
-      placeholder="filtern …"
-      className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs font-normal normal-case text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none"
-      onClick={(e) => e.stopPropagation()}
-    />
-  );
-}
+export const TextFilter = ComboboxFilter;
 
 export function NumberFilter({ value, onChange }: RendererProps): ReactNode {
   return (
@@ -341,43 +339,40 @@ export function NumberFilter({ value, onChange }: RendererProps): ReactNode {
 }
 
 /**
- * SelectFilter — bleibt für Backwards-Compat erhalten. Pages, die explizit
- * `options` durchgeben, nutzen weiter den alten Multi-Pill-Button-Style.
- * Für neue Spalten bitte stattdessen direkt `ComboboxFilter` mit `options`
- * verwenden.
+ * SelectFilter — wrappt jetzt ComboboxFilter. Backwards-Compat-Bridge:
+ * Aufrufer geben weiterhin `options` durch und erhalten dieselbe UX wie
+ * ComboboxFilter (compact Slot + Dropdown), statt Buttons inline.
+ *
+ * Das alte Value-Format (string[]) wird automatisch in das ComboboxValue-
+ * Format konvertiert.
  */
 export function SelectFilter({
   value,
   onChange,
   options,
 }: RendererProps & { options: SelectOption[] }): ReactNode {
-  const selected = (value as string[]) ?? [];
-  function toggle(v: string) {
-    const next = selected.includes(v)
-      ? selected.filter((x) => x !== v)
-      : [...selected, v];
-    onChange(next.length > 0 ? next : undefined);
-  }
+  const pills: string[] = Array.isArray(value)
+    ? (value as string[])
+    : isComboboxValue(value)
+      ? value.pills
+      : [];
+
   return (
-    <div
-      className="flex flex-wrap gap-0.5"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => toggle(o.value)}
-          className={`rounded px-1.5 py-0.5 text-[10px] font-normal normal-case ${
-            selected.includes(o.value)
-              ? 'bg-emerald-500 text-zinc-950'
-              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <ComboboxFilter
+      value={{ pills, text: '' }}
+      onChange={(v) => {
+        if (v === undefined) {
+          onChange(undefined);
+          return;
+        }
+        if (isComboboxValue(v)) {
+          // Map back to legacy string[] shape so existing TanStack
+          // arrIncludesSome filterFn keeps working.
+          onChange(v.pills.length > 0 ? v.pills : undefined);
+        }
+      }}
+      options={options}
+    />
   );
 }
 

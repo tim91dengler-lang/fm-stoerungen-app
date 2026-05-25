@@ -21,11 +21,6 @@ import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
-import {
-  MassEditModal,
-  type ColumnSpec,
-  type MassEditResult,
-} from '../core/liste/MassEditModal';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -73,26 +68,19 @@ export function ObjektePage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<ObjektRead[] | null>(null);
-  const [massEditRows, setMassEditRows] = useState<ObjektRead[] | null>(null);
-
   const qc = useQueryClient();
 
-  const massEditColumns: ColumnSpec[] = [
-    { id: 'notiz', label: 'Notiz', type: 'text' },
-  ];
-
   async function handleMassEdit(
-    rows: ObjektRead[],
     columnId: string,
     value: unknown,
-  ): Promise<MassEditResult> {
+    rows: ObjektRead[],
+  ): Promise<{ ok: number; failed: number }> {
     const payload: ObjektUpdate = { [columnId]: value };
     const results = await Promise.allSettled(
       rows.map((r) => objektApi.update(r.id, payload)),
     );
     const ok = results.filter((x) => x.status === 'fulfilled').length;
     qc.invalidateQueries({ queryKey: ['objekte'] });
-    setRowSelection({});
     return { ok, failed: results.length - ok };
   }
 
@@ -335,24 +323,16 @@ export function ObjektePage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
-          <>
-            <button
-              type="button"
-              onClick={() => setMassEditRows(selected)}
-              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10"
-            >
-              Bearbeiten ({selected.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkConfirm(selected)}
-              disabled={bulkDeleteMut.isPending}
-              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-            >
-              Löschen ({selected.length})
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
         )}
+        onMassEdit={handleMassEdit}
         count={{
           filtered: listQuery.data?.items.length ?? 0,
           total: listQuery.data?.total ?? 0,
@@ -373,16 +353,6 @@ export function ObjektePage() {
         itemLabel={{ singular: 'Objekt', plural: 'Objekte' }}
       />
 
-      <MassEditModal<ObjektRead>
-        open={massEditRows !== null}
-        selectedRows={massEditRows ?? []}
-        columns={massEditColumns}
-        itemLabel={{ singular: 'Objekt', plural: 'Objekte' }}
-        onClose={() => setMassEditRows(null)}
-        onSubmit={(col, val) =>
-          handleMassEdit(massEditRows ?? [], col, val)
-        }
-      />
 
       <ConfirmDialog
         open={bulkConfirm !== null}

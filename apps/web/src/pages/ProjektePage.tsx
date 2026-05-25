@@ -29,11 +29,6 @@ import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
-import {
-  MassEditModal,
-  type ColumnSpec,
-  type MassEditResult,
-} from '../core/liste/MassEditModal';
 import { ProjektModal } from '../components/ProjektModal';
 
 interface ViewConfig {
@@ -151,7 +146,6 @@ export function ProjektePage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkConfirm, setBulkConfirm] = useState<ProjektRead[] | null>(null);
-  const [massEditRows, setMassEditRows] = useState<ProjektRead[] | null>(null);
   const [bulkStatusModal, setBulkStatusModal] = useState<{
     rows: ProjektRead[];
     statusSlug: string;
@@ -256,33 +250,24 @@ export function ProjektePage() {
     [projekttypOptions],
   );
 
-  const massEditColumns: ColumnSpec[] = [
-    {
-      id: 'status_slug',
-      label: 'Status',
-      type: 'auswahl',
-      options: statusSlugOptions,
-    },
-    {
-      id: 'projekttyp_slug',
-      label: 'Projekttyp',
-      type: 'auswahl',
-      options: projekttypSlugOptions,
-    },
-  ];
-
   async function handleMassEdit(
-    rows: ProjektRead[],
     columnId: string,
     value: unknown,
-  ): Promise<MassEditResult> {
-    const payload: ProjektUpdate = { [columnId]: value } as ProjektUpdate;
+    rows: ProjektRead[],
+  ): Promise<{ ok: number; failed: number }> {
+    // Map UI column ids → backend fields (status / projekttyp use _slug suffix).
+    const field =
+      columnId === 'status'
+        ? 'status_slug'
+        : columnId === 'projekttyp'
+          ? 'projekttyp_slug'
+          : columnId;
+    const payload: ProjektUpdate = { [field]: value } as ProjektUpdate;
     const results = await Promise.allSettled(
       rows.map((r) => projektApi.update(r.id, payload)),
     );
     const ok = results.filter((x) => x.status === 'fulfilled').length;
     qc.invalidateQueries({ queryKey: ['projekte'] });
-    setRowSelection({});
     return { ok, failed: results.length - ok };
   }
 
@@ -332,6 +317,12 @@ export function ProjektePage() {
         accessorFn: (row) => row.projekttyp.key,
         header: 'Projekttyp',
         filterFn: 'arrIncludesSome',
+        meta: {
+          massEdit: {
+            type: 'auswahl' as const,
+            options: projekttypSlugOptions,
+          },
+        },
         cell: (ctx) => {
           const t = ctx.row.original.projekttyp;
           return <Pill label={t.label} farbe={t.farbe} />;
@@ -342,6 +333,12 @@ export function ProjektePage() {
         accessorFn: (row) => row.status.key,
         header: 'Status',
         filterFn: 'arrIncludesSome',
+        meta: {
+          massEdit: {
+            type: 'auswahl' as const,
+            options: statusSlugOptions,
+          },
+        },
         cell: (ctx) => {
           const s = ctx.row.original.status;
           return (
@@ -442,7 +439,7 @@ export function ProjektePage() {
         ),
       },
     ],
-    [],
+    [projekttypSlugOptions, statusSlugOptions],
   );
 
   function confirmBulkDelete() {
@@ -533,37 +530,16 @@ export function ProjektePage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
-          <>
-            <button
-              type="button"
-              onClick={() => setMassEditRows(selected)}
-              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10"
-            >
-              Bearbeiten ({selected.length})
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                setBulkStatusModal({
-                  rows: selected,
-                  statusSlug: statusOptions[0]?.key ?? 'geplant',
-                })
-              }
-              disabled={bulkStatusMut.isPending || statusOptions.length === 0}
-              className="rounded-md border border-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
-            >
-              Status setzen ({selected.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkConfirm(selected)}
-              disabled={bulkDeleteMut.isPending}
-              className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-            >
-              Löschen ({selected.length})
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => setBulkConfirm(selected)}
+            disabled={bulkDeleteMut.isPending}
+            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Löschen ({selected.length})
+          </button>
         )}
+        onMassEdit={handleMassEdit}
         count={{
           filtered: filtered.length,
           total: listQuery.data?.length ?? 0,
@@ -582,17 +558,6 @@ export function ProjektePage() {
         searchPlaceholder="Suche in Projekten …"
         showFooter
         itemLabel={{ singular: 'Projekt', plural: 'Projekte' }}
-      />
-
-      <MassEditModal<ProjektRead>
-        open={massEditRows !== null}
-        selectedRows={massEditRows ?? []}
-        columns={massEditColumns}
-        itemLabel={{ singular: 'Projekt', plural: 'Projekte' }}
-        onClose={() => setMassEditRows(null)}
-        onSubmit={(col, val) =>
-          handleMassEdit(massEditRows ?? [], col, val)
-        }
       />
 
       <ConfirmDialog
