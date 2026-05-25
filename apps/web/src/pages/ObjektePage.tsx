@@ -421,84 +421,93 @@ export function ObjektePage() {
                 />
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-300">
-                  Adresse
-                </label>
-                <select
-                  value={form.adresse_id ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, adresse_id: e.target.value || null })
-                  }
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="">— Keine —</option>
-                  {adressenQuery.data?.items.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.strasse}
-                      {a.hausnummer ? ` ${a.hausnummer}` : ''}, {a.plz} {a.ort}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-300">
-                  Notiz
-                </label>
-                <textarea
-                  rows={2}
-                  value={form.notiz ?? ''}
-                  onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-2 rounded-md border border-zinc-800 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  Partner-Zuordnungen
-                </div>
-                {(form.partner_links ?? []).length === 0 && (
-                  <div className="text-xs text-zinc-500">
-                    Noch keine Partner zugeordnet.
+              {/* Im Create-Modus (Tim R5a) bewusst NUR Name fragen, alles
+                  Weitere (Adresse, Notiz, Partner) auf der Detail-Seite
+                  bearbeiten. Im Edit-Modus erscheinen die Felder weiterhin. */}
+              {editingId !== null && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-300">
+                      Adresse
+                    </label>
+                    <select
+                      value={form.adresse_id ?? ''}
+                      onChange={(e) =>
+                        setForm({ ...form, adresse_id: e.target.value || null })
+                      }
+                      className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+                    >
+                      <option value="">— Keine —</option>
+                      {adressenQuery.data?.items.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.strasse}
+                          {a.hausnummer ? ` ${a.hausnummer}` : ''}, {a.plz}{' '}
+                          {a.ort}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                )}
-                <ul className="space-y-1">
-                  {(form.partner_links ?? []).map((l, idx) => {
-                    const p = partnerQuery.data?.items.find(
-                      (pp) => pp.id === l.partner_id,
-                    );
-                    return (
-                      <li
-                        key={`${l.partner_id}-${l.rolle}-${idx}`}
-                        className="flex items-center justify-between rounded bg-zinc-900/50 px-2 py-1 text-sm"
-                      >
-                        <span>
-                          {p?.name ?? l.partner_id} —{' '}
-                          <span className="text-xs text-zinc-400">
-                            {TYP_LABEL[l.rolle]}
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeLink(idx)}
-                          className="text-xs text-red-400 hover:underline"
-                        >
-                          entfernen
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
 
-                <PartnerLinkAdder
-                  partnerOptions={(partnerQuery.data?.items ?? []).map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                  }))}
-                  onAdd={addLink}
-                />
-              </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-300">
+                      Notiz
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={form.notiz ?? ''}
+                      onChange={(e) =>
+                        setForm({ ...form, notiz: e.target.value })
+                      }
+                      className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2 rounded-md border border-zinc-800 p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      Partner-Zuordnungen
+                    </div>
+                    {(form.partner_links ?? []).length === 0 && (
+                      <div className="text-xs text-zinc-500">
+                        Noch keine Partner zugeordnet.
+                      </div>
+                    )}
+                    <ul className="space-y-1">
+                      {(form.partner_links ?? []).map((l, idx) => {
+                        const p = partnerQuery.data?.items.find(
+                          (pp) => pp.id === l.partner_id,
+                        );
+                        return (
+                          <li
+                            key={`${l.partner_id}-${l.rolle}-${idx}`}
+                            className="flex items-center justify-between rounded bg-zinc-900/50 px-2 py-1 text-sm"
+                          >
+                            <span>
+                              {p?.name ?? l.partner_id} —{' '}
+                              <span className="text-xs text-zinc-400">
+                                {TYP_LABEL[l.rolle]}
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeLink(idx)}
+                              className="text-xs text-red-400 hover:underline"
+                            >
+                              entfernen
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    <PartnerLinkAdder
+                      partnerOptions={(partnerQuery.data?.items ?? []).map(
+                        (p) => ({ id: p.id, name: p.name }),
+                      )}
+                      onAdd={addLink}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
