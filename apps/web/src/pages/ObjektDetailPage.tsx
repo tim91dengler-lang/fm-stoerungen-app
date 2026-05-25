@@ -29,6 +29,7 @@ import type {
   HausRead,
   StockwerkRead,
   EinheitRead,
+  PartnerMini,
   PartnerRead,
 } from '../api/types';
 import { HausModal } from '../components/HausModal';
@@ -138,11 +139,15 @@ export function ObjektDetailPage() {
       bezeichnung: string;
       notiz: string;
       adresse_id: string | null;
+      eigentuemer_ids: string[];
+      mieter_ids: string[];
     }) =>
       objektstrukturApi.createHaus(objektId, {
         bezeichnung: payload.bezeichnung,
         notiz: payload.notiz || null,
         adresse_id: payload.adresse_id,
+        eigentuemer_ids: payload.eigentuemer_ids,
+        mieter_ids: payload.mieter_ids,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -155,16 +160,22 @@ export function ObjektDetailPage() {
       bezeichnung,
       notiz,
       adresse_id,
+      eigentuemer_ids,
+      mieter_ids,
     }: {
       hausId: string;
       bezeichnung: string;
       notiz: string;
       adresse_id: string | null;
+      eigentuemer_ids: string[];
+      mieter_ids: string[];
     }) =>
       objektstrukturApi.updateHaus(hausId, {
         bezeichnung,
         notiz: notiz || null,
         adresse_id,
+        eigentuemer_ids,
+        mieter_ids,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -184,10 +195,14 @@ export function ObjektDetailPage() {
       hausId: string;
       bezeichnung: string;
       ausrichtung: Ausrichtung | null;
+      eigentuemer_ids: string[];
+      mieter_ids: string[];
     }) =>
       objektstrukturApi.createStockwerk(vars.hausId, {
         bezeichnung: vars.bezeichnung,
         ausrichtung: vars.ausrichtung,
+        eigentuemer_ids: vars.eigentuemer_ids,
+        mieter_ids: vars.mieter_ids,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -199,10 +214,14 @@ export function ObjektDetailPage() {
       swId: string;
       bezeichnung: string;
       ausrichtung: Ausrichtung | null;
+      eigentuemer_ids: string[];
+      mieter_ids: string[];
     }) =>
       objektstrukturApi.updateStockwerk(vars.swId, {
         bezeichnung: vars.bezeichnung,
         ausrichtung: vars.ausrichtung,
+        eigentuemer_ids: vars.eigentuemer_ids,
+        mieter_ids: vars.mieter_ids,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -222,11 +241,13 @@ export function ObjektDetailPage() {
       swId: string;
       bezeichnung: string;
       groesse_qm: number | null;
+      eigentuemer_ids: string[];
       mieter_ids: string[];
     }) =>
       objektstrukturApi.createEinheit(vars.swId, {
         bezeichnung: vars.bezeichnung,
         groesse_qm: vars.groesse_qm,
+        eigentuemer_ids: vars.eigentuemer_ids,
         mieter_ids: vars.mieter_ids,
       }),
     onSuccess: () => {
@@ -239,11 +260,13 @@ export function ObjektDetailPage() {
       eId: string;
       bezeichnung: string;
       groesse_qm: number | null;
+      eigentuemer_ids: string[];
       mieter_ids: string[];
     }) =>
       objektstrukturApi.updateEinheit(vars.eId, {
         bezeichnung: vars.bezeichnung,
         groesse_qm: vars.groesse_qm,
+        eigentuemer_ids: vars.eigentuemer_ids,
         mieter_ids: vars.mieter_ids,
       }),
     onSuccess: () => {
@@ -308,6 +331,8 @@ export function ObjektDetailPage() {
     bezeichnung: string;
     notiz: string;
     adresse_id: string | null;
+    eigentuemer_ids: string[];
+    mieter_ids: string[];
   }) {
     if (hausModal.mode === 'edit') {
       updateHaus.mutate({
@@ -315,6 +340,8 @@ export function ObjektDetailPage() {
         bezeichnung: values.bezeichnung,
         notiz: values.notiz,
         adresse_id: values.adresse_id,
+        eigentuemer_ids: values.eigentuemer_ids,
+        mieter_ids: values.mieter_ids,
       });
     } else if (hausModal.mode === 'create') {
       createHaus.mutate(values);
@@ -324,18 +351,24 @@ export function ObjektDetailPage() {
   function handleStockwerkSubmit(values: {
     bezeichnung: string;
     ausrichtung: Ausrichtung | null;
+    eigentuemer_ids: string[];
+    mieter_ids: string[];
   }) {
     if (stockwerkModal.mode === 'edit') {
       updateStockwerk.mutate({
         swId: stockwerkModal.stockwerk.id,
         bezeichnung: values.bezeichnung,
         ausrichtung: values.ausrichtung,
+        eigentuemer_ids: values.eigentuemer_ids,
+        mieter_ids: values.mieter_ids,
       });
     } else if (stockwerkModal.mode === 'create') {
       createStockwerk.mutate({
         hausId: stockwerkModal.hausId,
         bezeichnung: values.bezeichnung,
         ausrichtung: values.ausrichtung,
+        eigentuemer_ids: values.eigentuemer_ids,
+        mieter_ids: values.mieter_ids,
       });
     }
   }
@@ -343,6 +376,7 @@ export function ObjektDetailPage() {
   function handleEinheitSubmit(values: {
     bezeichnung: string;
     groesse_qm: number | null;
+    eigentuemer_ids: string[];
     mieter_ids: string[];
   }) {
     if (einheitModal.mode === 'edit') {
@@ -350,6 +384,7 @@ export function ObjektDetailPage() {
         eId: einheitModal.einheit.id,
         bezeichnung: values.bezeichnung,
         groesse_qm: values.groesse_qm,
+        eigentuemer_ids: values.eigentuemer_ids,
         mieter_ids: values.mieter_ids,
       });
     } else if (einheitModal.mode === 'create') {
@@ -357,6 +392,7 @@ export function ObjektDetailPage() {
         swId: einheitModal.stockwerkId,
         bezeichnung: values.bezeichnung,
         groesse_qm: values.groesse_qm,
+        eigentuemer_ids: values.eigentuemer_ids,
         mieter_ids: values.mieter_ids,
       });
     }
@@ -488,11 +524,14 @@ export function ObjektDetailPage() {
                 bezeichnung: hausModal.haus.bezeichnung,
                 notiz: hausModal.haus.notiz,
                 adresse_id: hausModal.haus.adresse?.id ?? null,
+                eigentuemer_ids: hausModal.haus.eigentuemer.map((p) => p.id),
+                mieter_ids: hausModal.haus.mieter.map((p) => p.id),
               }
             : null
         }
         adressen={adressenQuery.data?.items ?? []}
         objektAdresseId={objektQuery.data?.adresse_id ?? null}
+        partner={allPartner}
         onClose={() => setHausModal({ mode: 'closed' })}
         onSubmit={handleHausSubmit}
         isPending={hausIsPending}
@@ -505,9 +544,14 @@ export function ObjektDetailPage() {
             ? {
                 bezeichnung: stockwerkModal.stockwerk.bezeichnung,
                 ausrichtung: stockwerkModal.stockwerk.ausrichtung,
+                eigentuemer_ids: stockwerkModal.stockwerk.eigentuemer.map(
+                  (p) => p.id,
+                ),
+                mieter_ids: stockwerkModal.stockwerk.mieter.map((p) => p.id),
               }
             : null
         }
+        partner={allPartner}
         onClose={() => setStockwerkModal({ mode: 'closed' })}
         onSubmit={handleStockwerkSubmit}
         isPending={stockwerkIsPending}
@@ -520,6 +564,7 @@ export function ObjektDetailPage() {
             ? {
                 bezeichnung: einheitModal.einheit.bezeichnung,
                 groesse_qm: einheitModal.einheit.groesse_qm,
+                eigentuemer_ids: einheitModal.einheit.eigentuemer.map((p) => p.id),
                 mieter_ids: einheitModal.einheit.mieter.map((m) => m.id),
               }
             : null
@@ -589,7 +634,7 @@ function HausNode({
 }: HausNodeProps) {
   return (
     <div className="group/haus rounded-md border border-zinc-800 bg-zinc-950/30">
-      <div className="flex items-center gap-2 px-2 py-2">
+      <div className="flex flex-wrap items-center gap-2 px-2 py-2">
         <button
           type="button"
           onClick={onToggle}
@@ -605,6 +650,10 @@ function HausNode({
             ({pluralStockwerke(haus.stockwerke.length)})
           </span>
         </button>
+        <PartnerBadges
+          eigentuemer={haus.eigentuemer}
+          mieter={haus.mieter}
+        />
         {/* Hover-only action icons */}
         <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/haus:opacity-100">
           <button
@@ -734,6 +783,10 @@ function StockwerkNode({
             ({pluralEinheiten(stockwerk.einheiten.length)})
           </span>
         </button>
+        <PartnerBadges
+          eigentuemer={stockwerk.eigentuemer}
+          mieter={stockwerk.mieter}
+        />
         <button
           type="button"
           onClick={setActive}
@@ -821,28 +874,10 @@ function EinheitNode({ einheit, onEdit, onRemove }: EinheitNodeProps) {
         {einheit.groesse_qm != null && (
           <span className="text-[10px] text-zinc-500">{einheit.groesse_qm} m²</span>
         )}
-        {einheit.mieter.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1">
-            {einheit.mieter.slice(0, 2).map((m) => (
-              <span
-                key={m.id}
-                title={`Mieter: ${m.name}`}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300"
-              >
-                <Users className="h-2.5 w-2.5" />
-                {m.name}
-              </span>
-            ))}
-            {einheit.mieter.length > 2 && (
-              <span
-                title={einheit.mieter.map((m) => m.name).join(', ')}
-                className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300"
-              >
-                +{einheit.mieter.length - 2}
-              </span>
-            )}
-          </div>
-        )}
+        <PartnerBadges
+          eigentuemer={einheit.eigentuemer}
+          mieter={einheit.mieter}
+        />
         {/* Hover-only action icons */}
         <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/e:opacity-100">
           <button
@@ -865,6 +900,62 @@ function EinheitNode({ einheit, onEdit, onRemove }: EinheitNodeProps) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Partner badges (Eigentümer + Mieter pills for tree nodes)
+// ============================================================================
+
+function PartnerBadges({
+  eigentuemer,
+  mieter,
+  max = 2,
+}: {
+  eigentuemer: PartnerMini[];
+  mieter: PartnerMini[];
+  max?: number;
+}) {
+  if (eigentuemer.length === 0 && mieter.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {eigentuemer.slice(0, max).map((p) => (
+        <span
+          key={`eig-${p.id}`}
+          title={`Eigentümer: ${p.name}`}
+          className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300"
+        >
+          <Crown className="h-2.5 w-2.5" />
+          {p.name}
+        </span>
+      ))}
+      {eigentuemer.length > max && (
+        <span
+          title={eigentuemer.map((p) => p.name).join(', ')}
+          className="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300"
+        >
+          +{eigentuemer.length - max}
+        </span>
+      )}
+      {mieter.slice(0, max).map((p) => (
+        <span
+          key={`mie-${p.id}`}
+          title={`Mieter: ${p.name}`}
+          className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300"
+        >
+          <Users className="h-2.5 w-2.5" />
+          {p.name}
+        </span>
+      ))}
+      {mieter.length > max && (
+        <span
+          title={mieter.map((p) => p.name).join(', ')}
+          className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300"
+        >
+          +{mieter.length - max}
+        </span>
+      )}
     </div>
   );
 }
