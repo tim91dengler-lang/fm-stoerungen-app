@@ -1,18 +1,9 @@
 import { useEffect, useState } from 'react';
 import { DoorOpen } from 'lucide-react';
-import { PartnerMultiSelect } from './PartnerMultiSelect';
-
-interface PartnerOption {
-  id: string;
-  name: string;
-  typen?: string[];
-}
 
 interface EinheitFormValues {
   bezeichnung: string;
   groesse_qm: number | null;
-  eigentuemer_ids: string[];
-  mieter_ids: string[];
 }
 
 interface EinheitModalProps {
@@ -21,11 +12,7 @@ interface EinheitModalProps {
   initial?: {
     bezeichnung: string;
     groesse_qm: number | null;
-    eigentuemer_ids: string[];
-    mieter_ids: string[];
   } | null;
-  /** All known partners — modal filters internally by typen. */
-  partner: PartnerOption[];
   onClose: () => void;
   onSubmit: (values: EinheitFormValues) => void;
   isPending?: boolean;
@@ -34,14 +21,11 @@ interface EinheitModalProps {
 const EMPTY: EinheitFormValues = {
   bezeichnung: '',
   groesse_qm: null,
-  eigentuemer_ids: [],
-  mieter_ids: [],
 };
 
 export function EinheitModal({
   open,
   initial,
-  partner,
   onClose,
   onSubmit,
   isPending = false,
@@ -55,8 +39,6 @@ export function EinheitModal({
       setForm({
         bezeichnung: initial.bezeichnung,
         groesse_qm: initial.groesse_qm,
-        eigentuemer_ids: [...initial.eigentuemer_ids],
-        mieter_ids: [...initial.mieter_ids],
       });
     } else {
       setForm(EMPTY);
@@ -77,8 +59,6 @@ export function EinheitModal({
     onSubmit({
       bezeichnung,
       groesse_qm: form.groesse_qm,
-      eigentuemer_ids: form.eigentuemer_ids,
-      mieter_ids: form.mieter_ids,
     });
   }
 
@@ -91,7 +71,7 @@ export function EinheitModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xl bg-zinc-900 p-6 shadow-xl"
+        className="w-full max-w-md rounded-xl bg-zinc-900 p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -112,7 +92,7 @@ export function EinheitModal({
           </button>
         </div>
 
-        <div className="flex flex-1 flex-col space-y-3 overflow-y-auto">
+        <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-zinc-300">
               Bezeichnung <span className="text-red-400">*</span>
@@ -150,27 +130,9 @@ export function EinheitModal({
             />
           </div>
 
-          <PartnerMultiSelect
-            partner={partner}
-            selected={form.eigentuemer_ids}
-            onChange={(ids) => setForm((f) => ({ ...f, eigentuemer_ids: ids }))}
-            typFilter="eigentuemer"
-            roleLabel="Eigentümer"
-            tone="violet"
-            searchPlaceholder="Eigentümer suchen …"
-            emptyHint="Keine Partner mit Typ „Eigentümer&ldquo; angelegt. Lege Eigentümer unter Stammdaten → Partner an."
-          />
-
-          <PartnerMultiSelect
-            partner={partner}
-            selected={form.mieter_ids}
-            onChange={(ids) => setForm((f) => ({ ...f, mieter_ids: ids }))}
-            typFilter="mieter"
-            roleLabel="Mieter"
-            tone="amber"
-            searchPlaceholder="Mieter suchen …"
-            emptyHint="Keine Partner mit Typ „Mieter&ldquo; angelegt. Lege Mieter unter Stammdaten → Partner an."
-          />
+          <p className="text-[10px] text-zinc-500">
+            Eigentümer und Mieter werden im Detail-Panel rechts gepflegt.
+          </p>
 
           {error && (
             <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">

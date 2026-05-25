@@ -8,33 +8,28 @@ import {
   Compass,
   Crown,
   DoorOpen,
+  FileText,
   Image as ImageIcon,
   Layers,
   Pencil,
   Plus,
   Trash2,
   Upload,
-  Users,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../api/client';
-import {
-  adresseApi,
-  objektApi,
-  objektstrukturApi,
-  partnerApi,
-} from '../api/endpoints';
+import { adresseApi, objektApi, objektstrukturApi } from '../api/endpoints';
 import type {
   Ausrichtung,
   HausRead,
   StockwerkRead,
   EinheitRead,
   PartnerMini,
-  PartnerRead,
 } from '../api/types';
 import { HausModal } from '../components/HausModal';
 import { StockwerkModal } from '../components/StockwerkModal';
 import { EinheitModal } from '../components/EinheitModal';
+import { PartnerSearchSelect } from '../components/PartnerSearchSelect';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 const AUSRICHTUNG_LABEL: Record<Ausrichtung, string> = {
@@ -44,7 +39,7 @@ const AUSRICHTUNG_LABEL: Record<Ausrichtung, string> = {
   west: '⬅ West',
 };
 
-// Pluralisation helpers — kept inline since this is the only place we need them
+// Pluralisation helpers
 function pluralStockwerke(n: number): string {
   return `${n} Stockwerk${n === 1 ? '' : 'e'}`;
 }
@@ -77,6 +72,12 @@ type ConfirmState =
       onConfirm: () => void;
     };
 
+type ActiveNode =
+  | { type: 'haus'; id: string }
+  | { type: 'stockwerk'; id: string }
+  | { type: 'einheit'; id: string }
+  | null;
+
 export function ObjektDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
@@ -94,14 +95,7 @@ export function ObjektDetailPage() {
     enabled: !!objektId,
   });
 
-  const partnerQuery = useQuery({
-    queryKey: ['partner-all'],
-    queryFn: () => partnerApi.list({ limit: 500 }),
-    staleTime: 60_000,
-  });
-
-  // Adressen für Haus-Adress-Picker (Tim R4): Häuser können eine eigene
-  // Adresse abweichend vom Objekt haben (z. B. großes Grundstück).
+  // Adressen für Haus-Adress-Picker
   const adressenQuery = useQuery({
     queryKey: ['adressen-for-haus'],
     queryFn: () => adresseApi.list({ limit: 500 }),
@@ -110,7 +104,7 @@ export function ObjektDetailPage() {
 
   const [openHaus, setOpenHaus] = useState<Record<string, boolean>>({});
   const [openStockwerk, setOpenStockwerk] = useState<Record<string, boolean>>({});
-  const [activeStockwerkId, setActiveStockwerkId] = useState<string | null>(null);
+  const [activeNode, setActiveNode] = useState<ActiveNode>(null);
 
   // Modal states
   const [hausModal, setHausModal] = useState<HausModalState>({ mode: 'closed' });
@@ -122,13 +116,16 @@ export function ObjektDetailPage() {
   });
   const [confirmState, setConfirmState] = useState<ConfirmState>({ mode: 'closed' });
 
-  // Default: open the first house
+  // Default: open first house, select it
   useEffect(() => {
     const houses = treeQuery.data ?? [];
     if (houses.length > 0 && Object.keys(openHaus).length === 0) {
       setOpenHaus({ [houses[0]!.id]: true });
+      if (!activeNode) {
+        setActiveNode({ type: 'haus', id: houses[0]!.id });
+      }
     }
-  }, [treeQuery.data, openHaus]);
+  }, [treeQuery.data, openHaus, activeNode]);
 
   // ---- Mutations ---------------------------------------------------------
   const invalidateTree = () =>
@@ -139,19 +136,16 @@ export function ObjektDetailPage() {
       bezeichnung: string;
       notiz: string;
       adresse_id: string | null;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
     }) =>
       objektstrukturApi.createHaus(objektId, {
         bezeichnung: payload.bezeichnung,
         notiz: payload.notiz || null,
         adresse_id: payload.adresse_id,
-        eigentuemer_ids: payload.eigentuemer_ids,
-        mieter_ids: payload.mieter_ids,
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       invalidateTree();
       setHausModal({ mode: 'closed' });
+      setActiveNode({ type: 'haus', id: created.id });
     },
   });
   const updateHaus = useMutation({
@@ -160,22 +154,16 @@ export function ObjektDetailPage() {
       bezeichnung,
       notiz,
       adresse_id,
-      eigentuemer_ids,
-      mieter_ids,
     }: {
       hausId: string;
       bezeichnung: string;
       notiz: string;
       adresse_id: string | null;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
     }) =>
       objektstrukturApi.updateHaus(hausId, {
         bezeichnung,
         notiz: notiz || null,
         adresse_id,
-        eigentuemer_ids,
-        mieter_ids,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -184,9 +172,12 @@ export function ObjektDetailPage() {
   });
   const removeHaus = useMutation({
     mutationFn: (hausId: string) => objektstrukturApi.removeHaus(hausId),
-    onSuccess: () => {
+    onSuccess: (_data, hausId) => {
       invalidateTree();
       setConfirmState({ mode: 'closed' });
+      if (activeNode?.type === 'haus' && activeNode.id === hausId) {
+        setActiveNode(null);
+      }
     },
   });
 
@@ -195,18 +186,15 @@ export function ObjektDetailPage() {
       hausId: string;
       bezeichnung: string;
       ausrichtung: Ausrichtung | null;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
     }) =>
       objektstrukturApi.createStockwerk(vars.hausId, {
         bezeichnung: vars.bezeichnung,
         ausrichtung: vars.ausrichtung,
-        eigentuemer_ids: vars.eigentuemer_ids,
-        mieter_ids: vars.mieter_ids,
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       invalidateTree();
       setStockwerkModal({ mode: 'closed' });
+      setActiveNode({ type: 'stockwerk', id: created.id });
     },
   });
   const updateStockwerk = useMutation({
@@ -214,14 +202,10 @@ export function ObjektDetailPage() {
       swId: string;
       bezeichnung: string;
       ausrichtung: Ausrichtung | null;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
     }) =>
       objektstrukturApi.updateStockwerk(vars.swId, {
         bezeichnung: vars.bezeichnung,
         ausrichtung: vars.ausrichtung,
-        eigentuemer_ids: vars.eigentuemer_ids,
-        mieter_ids: vars.mieter_ids,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -230,9 +214,12 @@ export function ObjektDetailPage() {
   });
   const removeStockwerk = useMutation({
     mutationFn: (swId: string) => objektstrukturApi.removeStockwerk(swId),
-    onSuccess: () => {
+    onSuccess: (_data, swId) => {
       invalidateTree();
       setConfirmState({ mode: 'closed' });
+      if (activeNode?.type === 'stockwerk' && activeNode.id === swId) {
+        setActiveNode(null);
+      }
     },
   });
 
@@ -241,18 +228,15 @@ export function ObjektDetailPage() {
       swId: string;
       bezeichnung: string;
       groesse_qm: number | null;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
     }) =>
       objektstrukturApi.createEinheit(vars.swId, {
         bezeichnung: vars.bezeichnung,
         groesse_qm: vars.groesse_qm,
-        eigentuemer_ids: vars.eigentuemer_ids,
-        mieter_ids: vars.mieter_ids,
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       invalidateTree();
       setEinheitModal({ mode: 'closed' });
+      setActiveNode({ type: 'einheit', id: created.id });
     },
   });
   const updateEinheit = useMutation({
@@ -260,14 +244,10 @@ export function ObjektDetailPage() {
       eId: string;
       bezeichnung: string;
       groesse_qm: number | null;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
     }) =>
       objektstrukturApi.updateEinheit(vars.eId, {
         bezeichnung: vars.bezeichnung,
         groesse_qm: vars.groesse_qm,
-        eigentuemer_ids: vars.eigentuemer_ids,
-        mieter_ids: vars.mieter_ids,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -276,20 +256,16 @@ export function ObjektDetailPage() {
   });
   const removeEinheit = useMutation({
     mutationFn: (eId: string) => objektstrukturApi.removeEinheit(eId),
-    onSuccess: () => {
+    onSuccess: (_data, eId) => {
       invalidateTree();
       setConfirmState({ mode: 'closed' });
+      if (activeNode?.type === 'einheit' && activeNode.id === eId) {
+        setActiveNode(null);
+      }
     },
   });
 
-  const allPartner = partnerQuery.data?.items ?? [];
-
-  const stockwerke = (treeQuery.data ?? []).flatMap((h) => h.stockwerke);
-  const activeStockwerk = activeStockwerkId
-    ? stockwerke.find((s) => s.id === activeStockwerkId) ?? null
-    : null;
-
-  // Eigentümer aus partner_links extrahieren (Rolle === 'eigentuemer')
+  // Eigentümer auf Objekt-Ebene (aus partner_links extrahiert)
   const eigentuemer = useMemo(
     () =>
       (objektQuery.data?.partner_links ?? []).filter(
@@ -298,7 +274,31 @@ export function ObjektDetailPage() {
     [objektQuery.data],
   );
 
-  if (!objektId) return <div className="p-6 text-sm text-zinc-500">Kein Objekt ausgewählt.</div>;
+  // Resolve active node to the underlying entity
+  const activeEntity = useMemo(() => {
+    if (!activeNode || !treeQuery.data) return null;
+    for (const h of treeQuery.data) {
+      if (activeNode.type === 'haus' && h.id === activeNode.id)
+        return { type: 'haus' as const, haus: h };
+      for (const s of h.stockwerke) {
+        if (activeNode.type === 'stockwerk' && s.id === activeNode.id)
+          return { type: 'stockwerk' as const, stockwerk: s, haus: h };
+        for (const e of s.einheiten) {
+          if (activeNode.type === 'einheit' && e.id === activeNode.id)
+            return {
+              type: 'einheit' as const,
+              einheit: e,
+              stockwerk: s,
+              haus: h,
+            };
+        }
+      }
+    }
+    return null;
+  }, [activeNode, treeQuery.data]);
+
+  if (!objektId)
+    return <div className="p-6 text-sm text-zinc-500">Kein Objekt ausgewählt.</div>;
 
   // ---- Confirm-Dialog helpers --------------------------------------------
   function askConfirmRemoveHaus(haus: HausRead) {
@@ -331,8 +331,6 @@ export function ObjektDetailPage() {
     bezeichnung: string;
     notiz: string;
     adresse_id: string | null;
-    eigentuemer_ids: string[];
-    mieter_ids: string[];
   }) {
     if (hausModal.mode === 'edit') {
       updateHaus.mutate({
@@ -340,8 +338,6 @@ export function ObjektDetailPage() {
         bezeichnung: values.bezeichnung,
         notiz: values.notiz,
         adresse_id: values.adresse_id,
-        eigentuemer_ids: values.eigentuemer_ids,
-        mieter_ids: values.mieter_ids,
       });
     } else if (hausModal.mode === 'create') {
       createHaus.mutate(values);
@@ -351,24 +347,18 @@ export function ObjektDetailPage() {
   function handleStockwerkSubmit(values: {
     bezeichnung: string;
     ausrichtung: Ausrichtung | null;
-    eigentuemer_ids: string[];
-    mieter_ids: string[];
   }) {
     if (stockwerkModal.mode === 'edit') {
       updateStockwerk.mutate({
         swId: stockwerkModal.stockwerk.id,
         bezeichnung: values.bezeichnung,
         ausrichtung: values.ausrichtung,
-        eigentuemer_ids: values.eigentuemer_ids,
-        mieter_ids: values.mieter_ids,
       });
     } else if (stockwerkModal.mode === 'create') {
       createStockwerk.mutate({
         hausId: stockwerkModal.hausId,
         bezeichnung: values.bezeichnung,
         ausrichtung: values.ausrichtung,
-        eigentuemer_ids: values.eigentuemer_ids,
-        mieter_ids: values.mieter_ids,
       });
     }
   }
@@ -376,24 +366,18 @@ export function ObjektDetailPage() {
   function handleEinheitSubmit(values: {
     bezeichnung: string;
     groesse_qm: number | null;
-    eigentuemer_ids: string[];
-    mieter_ids: string[];
   }) {
     if (einheitModal.mode === 'edit') {
       updateEinheit.mutate({
         eId: einheitModal.einheit.id,
         bezeichnung: values.bezeichnung,
         groesse_qm: values.groesse_qm,
-        eigentuemer_ids: values.eigentuemer_ids,
-        mieter_ids: values.mieter_ids,
       });
     } else if (einheitModal.mode === 'create') {
       createEinheit.mutate({
         swId: einheitModal.stockwerkId,
         bezeichnung: values.bezeichnung,
         groesse_qm: values.groesse_qm,
-        eigentuemer_ids: values.eigentuemer_ids,
-        mieter_ids: values.mieter_ids,
       });
     }
   }
@@ -427,7 +411,7 @@ export function ObjektDetailPage() {
           {eigentuemer.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-zinc-500">
-                <Crown className="h-3 w-3" /> Eigentümer
+                <Crown className="h-3 w-3" /> Eigentümer (Objekt)
               </span>
               {eigentuemer.map((p) => (
                 <span
@@ -450,8 +434,8 @@ export function ObjektDetailPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Tree (left) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        {/* Tree (left) — pure structure, no badges */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
           {treeQuery.isLoading && (
             <div className="py-8 text-center text-sm text-zinc-500">Lade Struktur …</div>
@@ -476,39 +460,75 @@ export function ObjektDetailPage() {
                 haus={h}
                 open={!!openHaus[h.id]}
                 onToggle={() => setOpenHaus((s) => ({ ...s, [h.id]: !s[h.id] }))}
+                isActive={
+                  activeNode?.type === 'haus' && activeNode.id === h.id
+                }
+                setActive={() => setActiveNode({ type: 'haus', id: h.id })}
+                activeNode={activeNode}
+                setActiveNode={setActiveNode}
                 openStockwerk={openStockwerk}
                 setOpenStockwerk={setOpenStockwerk}
-                activeStockwerkId={activeStockwerkId}
-                setActiveStockwerkId={setActiveStockwerkId}
-                onEditHaus={() => setHausModal({ mode: 'edit', haus: h })}
-                onRemoveHaus={() => askConfirmRemoveHaus(h)}
                 onAddStockwerk={() =>
                   setStockwerkModal({ mode: 'create', hausId: h.id })
                 }
-                onEditStockwerk={(sw) =>
-                  setStockwerkModal({ mode: 'edit', stockwerk: sw })
-                }
-                onRemoveStockwerk={askConfirmRemoveStockwerk}
                 onAddEinheit={(swId) =>
                   setEinheitModal({ mode: 'create', stockwerkId: swId })
                 }
-                onEditEinheit={(e) => setEinheitModal({ mode: 'edit', einheit: e })}
-                onRemoveEinheit={askConfirmRemoveEinheit}
-                allPartner={allPartner}
               />
             ))}
           </div>
         </div>
 
-        {/* Grundriss panel (right) */}
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-          {activeStockwerk ? (
-            <GrundrissPanel stockwerk={activeStockwerk} objektId={objektId} />
+        {/* Detail panel (right) — sections */}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+          {activeEntity ? (
+            <DetailPanel
+              entity={activeEntity}
+              objektId={objektId}
+              adressen={adressenQuery.data?.items ?? []}
+              objektAdresseId={objektQuery.data?.adresse_id ?? null}
+              onEditHaus={() =>
+                activeEntity.type === 'haus'
+                  ? setHausModal({ mode: 'edit', haus: activeEntity.haus })
+                  : null
+              }
+              onEditStockwerk={() =>
+                activeEntity.type === 'stockwerk'
+                  ? setStockwerkModal({
+                      mode: 'edit',
+                      stockwerk: activeEntity.stockwerk,
+                    })
+                  : null
+              }
+              onEditEinheit={() =>
+                activeEntity.type === 'einheit'
+                  ? setEinheitModal({
+                      mode: 'edit',
+                      einheit: activeEntity.einheit,
+                    })
+                  : null
+              }
+              onRemoveHaus={() =>
+                activeEntity.type === 'haus'
+                  ? askConfirmRemoveHaus(activeEntity.haus)
+                  : null
+              }
+              onRemoveStockwerk={() =>
+                activeEntity.type === 'stockwerk'
+                  ? askConfirmRemoveStockwerk(activeEntity.stockwerk)
+                  : null
+              }
+              onRemoveEinheit={() =>
+                activeEntity.type === 'einheit'
+                  ? askConfirmRemoveEinheit(activeEntity.einheit)
+                  : null
+              }
+            />
           ) : (
             <div className="flex h-64 items-center justify-center text-sm text-zinc-500">
               <div className="text-center">
                 <Layers className="mx-auto mb-2 h-8 w-8 text-zinc-700" />
-                Wähle ein Stockwerk links für Grundriss-Vorschau und Upload.
+                Wähle links ein Haus, Stockwerk oder eine Einheit aus.
               </div>
             </div>
           )}
@@ -524,14 +544,11 @@ export function ObjektDetailPage() {
                 bezeichnung: hausModal.haus.bezeichnung,
                 notiz: hausModal.haus.notiz,
                 adresse_id: hausModal.haus.adresse?.id ?? null,
-                eigentuemer_ids: hausModal.haus.eigentuemer.map((p) => p.id),
-                mieter_ids: hausModal.haus.mieter.map((p) => p.id),
               }
             : null
         }
         adressen={adressenQuery.data?.items ?? []}
         objektAdresseId={objektQuery.data?.adresse_id ?? null}
-        partner={allPartner}
         onClose={() => setHausModal({ mode: 'closed' })}
         onSubmit={handleHausSubmit}
         isPending={hausIsPending}
@@ -544,14 +561,9 @@ export function ObjektDetailPage() {
             ? {
                 bezeichnung: stockwerkModal.stockwerk.bezeichnung,
                 ausrichtung: stockwerkModal.stockwerk.ausrichtung,
-                eigentuemer_ids: stockwerkModal.stockwerk.eigentuemer.map(
-                  (p) => p.id,
-                ),
-                mieter_ids: stockwerkModal.stockwerk.mieter.map((p) => p.id),
               }
             : null
         }
-        partner={allPartner}
         onClose={() => setStockwerkModal({ mode: 'closed' })}
         onSubmit={handleStockwerkSubmit}
         isPending={stockwerkIsPending}
@@ -564,12 +576,9 @@ export function ObjektDetailPage() {
             ? {
                 bezeichnung: einheitModal.einheit.bezeichnung,
                 groesse_qm: einheitModal.einheit.groesse_qm,
-                eigentuemer_ids: einheitModal.einheit.eigentuemer.map((p) => p.id),
-                mieter_ids: einheitModal.einheit.mieter.map((m) => m.id),
               }
             : null
         }
-        partner={allPartner}
         onClose={() => setEinheitModal({ mode: 'closed' })}
         onSubmit={handleEinheitSubmit}
         isPending={einheitIsPending}
@@ -592,98 +601,81 @@ export function ObjektDetailPage() {
 }
 
 // ============================================================================
-// Tree nodes
+// Tree (pure structure, no badges, no inline actions — selection only)
 // ============================================================================
 
 interface HausNodeProps {
   haus: HausRead;
   open: boolean;
   onToggle: () => void;
+  isActive: boolean;
+  setActive: () => void;
+  activeNode: ActiveNode;
+  setActiveNode: (n: ActiveNode) => void;
   openStockwerk: Record<string, boolean>;
   setOpenStockwerk: (fn: (s: Record<string, boolean>) => Record<string, boolean>) => void;
-  activeStockwerkId: string | null;
-  setActiveStockwerkId: (id: string | null) => void;
-  onEditHaus: () => void;
-  onRemoveHaus: () => void;
   onAddStockwerk: () => void;
-  onEditStockwerk: (sw: StockwerkRead) => void;
-  onRemoveStockwerk: (sw: StockwerkRead) => void;
   onAddEinheit: (swId: string) => void;
-  onEditEinheit: (e: EinheitRead) => void;
-  onRemoveEinheit: (e: EinheitRead) => void;
-  allPartner: PartnerRead[];
 }
 
 function HausNode({
   haus,
   open,
   onToggle,
+  isActive,
+  setActive,
+  activeNode,
+  setActiveNode,
   openStockwerk,
   setOpenStockwerk,
-  activeStockwerkId,
-  setActiveStockwerkId,
-  onEditHaus,
-  onRemoveHaus,
   onAddStockwerk,
-  onEditStockwerk,
-  onRemoveStockwerk,
   onAddEinheit,
-  onEditEinheit,
-  onRemoveEinheit,
-  allPartner,
 }: HausNodeProps) {
   return (
-    <div className="group/haus rounded-md border border-zinc-800 bg-zinc-950/30">
-      <div className="flex flex-wrap items-center gap-2 px-2 py-2">
+    <div
+      className={clsx(
+        'group/haus rounded-md border bg-zinc-950/30',
+        isActive ? 'border-emerald-500/50' : 'border-zinc-800',
+      )}
+    >
+      <div
+        className={clsx(
+          'flex items-center gap-2 px-2 py-2',
+          isActive && 'bg-emerald-500/5',
+        )}
+      >
         <button
           type="button"
           onClick={onToggle}
-          className="flex flex-1 items-center gap-2 text-left text-sm font-medium text-zinc-100"
+          className="rounded-md p-0.5 text-zinc-400 hover:bg-zinc-800"
+          aria-label={open ? 'Zuklappen' : 'Aufklappen'}
         >
           {open ? (
             <ChevronDown className="h-3.5 w-3.5" />
           ) : (
             <ChevronRight className="h-3.5 w-3.5" />
           )}
-          <Building2 className="h-4 w-4 text-emerald-400" /> {haus.bezeichnung}
+        </button>
+        <button
+          type="button"
+          onClick={setActive}
+          className="flex flex-1 items-center gap-2 text-left text-sm font-medium text-zinc-100"
+        >
+          <Building2 className="h-4 w-4 text-emerald-400" />
+          {haus.bezeichnung}
           <span className="text-[10px] text-zinc-500">
             ({pluralStockwerke(haus.stockwerke.length)})
           </span>
         </button>
-        <PartnerBadges
-          eigentuemer={haus.eigentuemer}
-          mieter={haus.mieter}
-        />
-        {/* Hover-only action icons */}
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/haus:opacity-100">
-          <button
-            type="button"
-            onClick={onAddStockwerk}
-            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            title="Stockwerk hinzufügen"
-            aria-label="Stockwerk hinzufügen"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onEditHaus}
-            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            title="Haus bearbeiten"
-            aria-label="Haus bearbeiten"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onRemoveHaus}
-            className="rounded-md p-1 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-            title="Haus löschen"
-            aria-label="Haus löschen"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onAddStockwerk}
+          className="rounded-md p-1 text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-zinc-200 group-hover/haus:opacity-100"
+          title="Stockwerk hinzufügen"
+          aria-label="Stockwerk hinzufügen"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
       </div>
       {open && (
         <div className="space-y-1 px-2 pb-2 pl-6">
@@ -707,14 +699,15 @@ function HausNode({
                 onToggle={() =>
                   setOpenStockwerk((st) => ({ ...st, [s.id]: !st[s.id] }))
                 }
-                isActive={activeStockwerkId === s.id}
-                setActive={() => setActiveStockwerkId(s.id)}
-                onEdit={() => onEditStockwerk(s)}
-                onRemove={() => onRemoveStockwerk(s)}
+                isActive={
+                  activeNode?.type === 'stockwerk' && activeNode.id === s.id
+                }
+                setActive={() =>
+                  setActiveNode({ type: 'stockwerk', id: s.id })
+                }
+                activeNode={activeNode}
+                setActiveNode={setActiveNode}
                 onAddEinheit={() => onAddEinheit(s.id)}
-                onEditEinheit={onEditEinheit}
-                onRemoveEinheit={onRemoveEinheit}
-                allPartner={allPartner}
               />
             ))
           )}
@@ -730,12 +723,9 @@ interface StockwerkNodeProps {
   onToggle: () => void;
   isActive: boolean;
   setActive: () => void;
-  onEdit: () => void;
-  onRemove: () => void;
+  activeNode: ActiveNode;
+  setActiveNode: (n: ActiveNode) => void;
   onAddEinheit: () => void;
-  onEditEinheit: (e: EinheitRead) => void;
-  onRemoveEinheit: (e: EinheitRead) => void;
-  allPartner: PartnerRead[];
 }
 
 function StockwerkNode({
@@ -744,91 +734,66 @@ function StockwerkNode({
   onToggle,
   isActive,
   setActive,
-  onEdit,
-  onRemove,
+  activeNode,
+  setActiveNode,
   onAddEinheit,
-  onEditEinheit,
-  onRemoveEinheit,
 }: StockwerkNodeProps) {
   return (
     <div
       className={clsx(
         'group/sw rounded-md border bg-zinc-950/30',
-        isActive ? 'border-emerald-500/40' : 'border-zinc-800',
+        isActive ? 'border-emerald-500/50' : 'border-zinc-800',
       )}
     >
-      <div className="flex items-center gap-2 px-2 py-1.5">
+      <div
+        className={clsx(
+          'flex items-center gap-2 px-2 py-1.5',
+          isActive && 'bg-emerald-500/5',
+        )}
+      >
         <button
           type="button"
           onClick={onToggle}
-          className="flex flex-1 items-center gap-2 text-left text-sm text-zinc-200"
+          className="rounded-md p-0.5 text-zinc-400 hover:bg-zinc-800"
+          aria-label={open ? 'Zuklappen' : 'Aufklappen'}
         >
           {open ? (
             <ChevronDown className="h-3 w-3" />
           ) : (
             <ChevronRight className="h-3 w-3" />
           )}
-          <Layers className="h-3.5 w-3.5 text-sky-400" /> {stockwerk.bezeichnung}
+        </button>
+        <button
+          type="button"
+          onClick={setActive}
+          className="flex flex-1 items-center gap-2 text-left text-sm text-zinc-200"
+        >
+          <Layers className="h-3.5 w-3.5 text-sky-400" />
+          {stockwerk.bezeichnung}
           {stockwerk.ausrichtung && (
             <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              <Compass className="h-2.5 w-2.5" /> {AUSRICHTUNG_LABEL[stockwerk.ausrichtung]}
+              <Compass className="h-2.5 w-2.5" />{' '}
+              {AUSRICHTUNG_LABEL[stockwerk.ausrichtung]}
             </span>
           )}
           {stockwerk.has_grundriss && (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-300">
-              <ImageIcon className="h-2.5 w-2.5" /> Grundriss
+              <ImageIcon className="h-2.5 w-2.5" />
             </span>
           )}
           <span className="text-[10px] text-zinc-500">
             ({pluralEinheiten(stockwerk.einheiten.length)})
           </span>
         </button>
-        <PartnerBadges
-          eigentuemer={stockwerk.eigentuemer}
-          mieter={stockwerk.mieter}
-        />
         <button
           type="button"
-          onClick={setActive}
-          className={clsx(
-            'rounded-md p-1 hover:bg-zinc-800',
-            isActive ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200',
-          )}
-          title="Grundriss anzeigen"
-          aria-label="Grundriss anzeigen"
+          onClick={onAddEinheit}
+          className="rounded-md p-1 text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-zinc-200 group-hover/sw:opacity-100"
+          title="Einheit hinzufügen"
+          aria-label="Einheit hinzufügen"
         >
-          <ImageIcon className="h-3.5 w-3.5" />
+          <Plus className="h-3 w-3" />
         </button>
-        {/* Hover-only action icons */}
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/sw:opacity-100">
-          <button
-            type="button"
-            onClick={onAddEinheit}
-            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            title="Einheit hinzufügen"
-            aria-label="Einheit hinzufügen"
-          >
-            <Plus className="h-3 w-3" />
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            title="Stockwerk bearbeiten"
-            aria-label="Stockwerk bearbeiten"
-          >
-            <Pencil className="h-3 w-3" />
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded-md p-1 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-            title="Stockwerk löschen"
-            aria-label="Stockwerk löschen"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
-        </div>
       </div>
       {open && (
         <div className="space-y-1 px-2 pb-2 pl-6">
@@ -848,8 +813,12 @@ function StockwerkNode({
               <EinheitNode
                 key={e.id}
                 einheit={e}
-                onEdit={() => onEditEinheit(e)}
-                onRemove={() => onRemoveEinheit(e)}
+                isActive={
+                  activeNode?.type === 'einheit' && activeNode.id === e.id
+                }
+                setActive={() =>
+                  setActiveNode({ type: 'einheit', id: e.id })
+                }
               />
             ))
           )}
@@ -861,107 +830,304 @@ function StockwerkNode({
 
 interface EinheitNodeProps {
   einheit: EinheitRead;
-  onEdit: () => void;
-  onRemove: () => void;
+  isActive: boolean;
+  setActive: () => void;
 }
 
-function EinheitNode({ einheit, onEdit, onRemove }: EinheitNodeProps) {
+function EinheitNode({ einheit, isActive, setActive }: EinheitNodeProps) {
   return (
-    <div className="group/e rounded-md border border-zinc-800 bg-zinc-950/20">
-      <div className="flex items-center gap-2 px-2 py-1.5">
-        <DoorOpen className="h-3.5 w-3.5 text-amber-400" />
-        <span className="flex-1 text-sm text-zinc-200">{einheit.bezeichnung}</span>
-        {einheit.groesse_qm != null && (
-          <span className="text-[10px] text-zinc-500">{einheit.groesse_qm} m²</span>
-        )}
-        <PartnerBadges
-          eigentuemer={einheit.eigentuemer}
-          mieter={einheit.mieter}
-        />
-        {/* Hover-only action icons */}
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/e:opacity-100">
+    <button
+      type="button"
+      onClick={setActive}
+      className={clsx(
+        'flex w-full items-center gap-2 rounded-md border bg-zinc-950/20 px-2 py-1.5 text-left',
+        isActive ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-zinc-800',
+      )}
+    >
+      <DoorOpen className="h-3.5 w-3.5 text-amber-400" />
+      <span className="flex-1 text-sm text-zinc-200">{einheit.bezeichnung}</span>
+      {einheit.groesse_qm != null && (
+        <span className="text-[10px] text-zinc-500">{einheit.groesse_qm} m²</span>
+      )}
+    </button>
+  );
+}
+
+// ============================================================================
+// Detail panel (sections for active node)
+// ============================================================================
+
+type ActiveEntity =
+  | { type: 'haus'; haus: HausRead }
+  | { type: 'stockwerk'; stockwerk: StockwerkRead; haus: HausRead }
+  | {
+      type: 'einheit';
+      einheit: EinheitRead;
+      stockwerk: StockwerkRead;
+      haus: HausRead;
+    };
+
+interface DetailPanelProps {
+  entity: ActiveEntity;
+  objektId: string;
+  adressen: import('../api/types').AdresseRead[];
+  objektAdresseId: string | null;
+  onEditHaus: () => void;
+  onEditStockwerk: () => void;
+  onEditEinheit: () => void;
+  onRemoveHaus: () => void;
+  onRemoveStockwerk: () => void;
+  onRemoveEinheit: () => void;
+}
+
+function DetailPanel({
+  entity,
+  objektId,
+  onEditHaus,
+  onEditStockwerk,
+  onEditEinheit,
+  onRemoveHaus,
+  onRemoveStockwerk,
+  onRemoveEinheit,
+}: DetailPanelProps) {
+  const qc = useQueryClient();
+  const invalidateTree = () =>
+    qc.invalidateQueries({ queryKey: ['objekt-tree', objektId] });
+
+  // ---- mutations for partner relations (inline edit) ---------------------
+  const updateHausPartner = useMutation({
+    mutationFn: (vars: {
+      hausId: string;
+      eigentuemer_ids: string[];
+      mieter_ids: string[];
+    }) =>
+      objektstrukturApi.updateHaus(vars.hausId, {
+        eigentuemer_ids: vars.eigentuemer_ids,
+        mieter_ids: vars.mieter_ids,
+      }),
+    onSuccess: invalidateTree,
+  });
+  const updateStockwerkPartner = useMutation({
+    mutationFn: (vars: {
+      swId: string;
+      eigentuemer_ids: string[];
+      mieter_ids: string[];
+    }) =>
+      objektstrukturApi.updateStockwerk(vars.swId, {
+        eigentuemer_ids: vars.eigentuemer_ids,
+        mieter_ids: vars.mieter_ids,
+      }),
+    onSuccess: invalidateTree,
+  });
+  const updateEinheitPartner = useMutation({
+    mutationFn: (vars: {
+      eId: string;
+      eigentuemer_ids: string[];
+      mieter_ids: string[];
+    }) =>
+      objektstrukturApi.updateEinheit(vars.eId, {
+        eigentuemer_ids: vars.eigentuemer_ids,
+        mieter_ids: vars.mieter_ids,
+      }),
+    onSuccess: invalidateTree,
+  });
+
+  // Determine props depending on entity type
+  let title: string;
+  let subtitle: string;
+  let icon: typeof Building2;
+  let iconColor: string;
+  let onEdit: () => void;
+  let onRemove: () => void;
+  let eigentuemer: PartnerMini[];
+  let mieter: PartnerMini[];
+  let savePartners: (eig: PartnerMini[], mie: PartnerMini[]) => void;
+  let grunddaten: Array<{ label: string; value: string | null | undefined }>;
+  let showGrundriss = false;
+  let stockwerkForGrundriss: StockwerkRead | null = null;
+
+  if (entity.type === 'haus') {
+    const h = entity.haus;
+    title = h.bezeichnung;
+    subtitle = 'Haus';
+    icon = Building2;
+    iconColor = 'text-emerald-400';
+    onEdit = onEditHaus;
+    onRemove = onRemoveHaus;
+    eigentuemer = h.eigentuemer;
+    mieter = h.mieter;
+    savePartners = (eig, mie) =>
+      updateHausPartner.mutate({
+        hausId: h.id,
+        eigentuemer_ids: eig.map((p) => p.id),
+        mieter_ids: mie.map((p) => p.id),
+      });
+    const adresse = h.adresse
+      ? `${h.adresse.strasse}${h.adresse.hausnummer ? ' ' + h.adresse.hausnummer : ''}, ${h.adresse.plz} ${h.adresse.ort}`
+      : '— (verwendet Objekt-Adresse)';
+    grunddaten = [
+      { label: 'Adresse', value: adresse },
+      { label: 'Notiz', value: h.notiz },
+    ];
+  } else if (entity.type === 'stockwerk') {
+    const s = entity.stockwerk;
+    title = s.bezeichnung;
+    subtitle = `Stockwerk · ${entity.haus.bezeichnung}`;
+    icon = Layers;
+    iconColor = 'text-sky-400';
+    onEdit = onEditStockwerk;
+    onRemove = onRemoveStockwerk;
+    eigentuemer = s.eigentuemer;
+    mieter = s.mieter;
+    savePartners = (eig, mie) =>
+      updateStockwerkPartner.mutate({
+        swId: s.id,
+        eigentuemer_ids: eig.map((p) => p.id),
+        mieter_ids: mie.map((p) => p.id),
+      });
+    grunddaten = [
+      {
+        label: 'Ausrichtung',
+        value: s.ausrichtung ? AUSRICHTUNG_LABEL[s.ausrichtung] : null,
+      },
+      { label: 'Einheiten', value: pluralEinheiten(s.einheiten.length) },
+    ];
+    showGrundriss = true;
+    stockwerkForGrundriss = s;
+  } else {
+    const e = entity.einheit;
+    title = e.bezeichnung;
+    subtitle = `Einheit · ${entity.haus.bezeichnung} → ${entity.stockwerk.bezeichnung}`;
+    icon = DoorOpen;
+    iconColor = 'text-amber-400';
+    onEdit = onEditEinheit;
+    onRemove = onRemoveEinheit;
+    eigentuemer = e.eigentuemer;
+    mieter = e.mieter;
+    savePartners = (eig, mie) =>
+      updateEinheitPartner.mutate({
+        eId: e.id,
+        eigentuemer_ids: eig.map((p) => p.id),
+        mieter_ids: mie.map((p) => p.id),
+      });
+    grunddaten = [
+      {
+        label: 'Größe',
+        value: e.groesse_qm != null ? `${e.groesse_qm} m²` : null,
+      },
+    ];
+  }
+
+  const Icon = icon;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-zinc-500">
+            {subtitle}
+          </p>
+          <h2 className="mt-0.5 flex items-center gap-2 text-lg font-semibold text-zinc-100">
+            <Icon className={clsx('h-5 w-5', iconColor)} />
+            {title}
+          </h2>
+        </div>
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={onEdit}
-            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            title="Einheit bearbeiten"
-            aria-label="Einheit bearbeiten"
+            className="inline-flex items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
           >
-            <Pencil className="h-3 w-3" />
+            <Pencil className="h-3 w-3" /> Bearbeiten
           </button>
           <button
             type="button"
             onClick={onRemove}
-            className="rounded-md p-1 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-            title="Einheit löschen"
-            aria-label="Einheit löschen"
+            className="inline-flex items-center gap-1 rounded-md border border-red-500/30 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10"
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3 w-3" /> Löschen
           </button>
         </div>
       </div>
+
+      {/* Grunddaten */}
+      <DetailSection title="Grunddaten">
+        <dl className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+          {grunddaten.map((row) => (
+            <div key={row.label} className="flex flex-col">
+              <dt className="text-[10px] uppercase tracking-wider text-zinc-500">
+                {row.label}
+              </dt>
+              <dd className="text-zinc-200">
+                {row.value || (
+                  <span className="text-zinc-600">— nicht gesetzt —</span>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </DetailSection>
+
+      {/* Eigentümer */}
+      <DetailSection title="Eigentümer">
+        <PartnerSearchSelect
+          selected={eigentuemer}
+          onChange={(next) => savePartners(next, mieter)}
+          roleLabel="Eigentümer"
+          tone="violet"
+          searchPlaceholder="Eigentümer suchen … (alle Partner)"
+        />
+      </DetailSection>
+
+      {/* Mieter */}
+      <DetailSection title="Mieter">
+        <PartnerSearchSelect
+          selected={mieter}
+          onChange={(next) => savePartners(eigentuemer, next)}
+          roleLabel="Mieter"
+          tone="amber"
+          searchPlaceholder="Mieter suchen … (alle Partner)"
+        />
+      </DetailSection>
+
+      {/* Grundriss (nur Stockwerk) */}
+      {showGrundriss && stockwerkForGrundriss && (
+        <DetailSection title="Grundriss">
+          <GrundrissPanel stockwerk={stockwerkForGrundriss} objektId={objektId} />
+        </DetailSection>
+      )}
+
+      {/* Dokumente — Placeholder */}
+      <DetailSection title="Dokumente" icon={FileText}>
+        <p className="text-xs text-zinc-500">
+          Verknüpfte Dokumente folgen — heute sind Dokumente nur an
+          Objekt-Ebene anhängbar, nicht an Haus / Stockwerk / Einheit.
+        </p>
+      </DetailSection>
     </div>
   );
 }
 
-// ============================================================================
-// Partner badges (Eigentümer + Mieter pills for tree nodes)
-// ============================================================================
+interface DetailSectionProps {
+  title: string;
+  icon?: typeof FileText;
+  children: React.ReactNode;
+}
 
-function PartnerBadges({
-  eigentuemer,
-  mieter,
-  max = 2,
-}: {
-  eigentuemer: PartnerMini[];
-  mieter: PartnerMini[];
-  max?: number;
-}) {
-  if (eigentuemer.length === 0 && mieter.length === 0) return null;
+function DetailSection({ title, icon: Icon, children }: DetailSectionProps) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      {eigentuemer.slice(0, max).map((p) => (
-        <span
-          key={`eig-${p.id}`}
-          title={`Eigentümer: ${p.name}`}
-          className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300"
-        >
-          <Crown className="h-2.5 w-2.5" />
-          {p.name}
-        </span>
-      ))}
-      {eigentuemer.length > max && (
-        <span
-          title={eigentuemer.map((p) => p.name).join(', ')}
-          className="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300"
-        >
-          +{eigentuemer.length - max}
-        </span>
-      )}
-      {mieter.slice(0, max).map((p) => (
-        <span
-          key={`mie-${p.id}`}
-          title={`Mieter: ${p.name}`}
-          className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300"
-        >
-          <Users className="h-2.5 w-2.5" />
-          {p.name}
-        </span>
-      ))}
-      {mieter.length > max && (
-        <span
-          title={mieter.map((p) => p.name).join(', ')}
-          className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300"
-        >
-          +{mieter.length - max}
-        </span>
-      )}
-    </div>
+    <section className="rounded-md border border-zinc-800 bg-zinc-950/30 p-3">
+      <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+        {Icon && <Icon className="h-3 w-3" />} {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 
 // ============================================================================
-// Grundriss panel
+// Grundriss panel (existing logic, unchanged)
 // ============================================================================
 
 function GrundrissPanel({
@@ -974,6 +1140,7 @@ function GrundrissPanel({
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!stockwerk.has_grundriss) {
@@ -1011,55 +1178,40 @@ function GrundrissPanel({
 
   const deleteGrundriss = useMutation({
     mutationFn: () => objektstrukturApi.deleteGrundriss(stockwerk.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['objekt-tree', objektId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['objekt-tree', objektId] });
+      setConfirmDelete(false);
+    },
   });
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Grundriss
-          </div>
-          <div className="text-sm font-medium text-zinc-100">
-            {stockwerk.bezeichnung}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="mb-2 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={upload.isPending}
+          className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+        >
+          <Upload className="h-3 w-3" />{' '}
+          {upload.isPending
+            ? 'lädt …'
+            : stockwerk.has_grundriss
+              ? 'Ersetzen'
+              : 'Hochladen'}
+        </button>
+        {stockwerk.has_grundriss && (
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={upload.isPending}
-            className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+            onClick={() => setConfirmDelete(true)}
+            disabled={deleteGrundriss.isPending}
+            className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            title="Grundriss entfernen"
           >
-            <Upload className="h-3 w-3" />{' '}
-            {upload.isPending
-              ? 'lädt …'
-              : stockwerk.has_grundriss
-                ? 'Ersetzen'
-                : 'Hochladen'}
+            <Trash2 className="h-3 w-3" />{' '}
+            {deleteGrundriss.isPending ? 'lösche …' : 'Löschen'}
           </button>
-          {stockwerk.has_grundriss && (
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  confirm(
-                    `Grundriss für „${stockwerk.bezeichnung}" wirklich löschen?`,
-                  )
-                ) {
-                  deleteGrundriss.mutate();
-                }
-              }}
-              disabled={deleteGrundriss.isPending}
-              className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-              title="Grundriss entfernen"
-            >
-              <Trash2 className="h-3 w-3" />{' '}
-              {deleteGrundriss.isPending ? 'lösche …' : 'Löschen'}
-            </button>
-          )}
-        </div>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -1087,14 +1239,24 @@ function GrundrissPanel({
           />
         )
       ) : (
-        <div className="flex h-64 items-center justify-center rounded-md border border-dashed border-zinc-800 bg-zinc-950/30 text-sm text-zinc-500">
+        <div className="flex h-32 items-center justify-center rounded-md border border-dashed border-zinc-800 bg-zinc-950/30 text-sm text-zinc-500">
           <div className="text-center">
-            <ImageIcon className="mx-auto mb-2 h-8 w-8 text-zinc-700" />
+            <ImageIcon className="mx-auto mb-2 h-6 w-6 text-zinc-700" />
             Noch kein Grundriss hinterlegt.
             <div className="text-[10px]">PNG / JPG / WEBP / PDF, max 10 MB</div>
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Grundriss löschen?"
+        message={`Möchtest du den Grundriss für „${stockwerk.bezeichnung}" wirklich löschen?`}
+        tone="danger"
+        confirmLabel="Löschen"
+        onConfirm={() => deleteGrundriss.mutate()}
+        onCancel={() => setConfirmDelete(false)}
+        busy={deleteGrundriss.isPending}
+      />
     </div>
   );
 }
