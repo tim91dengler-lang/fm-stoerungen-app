@@ -8,7 +8,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { adresseApi, partnerApi } from '../api/endpoints';
 import type {
   PartnerCreate,
@@ -32,7 +32,7 @@ interface ViewConfig {
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
-  columnOrder: ['name', 'typen', 'ansprechpartner', 'kontakt', '__actions__'],
+  columnOrder: ['name', 'typen', 'ansprechpartner', 'kontakt'],
   columnFilters: [],
   grouping: [],
 };
@@ -253,33 +253,6 @@ export function PartnerPage() {
           );
         },
       },
-      {
-        id: '__actions__',
-        header: '',
-        enableSorting: false,
-        enableColumnFilter: false,
-        enableGrouping: false,
-        cell: (ctx) => (
-          <div className="flex justify-end gap-1">
-            <button
-              type="button"
-              onClick={() => openEdit(ctx.row.original)}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              title="Bearbeiten"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkConfirm([ctx.row.original])}
-              className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-              title="Löschen"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ),
-      },
     ],
     [],
   );
@@ -363,6 +336,10 @@ export function PartnerPage() {
         getRowId={(p) => p.id}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        rowActions={{
+          onEdit: openEdit,
+          onDelete: (rows) => setBulkConfirm(rows),
+        }}
         bulkActions={(selected) => (
           <button
             type="button"
