@@ -43,6 +43,13 @@ def _serialize_haus(h: object) -> HausRead:
             "notiz": h.notiz,
             "reihenfolge": h.reihenfolge,
             "adresse": h.adresse,
+            "eigentuemer": [
+                PartnerMini(id=link.partner.id, name=link.partner.name)
+                for link in h.eigentuemer_links
+            ],
+            "mieter": [
+                PartnerMini(id=link.partner.id, name=link.partner.name) for link in h.mieter_links
+            ],
             "created_at": h.created_at,
             "updated_at": h.updated_at,
             "stockwerke": [_serialize_stockwerk(s) for s in h.stockwerke],
@@ -64,9 +71,10 @@ def _serialize_stockwerk(s: object) -> StockwerkRead:
             "reihenfolge": s.reihenfolge,
             "has_grundriss": s.grundriss_storage_path is not None,
             "grundriss_mime": s.grundriss_mime,
-            "eigentuemer": PartnerMini(id=s.eigentuemer.id, name=s.eigentuemer.name)
-            if s.eigentuemer
-            else None,
+            "eigentuemer": [
+                PartnerMini(id=link.partner.id, name=link.partner.name)
+                for link in s.eigentuemer_links
+            ],
             "mieter": [PartnerMini(id=m.partner.id, name=m.partner.name) for m in s.mieter_links],
             "einheiten": [_serialize_einheit(e) for e in s.einheiten],
             "created_at": s.created_at,
@@ -87,9 +95,10 @@ def _serialize_einheit(e: object) -> EinheitRead:
             "bezeichnung": e.bezeichnung,
             "groesse_qm": e.groesse_qm,
             "reihenfolge": e.reihenfolge,
-            "eigentuemer": PartnerMini(id=e.eigentuemer.id, name=e.eigentuemer.name)
-            if e.eigentuemer
-            else None,
+            "eigentuemer": [
+                PartnerMini(id=link.partner.id, name=link.partner.name)
+                for link in e.eigentuemer_links
+            ],
             "mieter": [PartnerMini(id=m.partner.id, name=m.partner.name) for m in e.mieter_links],
             "created_at": e.created_at,
             "updated_at": e.updated_at,

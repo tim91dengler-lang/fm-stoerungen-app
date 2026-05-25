@@ -23,16 +23,16 @@ class PartnerMini(BaseModel):
 class EinheitCreate(BaseModel):
     bezeichnung: str = Field(min_length=1, max_length=120)
     groesse_qm: Decimal | None = None
-    eigentuemer_partner_id: UUID | None = None
     reihenfolge: int = 0
+    eigentuemer_ids: list[UUID] = Field(default_factory=list)
     mieter_ids: list[UUID] = Field(default_factory=list)
 
 
 class EinheitUpdate(BaseModel):
     bezeichnung: str | None = Field(default=None, min_length=1, max_length=120)
     groesse_qm: Decimal | None = None
-    eigentuemer_partner_id: UUID | None = None
     reihenfolge: int | None = None
+    eigentuemer_ids: list[UUID] | None = None
     mieter_ids: list[UUID] | None = None
 
 
@@ -43,7 +43,7 @@ class EinheitRead(TimestampedRead):
     bezeichnung: str
     groesse_qm: Decimal | None
     reihenfolge: int
-    eigentuemer: PartnerMini | None = None
+    eigentuemer: list[PartnerMini] = Field(default_factory=list)
     mieter: list[PartnerMini] = Field(default_factory=list)
 
 
@@ -53,8 +53,8 @@ class EinheitRead(TimestampedRead):
 class StockwerkCreate(BaseModel):
     bezeichnung: str = Field(min_length=1, max_length=120)
     ausrichtung: AusrichtungLiteral | None = None
-    eigentuemer_partner_id: UUID | None = None
     reihenfolge: int = 0
+    eigentuemer_ids: list[UUID] = Field(default_factory=list)
     mieter_ids: list[UUID] = Field(
         default_factory=list,
         description="Fallback wenn das Stockwerk keine Einheiten hat",
@@ -64,8 +64,8 @@ class StockwerkCreate(BaseModel):
 class StockwerkUpdate(BaseModel):
     bezeichnung: str | None = Field(default=None, min_length=1, max_length=120)
     ausrichtung: AusrichtungLiteral | None = None
-    eigentuemer_partner_id: UUID | None = None
     reihenfolge: int | None = None
+    eigentuemer_ids: list[UUID] | None = None
     mieter_ids: list[UUID] | None = None
 
 
@@ -78,7 +78,7 @@ class StockwerkRead(TimestampedRead):
     reihenfolge: int
     has_grundriss: bool
     grundriss_mime: str | None
-    eigentuemer: PartnerMini | None = None
+    eigentuemer: list[PartnerMini] = Field(default_factory=list)
     mieter: list[PartnerMini] = Field(default_factory=list)
     einheiten: list[EinheitRead] = Field(default_factory=list)
 
@@ -91,6 +91,8 @@ class HausCreate(BaseModel):
     adresse_id: UUID | None = None
     notiz: str | None = None
     reihenfolge: int = 0
+    eigentuemer_ids: list[UUID] = Field(default_factory=list)
+    mieter_ids: list[UUID] = Field(default_factory=list)
 
 
 class HausUpdate(BaseModel):
@@ -98,6 +100,8 @@ class HausUpdate(BaseModel):
     adresse_id: UUID | None = None
     notiz: str | None = None
     reihenfolge: int | None = None
+    eigentuemer_ids: list[UUID] | None = None
+    mieter_ids: list[UUID] | None = None
 
 
 class HausRead(TimestampedRead):
@@ -108,4 +112,6 @@ class HausRead(TimestampedRead):
     notiz: str | None
     reihenfolge: int
     adresse: AdresseRead | None = None
+    eigentuemer: list[PartnerMini] = Field(default_factory=list)
+    mieter: list[PartnerMini] = Field(default_factory=list)
     stockwerke: list[StockwerkRead] = Field(default_factory=list)

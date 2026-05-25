@@ -13,11 +13,15 @@ from sqlalchemy.orm import selectinload
 
 from fm_api.core.config import get_settings
 from fm_api.models import (
+    EinheitEigentuemer,
     EinheitMieter,
     Haus,
+    HausEigentuemer,
+    HausMieter,
     Objekt,
     ObjektStockwerk,
     StockwerkAusrichtung,
+    StockwerkEigentuemer,
     StockwerkEinheit,
     StockwerkMieter,
 )
@@ -83,13 +87,19 @@ async def list_haus(db: AsyncSession, mandant_id: UUID, objekt_id: UUID) -> list
             selectinload(Haus.stockwerke)
             .selectinload(ObjektStockwerk.einheiten)
             .options(
-                selectinload(StockwerkEinheit.eigentuemer),
+                selectinload(StockwerkEinheit.eigentuemer_links).selectinload(
+                    EinheitEigentuemer.partner
+                ),
                 selectinload(StockwerkEinheit.mieter_links).selectinload(EinheitMieter.partner),
             ),
-            selectinload(Haus.stockwerke).selectinload(ObjektStockwerk.eigentuemer),
+            selectinload(Haus.stockwerke)
+            .selectinload(ObjektStockwerk.eigentuemer_links)
+            .selectinload(StockwerkEigentuemer.partner),
             selectinload(Haus.stockwerke)
             .selectinload(ObjektStockwerk.mieter_links)
             .selectinload(StockwerkMieter.partner),
+            selectinload(Haus.eigentuemer_links).selectinload(HausEigentuemer.partner),
+            selectinload(Haus.mieter_links).selectinload(HausMieter.partner),
         )
         .order_by(Haus.reihenfolge, Haus.bezeichnung)
     )
@@ -109,13 +119,19 @@ async def get_haus(db: AsyncSession, mandant_id: UUID, haus_id: UUID) -> Haus:
             selectinload(Haus.stockwerke)
             .selectinload(ObjektStockwerk.einheiten)
             .options(
-                selectinload(StockwerkEinheit.eigentuemer),
+                selectinload(StockwerkEinheit.eigentuemer_links).selectinload(
+                    EinheitEigentuemer.partner
+                ),
                 selectinload(StockwerkEinheit.mieter_links).selectinload(EinheitMieter.partner),
             ),
-            selectinload(Haus.stockwerke).selectinload(ObjektStockwerk.eigentuemer),
+            selectinload(Haus.stockwerke)
+            .selectinload(ObjektStockwerk.eigentuemer_links)
+            .selectinload(StockwerkEigentuemer.partner),
             selectinload(Haus.stockwerke)
             .selectinload(ObjektStockwerk.mieter_links)
             .selectinload(StockwerkMieter.partner),
+            selectinload(Haus.eigentuemer_links).selectinload(HausEigentuemer.partner),
+            selectinload(Haus.mieter_links).selectinload(HausMieter.partner),
         )
     )
     haus = (await db.execute(stmt)).scalar_one_or_none()
@@ -132,8 +148,21 @@ async def create_haus(
     payload: dict[str, Any],
 ) -> Haus:
     await _assert_objekt(db, objekt_id, mandant_id)
+    eigentuemer_ids: list[UUID] = payload.pop("eigentuemer_ids", []) or []
+    mieter_ids: list[UUID] = payload.pop("mieter_ids", []) or []
     haus = Haus(mandant_id=mandant_id, objekt_id=objekt_id, **payload)
     db.add(haus)
+    await db.flush()
+    if eigentuemer_ids:
+        await db.execute(
+            insert(HausEigentuemer),
+            [{"haus_id": haus.id, "partner_id": pid} for pid in eigentuemer_ids],
+        )
+    if mieter_ids:
+        await db.execute(
+            insert(HausMieter),
+            [{"haus_id": haus.id, "partner_id": pid} for pid in mieter_ids],
+        )
     await db.flush()
     return await get_haus(db, mandant_id, haus.id)
 
@@ -145,10 +174,28 @@ async def update_haus(
     updates: dict[str, Any],
 ) -> Haus:
     haus = await get_haus(db, mandant_id, haus_id)
+    new_eigentuemer = updates.pop("eigentuemer_ids", None)
+    new_mieter = updates.pop("mieter_ids", None)
     for key, value in updates.items():
         if value is None and key in ("bezeichnung",):
             continue
         setattr(haus, key, value)
+    if new_eigentuemer is not None:
+        await db.execute(delete(HausEigentuemer).where(HausEigentuemer.haus_id == haus.id))
+        await db.flush()
+        if new_eigentuemer:
+            await db.execute(
+                insert(HausEigentuemer),
+                [{"haus_id": haus.id, "partner_id": pid} for pid in new_eigentuemer],
+            )
+    if new_mieter is not None:
+        await db.execute(delete(HausMieter).where(HausMieter.haus_id == haus.id))
+        await db.flush()
+        if new_mieter:
+            await db.execute(
+                insert(HausMieter),
+                [{"haus_id": haus.id, "partner_id": pid} for pid in new_mieter],
+            )
     await db.flush()
     return await get_haus(db, mandant_id, haus_id)
 
@@ -183,9 +230,13 @@ async def get_stockwerk(db: AsyncSession, mandant_id: UUID, stockwerk_id: UUID) 
             ObjektStockwerk.deleted_at.is_(None),
         )
         .options(
-            selectinload(ObjektStockwerk.eigentuemer),
+            selectinload(ObjektStockwerk.eigentuemer_links).selectinload(
+                StockwerkEigentuemer.partner
+            ),
             selectinload(ObjektStockwerk.einheiten).options(
-                selectinload(StockwerkEinheit.eigentuemer),
+                selectinload(StockwerkEinheit.eigentuemer_links).selectinload(
+                    EinheitEigentuemer.partner
+                ),
                 selectinload(StockwerkEinheit.mieter_links).selectinload(EinheitMieter.partner),
             ),
             selectinload(ObjektStockwerk.mieter_links).selectinload(StockwerkMieter.partner),
@@ -205,6 +256,7 @@ async def create_stockwerk(
     payload: dict[str, Any],
 ) -> ObjektStockwerk:
     await _assert_haus(db, mandant_id, haus_id)
+    eigentuemer_ids: list[UUID] = payload.pop("eigentuemer_ids", []) or []
     mieter_ids: list[UUID] = payload.pop("mieter_ids", []) or []
     ausr_str = payload.pop("ausrichtung", None)
     sw = ObjektStockwerk(
@@ -215,6 +267,11 @@ async def create_stockwerk(
     )
     db.add(sw)
     await db.flush()
+    if eigentuemer_ids:
+        await db.execute(
+            insert(StockwerkEigentuemer),
+            [{"stockwerk_id": sw.id, "partner_id": pid} for pid in eigentuemer_ids],
+        )
     if mieter_ids:
         await db.execute(
             insert(StockwerkMieter),
@@ -231,6 +288,7 @@ async def update_stockwerk(
     updates: dict[str, Any],
 ) -> ObjektStockwerk:
     sw = await get_stockwerk(db, mandant_id, stockwerk_id)
+    new_eigentuemer = updates.pop("eigentuemer_ids", None)
     new_mieter = updates.pop("mieter_ids", None)
     ausr_str = updates.pop("ausrichtung", "__unset__")
 
@@ -241,6 +299,16 @@ async def update_stockwerk(
     if ausr_str != "__unset__":
         sw.ausrichtung = StockwerkAusrichtung(ausr_str) if ausr_str else None
 
+    if new_eigentuemer is not None:
+        await db.execute(
+            delete(StockwerkEigentuemer).where(StockwerkEigentuemer.stockwerk_id == sw.id)
+        )
+        await db.flush()
+        if new_eigentuemer:
+            await db.execute(
+                insert(StockwerkEigentuemer),
+                [{"stockwerk_id": sw.id, "partner_id": pid} for pid in new_eigentuemer],
+            )
     if new_mieter is not None:
         await db.execute(delete(StockwerkMieter).where(StockwerkMieter.stockwerk_id == sw.id))
         await db.flush()
@@ -343,7 +411,9 @@ async def get_einheit(db: AsyncSession, mandant_id: UUID, einheit_id: UUID) -> S
             StockwerkEinheit.deleted_at.is_(None),
         )
         .options(
-            selectinload(StockwerkEinheit.eigentuemer),
+            selectinload(StockwerkEinheit.eigentuemer_links).selectinload(
+                EinheitEigentuemer.partner
+            ),
             selectinload(StockwerkEinheit.mieter_links).selectinload(EinheitMieter.partner),
         )
     )
@@ -361,10 +431,16 @@ async def create_einheit(
     payload: dict[str, Any],
 ) -> StockwerkEinheit:
     await _assert_stockwerk(db, mandant_id, stockwerk_id)
+    eigentuemer_ids: list[UUID] = payload.pop("eigentuemer_ids", []) or []
     mieter_ids: list[UUID] = payload.pop("mieter_ids", []) or []
     e = StockwerkEinheit(mandant_id=mandant_id, stockwerk_id=stockwerk_id, **payload)
     db.add(e)
     await db.flush()
+    if eigentuemer_ids:
+        await db.execute(
+            insert(EinheitEigentuemer),
+            [{"einheit_id": e.id, "partner_id": pid} for pid in eigentuemer_ids],
+        )
     if mieter_ids:
         await db.execute(
             insert(EinheitMieter),
@@ -381,11 +457,20 @@ async def update_einheit(
     updates: dict[str, Any],
 ) -> StockwerkEinheit:
     e = await get_einheit(db, mandant_id, einheit_id)
+    new_eigentuemer = updates.pop("eigentuemer_ids", None)
     new_mieter = updates.pop("mieter_ids", None)
     for key, value in updates.items():
         if value is None and key in ("bezeichnung",):
             continue
         setattr(e, key, value)
+    if new_eigentuemer is not None:
+        await db.execute(delete(EinheitEigentuemer).where(EinheitEigentuemer.einheit_id == e.id))
+        await db.flush()
+        if new_eigentuemer:
+            await db.execute(
+                insert(EinheitEigentuemer),
+                [{"einheit_id": e.id, "partner_id": pid} for pid in new_eigentuemer],
+            )
     if new_mieter is not None:
         await db.execute(delete(EinheitMieter).where(EinheitMieter.einheit_id == e.id))
         await db.flush()
