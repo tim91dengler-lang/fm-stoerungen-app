@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     Enum,
     ForeignKey,
+    Sequence,
     String,
     Text,
 )
@@ -39,6 +40,11 @@ partner_typ_enum = Enum(
     values_callable=lambda enum_cls: [e.value for e in enum_cls],
 )
 
+# Sequence für Partner-Nummern; die echte Sequence wird in Migration 0013
+# (CREATE SEQUENCE IF NOT EXISTS) angelegt. Diese SQLAlchemy-Sequence-Klasse
+# erlaubt es, create_all() in Tests die Sequence auch zu erstellen.
+partner_nummer_seq = Sequence("partner_nummer_seq", start=1000, metadata=Base.metadata)
+
 
 class GeschaeftsPartner(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "geschaeftspartner"
@@ -53,8 +59,9 @@ class GeschaeftsPartner(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     # gibt es zur internen Referenz; standardmäßig nicht in der Liste angezeigt.
     partner_nummer: Mapped[int] = mapped_column(
         BigInteger,
+        partner_nummer_seq,
         nullable=False,
-        server_default="nextval('partner_nummer_seq')",
+        server_default=partner_nummer_seq.next_value(),
         index=True,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
