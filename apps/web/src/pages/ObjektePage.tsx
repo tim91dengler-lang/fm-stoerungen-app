@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
@@ -101,11 +101,16 @@ export function ObjektePage() {
     staleTime: 60_000,
   });
 
+  const navigate = useNavigate();
+
   const createMut = useMutation({
     mutationFn: (payload: ObjektCreate) => objektApi.create(payload),
-    onSuccess: () => {
+    onSuccess: (created) => {
+      // Tims R4-Anforderung: nach Anlage direkt auf die Detail-Seite,
+      // damit der User unmittelbar Häuser/Stockwerke/Einheiten anlegen kann.
       qc.invalidateQueries({ queryKey: ['objekte'] });
       closeModal();
+      navigate(`/stammdaten/objekte/${created.id}`);
     },
   });
 
@@ -412,7 +417,7 @@ export function ObjektePage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -425,7 +430,7 @@ export function ObjektePage() {
                   onChange={(e) =>
                     setForm({ ...form, adresse_id: e.target.value || null })
                   }
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
                 >
                   <option value="">— Keine —</option>
                   {adressenQuery.data?.items.map((a) => (
@@ -445,7 +450,7 @@ export function ObjektePage() {
                   rows={2}
                   value={form.notiz ?? ''}
                   onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -500,7 +505,7 @@ export function ObjektePage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
               >
                 Abbrechen
               </button>

@@ -337,6 +337,10 @@ export const objektstrukturApi = {
         responseType: 'blob',
       })
       .then((r) => r.data),
+  deleteGrundriss: (stockwerkId: UUID) =>
+    api
+      .delete<StockwerkRead>(`/objektstruktur/stockwerke/${stockwerkId}/grundriss`)
+      .then((r) => r.data),
   createEinheit: (stockwerkId: UUID, payload: EinheitCreate) =>
     api
       .post<EinheitRead>(`/objektstruktur/stockwerke/${stockwerkId}/einheiten`, payload)

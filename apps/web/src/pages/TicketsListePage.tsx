@@ -18,7 +18,13 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { ticketApi } from '../api/endpoints';
+import {
+  auswahllistenApi,
+  objektApi,
+  partnerApi,
+  ticketApi,
+  userApi,
+} from '../api/endpoints';
 import type {
   TicketPrioritaetSlug,
   TicketRead,
@@ -122,8 +128,19 @@ const PRIO_FILTER_OPTIONS: SelectOption[] = PRIO_SLUGS.map((p) => ({
   label: labelForPrioSlug(p),
 }));
 
+interface MassEditOptions {
+  status: SelectOption[];
+  prioritaet: SelectOption[];
+  kategorie: SelectOption[];
+  objekt: SelectOption[];
+  partner: SelectOption[];
+  zugewiesen_an: SelectOption[];
+  projekt: SelectOption[];
+}
+
 function buildColumns(
   onOpen: (ticketId: string) => void,
+  massEditOptions: MassEditOptions,
 ): ColumnDef<TicketRead>[] {
   return [
     {
@@ -167,6 +184,9 @@ function buildColumns(
       header: 'Status',
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
       filterFn: 'arrIncludesSome',
+      meta: {
+        massEdit: { type: 'auswahl' as const, options: massEditOptions.status },
+      },
     },
     {
       id: 'prioritaet',
@@ -174,6 +194,12 @@ function buildColumns(
       header: 'Priorität',
       cell: ({ row }) => <PrioBadge prioritaet={row.original.prioritaet} />,
       filterFn: 'arrIncludesSome',
+      meta: {
+        massEdit: {
+          type: 'auswahl' as const,
+          options: massEditOptions.prioritaet,
+        },
+      },
     },
     {
       id: 'kategorie',
@@ -181,6 +207,12 @@ function buildColumns(
       header: 'Kategorie',
       cell: ({ row }) => row.original.kategorie?.label ?? '—',
       filterFn: 'includesString',
+      meta: {
+        massEdit: {
+          type: 'auswahl' as const,
+          options: massEditOptions.kategorie,
+        },
+      },
     },
     {
       id: 'objekt',
@@ -197,6 +229,12 @@ function buildColumns(
         );
       },
       filterFn: 'includesString',
+      meta: {
+        massEdit: {
+          type: 'combobox' as const,
+          options: massEditOptions.objekt,
+        },
+      },
     },
     {
       id: 'partner',
@@ -214,6 +252,12 @@ function buildColumns(
         );
       },
       filterFn: 'includesString',
+      meta: {
+        massEdit: {
+          type: 'combobox' as const,
+          options: massEditOptions.partner,
+        },
+      },
     },
     {
       id: 'zugewiesen_an',
@@ -235,6 +279,12 @@ function buildColumns(
         );
       },
       filterFn: 'includesString',
+      meta: {
+        massEdit: {
+          type: 'combobox' as const,
+          options: massEditOptions.zugewiesen_an,
+        },
+      },
     },
     {
       id: 'eroeffnet_am',
@@ -295,9 +345,103 @@ export function TicketsListePage() {
     setSearchParams(searchParams);
   }
 
-  const columns = useMemo(() => buildColumns(openTicket), []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const qc = useQueryClient();
+
+  // Reference-Data-Queries für Mass-Edit-Combobox-Optionen.
+  // Werden nur 1x geladen + gecacht (staleTime 60s) — keine
+  // Performance-Belastung wenn der User Mass-Edit gar nicht nutzt.
+  const auswahllistenQuery = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
+    staleTime: 60_000,
+  });
+  const objekteQuery = useQuery({
+    queryKey: ['objekte-for-mass-edit'],
+    queryFn: () => objektApi.list({ limit: 500 }),
+    staleTime: 60_000,
+  });
+  const partnerQuery = useQuery({
+    queryKey: ['partner-for-mass-edit'],
+    queryFn: () => partnerApi.list({ limit: 500 }),
+    staleTime: 60_000,
+  });
+  const usersQuery = useQuery({
+    queryKey: ['users-for-mass-edit'],
+    queryFn: () => userApi.list({ limit: 200 }),
+    staleTime: 60_000,
+  });
+
+  const massEditOptions = useMemo<MassEditOptions>(() => {
+    const statusListe = auswahllistenQuery.data?.find(
+      (l) => l.key === 'ticket_status',
+    );
+    const prioListe = auswahllistenQuery.data?.find(
+      (l) => l.key === 'ticket_prioritaet',
+    );
+    const kategorieListe = auswahllistenQuery.data?.find(
+      (l) => l.key === 'ticket_kategorie',
+    );
+    return {
+      status: (statusListe?.werte ?? [])
+        .filter((w) => w.ist_aktiv)
+        .map((w) => ({ value: w.key, label: w.label })),
+      prioritaet: (prioListe?.werte ?? [])
+        .filter((w) => w.ist_aktiv)
+        .map((w) => ({ value: w.key, label: w.label })),
+      kategorie: (kategorieListe?.werte ?? [])
+        .filter((w) => w.ist_aktiv)
+        .map((w) => ({ value: w.key, label: w.label })),
+      objekt: (objekteQuery.data?.items ?? []).map((o) => ({
+        value: o.id,
+        label: o.name,
+      })),
+      partner: (partnerQuery.data?.items ?? []).map((p) => ({
+        value: p.id,
+        label: p.name,
+      })),
+      zugewiesen_an: (usersQuery.data?.items ?? []).map((u) => ({
+        value: u.id,
+        label: u.full_name,
+      })),
+      projekt: [], // belegt sobald Projekt-Spalte ergänzt wird
+    };
+  }, [
+    auswahllistenQuery.data,
+    objekteQuery.data,
+    partnerQuery.data,
+    usersQuery.data,
+  ]);
+
+  const columns = useMemo(
+    () => buildColumns(openTicket, massEditOptions),
+    [massEditOptions], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Inline-Mass-Edit-Handler. Mapped die Combobox-/Auswahl-Werte auf den
+  // korrekten Backend-Payload (Slugs für ticket_*-Spalten, UUIDs für FK-Spalten).
+  async function handleMassEdit(
+    columnId: string,
+    value: unknown,
+    rows: TicketRead[],
+  ): Promise<{ ok: number; failed: number }> {
+    const fieldMap: Record<string, string> = {
+      status: 'status',
+      prioritaet: 'prioritaet',
+      kategorie: 'kategorie',
+      objekt: 'objekt_id',
+      partner: 'partner_id',
+      zugewiesen_an: 'zugewiesen_an_id',
+    };
+    const field = fieldMap[columnId] ?? columnId;
+    const payload = { [field]: value };
+    const results = await Promise.allSettled(
+      rows.map((r) => ticketApi.update(r.id, payload)),
+    );
+    const ok = results.filter((x) => x.status === 'fulfilled').length;
+    qc.invalidateQueries({ queryKey: ['tickets'] });
+    qc.invalidateQueries({ queryKey: ['tickets-kpi'] });
+    return { ok, failed: results.length - ok };
+  }
 
   // Sidebar-Button „+ Neues Ticket" navigiert auf /tickets?new=1
   useEffect(() => {
@@ -472,6 +616,7 @@ export function TicketsListePage() {
         getRowId={(t) => t.id}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
+        onMassEdit={handleMassEdit}
         bulkActions={(selected) => (
           <>
             <button

@@ -19,6 +19,7 @@ import {
 import clsx from 'clsx';
 import { api } from '../api/client';
 import {
+  adresseApi,
   objektApi,
   objektstrukturApi,
   partnerApi,
@@ -98,6 +99,14 @@ export function ObjektDetailPage() {
     staleTime: 60_000,
   });
 
+  // Adressen für Haus-Adress-Picker (Tim R4): Häuser können eine eigene
+  // Adresse abweichend vom Objekt haben (z. B. großes Grundstück).
+  const adressenQuery = useQuery({
+    queryKey: ['adressen-for-haus'],
+    queryFn: () => adresseApi.list({ limit: 500 }),
+    staleTime: 60_000,
+  });
+
   const [openHaus, setOpenHaus] = useState<Record<string, boolean>>({});
   const [openStockwerk, setOpenStockwerk] = useState<Record<string, boolean>>({});
   const [activeStockwerkId, setActiveStockwerkId] = useState<string | null>(null);
@@ -125,10 +134,15 @@ export function ObjektDetailPage() {
     qc.invalidateQueries({ queryKey: ['objekt-tree', objektId] });
 
   const createHaus = useMutation({
-    mutationFn: (payload: { bezeichnung: string; notiz: string }) =>
+    mutationFn: (payload: {
+      bezeichnung: string;
+      notiz: string;
+      adresse_id: string | null;
+    }) =>
       objektstrukturApi.createHaus(objektId, {
         bezeichnung: payload.bezeichnung,
         notiz: payload.notiz || null,
+        adresse_id: payload.adresse_id,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -140,14 +154,17 @@ export function ObjektDetailPage() {
       hausId,
       bezeichnung,
       notiz,
+      adresse_id,
     }: {
       hausId: string;
       bezeichnung: string;
       notiz: string;
+      adresse_id: string | null;
     }) =>
       objektstrukturApi.updateHaus(hausId, {
         bezeichnung,
         notiz: notiz || null,
+        adresse_id,
       }),
     onSuccess: () => {
       invalidateTree();
@@ -287,12 +304,17 @@ export function ObjektDetailPage() {
   }
 
   // ---- Modal submit handlers --------------------------------------------
-  function handleHausSubmit(values: { bezeichnung: string; notiz: string }) {
+  function handleHausSubmit(values: {
+    bezeichnung: string;
+    notiz: string;
+    adresse_id: string | null;
+  }) {
     if (hausModal.mode === 'edit') {
       updateHaus.mutate({
         hausId: hausModal.haus.id,
         bezeichnung: values.bezeichnung,
         notiz: values.notiz,
+        adresse_id: values.adresse_id,
       });
     } else if (hausModal.mode === 'create') {
       createHaus.mutate(values);
@@ -465,9 +487,12 @@ export function ObjektDetailPage() {
             ? {
                 bezeichnung: hausModal.haus.bezeichnung,
                 notiz: hausModal.haus.notiz,
+                adresse_id: hausModal.haus.adresse?.id ?? null,
               }
             : null
         }
+        adressen={adressenQuery.data?.items ?? []}
+        objektAdresseId={objektQuery.data?.adresse_id ?? null}
         onClose={() => setHausModal({ mode: 'closed' })}
         onSubmit={handleHausSubmit}
         isPending={hausIsPending}
@@ -893,6 +918,11 @@ function GrundrissPanel({
     onSuccess: () => qc.invalidateQueries({ queryKey: ['objekt-tree', objektId] }),
   });
 
+  const deleteGrundriss = useMutation({
+    mutationFn: () => objektstrukturApi.deleteGrundriss(stockwerk.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['objekt-tree', objektId] }),
+  });
+
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -904,15 +934,41 @@ function GrundrissPanel({
             {stockwerk.bezeichnung}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={upload.isPending}
-          className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-        >
-          <Upload className="h-3 w-3" />{' '}
-          {upload.isPending ? 'lädt …' : 'Hochladen'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={upload.isPending}
+            className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-2 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+          >
+            <Upload className="h-3 w-3" />{' '}
+            {upload.isPending
+              ? 'lädt …'
+              : stockwerk.has_grundriss
+                ? 'Ersetzen'
+                : 'Hochladen'}
+          </button>
+          {stockwerk.has_grundriss && (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  confirm(
+                    `Grundriss für „${stockwerk.bezeichnung}" wirklich löschen?`,
+                  )
+                ) {
+                  deleteGrundriss.mutate();
+                }
+              }}
+              disabled={deleteGrundriss.isPending}
+              className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-2 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+              title="Grundriss entfernen"
+            >
+              <Trash2 className="h-3 w-3" />{' '}
+              {deleteGrundriss.isPending ? 'lösche …' : 'Löschen'}
+            </button>
+          )}
+        </div>
         <input
           ref={fileInputRef}
           type="file"

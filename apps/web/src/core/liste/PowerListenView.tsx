@@ -128,8 +128,15 @@ export interface PowerListenViewProps<TData> {
  *  Liegt in `column.columnDef.meta.massEdit` der einzelnen Spalte.
  */
 export interface MassEditSpec {
-  type: 'text' | 'auswahl' | 'boolean';
-  /** Wenn type='auswahl': die Auswahlmöglichkeiten als Slug→Label-Liste. */
+  /** type:
+   *  - 'text': freie Text-Eingabe (Enter = Anwenden)
+   *  - 'auswahl': natives <select> für kleine Listen (≤10 Werte)
+   *  - 'combobox': searchable Dropdown für viele Werte (FK-Selects, User-Listen)
+   *  - 'boolean': Ja/Nein-Buttons
+   *  - 'null': nur ein „Auf NULL setzen"-Knopf (z. B. Zuweisung entfernen)
+   */
+  type: 'text' | 'auswahl' | 'combobox' | 'boolean' | 'null';
+  /** Wenn type='auswahl' oder 'combobox': die Auswahlmöglichkeiten. */
   options?: Array<{ value: string; label: string }>;
   /** Optionaler Helper-Text unter dem Input (z. B. „setzt für alle Auswahl"). */
   hint?: string;
@@ -238,6 +245,21 @@ export function PowerListenView<TData>({
   // Re-Renders pro Mount und Total-Block des Mainthreads.
   const groupingEnabled = onGroupingChange !== undefined;
 
+  // __select__-Spalte ist hartcodiert ganz links: wenn die Page einen
+  // columnOrder gibt, der __select__ nicht enthält (üblich, weil Pages die
+  // Spalte nicht selbst kennen), prepend wir sie hier. So bleibt die
+  // Mehrfachauswahl-Spalte immer als erste sichtbar — sie kann auch nicht
+  // per Drag-Reorder verschoben werden (siehe onDrop unten).
+  const effectiveColumnOrder = useMemo(() => {
+    if (!enableRowSelection) {
+      return columnOrder.length > 0 ? columnOrder : undefined;
+    }
+    if (columnOrder.length === 0) return undefined;
+    return columnOrder.includes('__select__')
+      ? columnOrder
+      : ['__select__', ...columnOrder];
+  }, [columnOrder, enableRowSelection]);
+
   const table = useReactTable<TData>({
     data,
     columns: allColumns,
@@ -246,7 +268,7 @@ export function PowerListenView<TData>({
       sorting,
       columnVisibility: visibility,
       columnFilters: columnFilters ?? stableEmptyColumnFilters,
-      columnOrder: columnOrder.length > 0 ? columnOrder : undefined,
+      columnOrder: effectiveColumnOrder,
       rowSelection: rowSelection ?? stableEmptyRowSelection,
       ...(groupingEnabled && grouping ? { grouping } : {}),
     },
@@ -901,6 +923,22 @@ function MassEditCell({
   onApply: (value: unknown) => void;
 }) {
   const [textValue, setTextValue] = useState('');
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [comboboxSearch, setComboboxSearch] = useState('');
+  const comboboxRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside zum Schließen der Combobox
+  useEffect(() => {
+    if (!comboboxOpen) return;
+    function handler(e: MouseEvent) {
+      if (!comboboxRef.current?.contains(e.target as Node)) {
+        setComboboxOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [comboboxOpen]);
+
   if (spec.type === 'auswahl') {
     return (
       <select
@@ -920,6 +958,79 @@ function MassEditCell({
           </option>
         ))}
       </select>
+    );
+  }
+  if (spec.type === 'combobox') {
+    const filtered = (spec.options ?? []).filter(
+      (o) =>
+        comboboxSearch === '' ||
+        o.label.toLowerCase().includes(comboboxSearch.toLowerCase()),
+    );
+    return (
+      <div ref={comboboxRef} className="relative w-full">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setComboboxOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-1 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-xs text-zinc-500 hover:text-zinc-200 disabled:opacity-60"
+        >
+          <span className="truncate">{busy ? 'wende an …' : 'setzen auf …'}</span>
+          <ChevronDown
+            className={`h-3 w-3 shrink-0 transition-transform ${comboboxOpen ? 'rotate-180' : ''}`}
+            aria-hidden
+          />
+        </button>
+        {comboboxOpen && (
+          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 w-max min-w-full max-w-sm overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-2xl">
+            <div className="border-b border-zinc-800 p-1">
+              <input
+                type="text"
+                value={comboboxSearch}
+                autoFocus
+                onChange={(e) => setComboboxSearch(e.target.value)}
+                placeholder="filtern …"
+                className="w-full rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none"
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto py-1">
+              {filtered.length === 0 ? (
+                <div className="px-2 py-1 text-[11px] text-zinc-500">
+                  Keine Treffer
+                </div>
+              ) : (
+                filtered.slice(0, 100).map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onApply(o.value);
+                      setComboboxOpen(false);
+                      setComboboxSearch('');
+                    }}
+                    className="block w-full truncate px-2 py-1 text-left text-xs text-zinc-200 hover:bg-emerald-500/10 hover:text-emerald-200"
+                  >
+                    {o.label}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (spec.type === 'null') {
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onApply(null)}
+        className="w-full rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-200 hover:bg-amber-500/20 disabled:opacity-60"
+        title="Wert für alle Auswahl auf NULL setzen"
+      >
+        {busy ? '…' : 'leeren'}
+      </button>
     );
   }
   if (spec.type === 'boolean') {
