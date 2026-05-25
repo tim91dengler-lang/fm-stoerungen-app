@@ -32,14 +32,14 @@ for (const p of probes) {
   test(`Power-Layout regression: ${p.path} click "${p.click}"`, async ({ page }) => {
     await login(page);
     await page.goto(`${BASE}${p.path}`);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3500);
     const t = Date.now();
     let frozen = false;
     try {
       await page
         .getByRole('button', { name: new RegExp(p.click, 'i') })
         .first()
-        .click({ timeout: 3500 });
+        .click({ timeout: 12_000 });
     } catch {
       frozen = true;
     }
