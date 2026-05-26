@@ -738,6 +738,7 @@ export interface TickettypRead {
   default_reminder_tage: number;
   reihenfolge: number;
   ist_system: boolean;
+  aktiv: boolean;
   felder: TickettypFeldRead[];
   created_at: string;
   updated_at: string;
@@ -752,6 +753,7 @@ export interface TickettypCreate {
   pflichtfelder?: string[];
   default_reminder_tage?: number;
   reihenfolge?: number;
+  aktiv?: boolean;
 }
 
 export type TickettypUpdate = Partial<Omit<TickettypCreate, 'key'>>;
