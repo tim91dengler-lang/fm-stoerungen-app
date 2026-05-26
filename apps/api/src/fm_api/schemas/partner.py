@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
 from fm_api.schemas.adresse import AdresseRead
 from fm_api.schemas.common import TimestampedRead
 
+# Slug-Literal für `ObjektPartner.rolle` (Postgres-Enum bleibt erhalten,
+# auch nach Track 3 Sub-PR B — Tim-Entscheidung 2026-04-20). Wird von
+# `schemas.objekt` importiert.
 PartnerTypLiteral = Literal[
     "mieter",
     "eigentuemer",
@@ -106,7 +109,9 @@ class PartnerBase(BaseModel):
     mobil: str | None = Field(default=None, max_length=64)
     telefax: str | None = Field(default=None, max_length=64)
     notiz: str | None = None
-    typen: list[PartnerTypLiteral] = Field(default_factory=list)
+    # UUID-Array auf Auswahllisten-Werte der Liste `partner_typ`
+    # (umgestellt in Migration 0016 / Track 3 Sub-PR B).
+    typen: list[UUID] = Field(default_factory=list)
 
 
 class PartnerCreate(PartnerBase):
@@ -131,7 +136,7 @@ class PartnerUpdate(BaseModel):
     mobil: str | None = Field(default=None, max_length=64)
     telefax: str | None = Field(default=None, max_length=64)
     notiz: str | None = None
-    typen: list[PartnerTypLiteral] | None = None
+    typen: list[UUID] | None = None
 
 
 class PartnerRead(TimestampedRead, PartnerBase):

@@ -15,13 +15,14 @@ import { partnerApi } from '../api/endpoints';
 import type {
   PartnerCreate,
   PartnerRead,
-  PartnerTyp,
   PartnerUpdate,
+  UUID,
 } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -39,22 +40,6 @@ const DEFAULT_CONFIG: ViewConfig = {
   grouping: [],
 };
 
-const PARTNER_TYPEN: PartnerTyp[] = [
-  'mieter',
-  'eigentuemer',
-  'auftraggeber',
-  'nachunternehmer',
-  'privatperson',
-];
-
-const TYP_LABEL: Record<PartnerTyp, string> = {
-  mieter: 'Mieter',
-  eigentuemer: 'Eigentümer',
-  auftraggeber: 'Auftraggeber',
-  nachunternehmer: 'Nachunternehmer',
-  privatperson: 'Privatperson',
-};
-
 type GesperrtFilter = 'aktiv' | 'gesperrt' | 'alle';
 
 const EMPTY_FORM: PartnerCreate = {
@@ -66,8 +51,13 @@ const EMPTY_FORM: PartnerCreate = {
 };
 
 export function PartnerPage() {
+  const partnerTypLookup = usePartnerTypLookup();
+  const typOptions = useMemo(
+    () => partnerTypLookup.werte.map((w) => ({ value: w.id, label: w.label })),
+    [partnerTypLookup.werte],
+  );
   const [search, setSearch] = useState('');
-  const [typenFilter, setTypenFilter] = useState<PartnerTyp[]>([]);
+  const [typenFilter, setTypenFilter] = useState<UUID[]>([]);
   const [gesperrtFilter, setGesperrtFilter] = useState<GesperrtFilter>('aktiv');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -161,18 +151,18 @@ export function PartnerPage() {
     setEditingId(null);
   }
 
-  function toggleTypInForm(t: PartnerTyp) {
+  function toggleTypInForm(id: UUID) {
     setForm((prev) => ({
       ...prev,
-      typen: prev.typen.includes(t)
-        ? prev.typen.filter((x) => x !== t)
-        : [...prev.typen, t],
+      typen: prev.typen.includes(id)
+        ? prev.typen.filter((x) => x !== id)
+        : [...prev.typen, id],
     }));
   }
 
-  function toggleTypFilter(t: PartnerTyp) {
+  function toggleTypFilter(id: UUID) {
     setTypenFilter((cur) =>
-      cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t],
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
     );
   }
 
@@ -226,19 +216,23 @@ export function PartnerPage() {
         meta: {
           massEdit: {
             type: 'auswahl' as const,
-            options: PARTNER_TYPEN.map((t) => ({ value: t, label: TYP_LABEL[t] })),
+            options: typOptions,
           },
         },
         cell: (ctx) => (
           <div className="flex flex-wrap gap-1">
-            {ctx.row.original.typen.map((t) => (
-              <span
-                key={t}
-                className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300"
-              >
-                {TYP_LABEL[t]}
-              </span>
-            ))}
+            {ctx.row.original.typen.map((t) => {
+              const label = partnerTypLookup.labelFor(t);
+              if (!label) return null;
+              return (
+                <span
+                  key={t}
+                  className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300"
+                >
+                  {label}
+                </span>
+              );
+            })}
           </div>
         ),
       },
@@ -283,7 +277,7 @@ export function PartnerPage() {
         },
       },
     ],
-    [partnerById],
+    [partnerById, partnerTypLookup, typOptions],
   );
 
   return (
@@ -305,21 +299,21 @@ export function PartnerPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* Typen-Filter (Pills) */}
+        {/* Typen-Filter (Pills, geladen aus Auswahlliste `partner_typ`) */}
         <div className="flex flex-wrap gap-1">
-          {PARTNER_TYPEN.map((t) => (
+          {partnerTypLookup.werte.map((w) => (
             <button
-              key={t}
+              key={w.id}
               type="button"
-              onClick={() => toggleTypFilter(t)}
+              onClick={() => toggleTypFilter(w.id)}
               className={clsx(
                 'rounded-full px-3 py-1 text-xs font-medium',
-                typenFilter.includes(t)
+                typenFilter.includes(w.id)
                   ? 'bg-emerald-500 text-zinc-950'
                   : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700',
               )}
             >
-              {TYP_LABEL[t]}
+              {w.label}
             </button>
           ))}
         </div>
@@ -368,10 +362,7 @@ export function PartnerPage() {
           kontakt: TextFilter,
           gehoert_zu: TextFilter,
           typen: (props) => (
-            <SelectFilter
-              {...props}
-              options={PARTNER_TYPEN.map((t) => ({ value: t, label: TYP_LABEL[t] }))}
-            />
+            <SelectFilter {...props} options={typOptions} />
           ),
         }}
         enableRowSelection
@@ -501,17 +492,17 @@ export function PartnerPage() {
                   Typen
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {PARTNER_TYPEN.map((t) => (
+                  {partnerTypLookup.werte.map((w) => (
                     <label
-                      key={t}
+                      key={w.id}
                       className="inline-flex cursor-pointer items-center gap-1 text-sm text-zinc-200"
                     >
                       <input
                         type="checkbox"
-                        checked={form.typen.includes(t)}
-                        onChange={() => toggleTypInForm(t)}
+                        checked={form.typen.includes(w.id)}
+                        onChange={() => toggleTypInForm(w.id)}
                       />
-                      {TYP_LABEL[t]}
+                      {w.label}
                     </label>
                   ))}
                 </div>

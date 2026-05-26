@@ -66,8 +66,12 @@ class GeschaeftsPartner(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     notiz: Mapped[str | None] = mapped_column(Text, nullable=True)
-    typen: Mapped[list[PartnerTyp]] = mapped_column(
-        ARRAY(partner_typ_enum), nullable=False, server_default="{}"
+    # typen ist seit Track 3 / Migration 0016 ein UUID-Array auf
+    # Auswahllisten-Werte der Liste `partner_typ` (pro Mandant).
+    # Das Postgres-Enum `partner_typ` bleibt erhalten, weil
+    # `ObjektPartner.rolle` es weiter nutzt.
+    typen: Mapped[list[UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)), nullable=False, server_default="{}"
     )
 
     # Hierarchie — Niederlassungen werden als eigene Partner mit parent_partner_id

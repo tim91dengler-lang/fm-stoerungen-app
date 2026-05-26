@@ -242,7 +242,7 @@ class TicketRead(TimestampedRead):
             partner=PartnerRef(
                 id=t.partner.id,
                 name=t.partner.name,
-                typen=[ty.value for ty in t.partner.typen],
+                typen=[str(ty) for ty in t.partner.typen],
             )
             if t.partner
             else None,
@@ -290,7 +290,7 @@ class TicketRead(TimestampedRead):
                 PartnerRef(
                     id=t.wartet_nachunternehmer.id,
                     name=t.wartet_nachunternehmer.name,
-                    typen=[ty.value for ty in t.wartet_nachunternehmer.typen],
+                    typen=[str(ty) for ty in t.wartet_nachunternehmer.typen],
                 )
                 if t.wartet_nachunternehmer is not None
                 else None

@@ -4,6 +4,7 @@ import { Check, ListChecks, X } from 'lucide-react';
 import clsx from 'clsx';
 import { partnerApi } from '../api/endpoints';
 import type { PartnerMini } from '../api/types';
+import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
 
 interface PartnerSearchSelectProps {
   /** Already selected partners (id + name) — rendered as pills. */
@@ -70,6 +71,7 @@ export function PartnerSearchSelect({
   className,
 }: PartnerSearchSelectProps) {
   const toneClasses = TONE_CLASSES[tone];
+  const partnerTypLookup = usePartnerTypLookup();
   const [rawQuery, setRawQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [browseOpen, setBrowseOpen] = useState(false);
@@ -208,7 +210,10 @@ export function PartnerSearchSelect({
                   <span className="flex-1 truncate">{p.name}</span>
                   {p.typen && p.typen.length > 0 && (
                     <span className="shrink-0 text-[10px] text-zinc-500">
-                      {p.typen.join(', ')}
+                      {p.typen
+                        .map((t) => partnerTypLookup.labelFor(t))
+                        .filter(Boolean)
+                        .join(', ')}
                     </span>
                   )}
                 </button>
@@ -254,6 +259,7 @@ function PartnerBrowseModal({
   onClose,
 }: PartnerBrowseModalProps) {
   const toneClasses = TONE_CLASSES[tone];
+  const partnerTypLookup = usePartnerTypLookup();
   const [filter, setFilter] = useState('');
   const [debouncedFilter, setDebouncedFilter] = useState('');
 
@@ -383,7 +389,10 @@ function PartnerBrowseModal({
                         <span className="flex-1 truncate">{p.name}</span>
                         {p.typen && p.typen.length > 0 && (
                           <span className="shrink-0 text-[10px] text-zinc-500">
-                            {p.typen.join(', ')}
+                            {p.typen
+                              .map((t) => partnerTypLookup.labelFor(t))
+                              .filter(Boolean)
+                              .join(', ')}
                           </span>
                         )}
                       </button>

@@ -9,9 +9,12 @@ async def _login_admin(client, admin_user) -> str:
 
 
 @pytest.mark.integration
-async def test_create_and_list_partner(client, admin_user) -> None:
+async def test_create_and_list_partner(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
+
+    eig = str(partner_typ_uuids["eigentuemer"])
+    auf = str(partner_typ_uuids["auftraggeber"])
 
     res = await client.post(
         "/api/v1/partner",
@@ -22,7 +25,7 @@ async def test_create_and_list_partner(client, admin_user) -> None:
             "telefon": "+49 30 12345678",
             "mobil": "+49 171 1234567",
             "telefax": "+49 30 99999999",
-            "typen": ["eigentuemer", "auftraggeber"],
+            "typen": [eig, auf],
         },
     )
     assert res.status_code == 201, res.text
@@ -30,7 +33,7 @@ async def test_create_and_list_partner(client, admin_user) -> None:
     assert body["name"] == "Wohnungsbau GmbH"
     assert body["mobil"] == "+49 171 1234567"
     assert body["telefax"] == "+49 30 99999999"
-    assert set(body["typen"]) == {"eigentuemer", "auftraggeber"}
+    assert set(body["typen"]) == {eig, auf}
 
     listed = await client.get("/api/v1/partner", headers=headers)
     assert listed.status_code == 200
@@ -38,22 +41,25 @@ async def test_create_and_list_partner(client, admin_user) -> None:
 
 
 @pytest.mark.integration
-async def test_filter_partner_by_typ(client, admin_user) -> None:
+async def test_filter_partner_by_typ(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
+    mieter_id = str(partner_typ_uuids["mieter"])
+    nach_id = str(partner_typ_uuids["nachunternehmer"])
+
     await client.post(
         "/api/v1/partner",
         headers=headers,
-        json={"name": "Mieter A", "typen": ["mieter"]},
+        json={"name": "Mieter A", "typen": [mieter_id]},
     )
     await client.post(
         "/api/v1/partner",
         headers=headers,
-        json={"name": "Subunternehmer B", "typen": ["nachunternehmer"]},
+        json={"name": "Subunternehmer B", "typen": [nach_id]},
     )
 
-    res = await client.get("/api/v1/partner?typ=mieter", headers=headers)
+    res = await client.get(f"/api/v1/partner?typ={mieter_id}", headers=headers)
     assert res.status_code == 200
     items = res.json()["items"]
     assert any(p["name"] == "Mieter A" for p in items)
@@ -61,14 +67,15 @@ async def test_filter_partner_by_typ(client, admin_user) -> None:
 
 
 @pytest.mark.integration
-async def test_soft_delete_partner_hides_from_list(client, admin_user) -> None:
+async def test_soft_delete_partner_hides_from_list(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
+    nach_id = str(partner_typ_uuids["nachunternehmer"])
     create = await client.post(
         "/api/v1/partner",
         headers=headers,
-        json={"name": "To-Delete GmbH", "typen": ["nachunternehmer"]},
+        json={"name": "To-Delete GmbH", "typen": [nach_id]},
     )
     pid = create.json()["id"]
 
@@ -90,15 +97,16 @@ async def test_partner_requires_auth(client) -> None:
 
 
 @pytest.mark.integration
-async def test_partner_hierarchie_mutter_kind(client, admin_user) -> None:
+async def test_partner_hierarchie_mutter_kind(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
+    eig = str(partner_typ_uuids["eigentuemer"])
 
     mutter = (
         await client.post(
             "/api/v1/partner",
             headers=headers,
-            json={"name": "Müller Holding AG", "typen": ["eigentuemer"]},
+            json={"name": "Müller Holding AG", "typen": [eig]},
         )
     ).json()
     kind = (
@@ -107,7 +115,7 @@ async def test_partner_hierarchie_mutter_kind(client, admin_user) -> None:
             headers=headers,
             json={
                 "name": "Müller München",
-                "typen": ["eigentuemer"],
+                "typen": [eig],
                 "parent_partner_id": mutter["id"],
             },
         )
@@ -124,18 +132,19 @@ async def test_partner_hierarchie_mutter_kind(client, admin_user) -> None:
 
 
 @pytest.mark.integration
-async def test_partner_objekte_endpoint(client, admin_user, db) -> None:
+async def test_partner_objekte_endpoint(client, admin_user, partner_typ_uuids, db) -> None:
     from fm_api.models import Objekt, ObjektPartner
     from fm_api.models.partner import PartnerTyp
 
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
+    eig = str(partner_typ_uuids["eigentuemer"])
 
     partner = (
         await client.post(
             "/api/v1/partner",
             headers=headers,
-            json={"name": "Eigentümer GmbH", "typen": ["eigentuemer"]},
+            json={"name": "Eigentümer GmbH", "typen": [eig]},
         )
     ).json()
 
@@ -163,7 +172,9 @@ async def test_partner_objekte_endpoint(client, admin_user, db) -> None:
 
 
 @pytest.mark.integration
-async def test_partner_tickets_endpoint_filters_erledigt(client, admin_user, db) -> None:
+async def test_partner_tickets_endpoint_filters_erledigt(
+    client, admin_user, partner_typ_uuids, db
+) -> None:
     from datetime import UTC, datetime
 
     from sqlalchemy import select
@@ -172,12 +183,13 @@ async def test_partner_tickets_endpoint_filters_erledigt(client, admin_user, db)
 
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
+    eig = str(partner_typ_uuids["eigentuemer"])
 
     partner = (
         await client.post(
             "/api/v1/partner",
             headers=headers,
-            json={"name": "Auftraggeber", "typen": ["eigentuemer"]},
+            json={"name": "Auftraggeber", "typen": [eig]},
         )
     ).json()
 
@@ -243,7 +255,9 @@ async def test_partner_tickets_endpoint_filters_erledigt(client, admin_user, db)
 
 
 @pytest.mark.integration
-async def test_partner_projekte_endpoint_transitiv(client, admin_user, db) -> None:
+async def test_partner_projekte_endpoint_transitiv(
+    client, admin_user, partner_typ_uuids, db
+) -> None:
     from sqlalchemy import select
 
     from fm_api.models import (
@@ -257,12 +271,13 @@ async def test_partner_projekte_endpoint_transitiv(client, admin_user, db) -> No
 
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
+    eig = str(partner_typ_uuids["eigentuemer"])
 
     partner = (
         await client.post(
             "/api/v1/partner",
             headers=headers,
-            json={"name": "Konzern AG", "typen": ["eigentuemer"]},
+            json={"name": "Konzern AG", "typen": [eig]},
         )
     ).json()
     me = (await client.get("/api/v1/users/me", headers=headers)).json()
