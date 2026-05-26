@@ -38,11 +38,15 @@ import type {
   PartnerAdresseRead,
   PartnerAdresseUpdate,
   PartnerCreate,
+  PartnerHierarchieResponse,
   PartnerKontaktCreate,
   PartnerKontaktRead,
   PartnerKontaktUpdate,
+  PartnerObjektLinkRead,
+  PartnerProjektLinkRead,
   PartnerRead,
   PartnerSperrenResponse,
+  PartnerTicketLinkRead,
   PartnerUpdate,
   ProjektCreate,
   ProjektListFilters,
@@ -183,6 +187,25 @@ export const partnerApi = {
     api
       .delete<void>(`/partner/adressen/${linkId}`)
       .then(() => undefined),
+  // Track 3 — Hierarchie + verlinkte Listen
+  getHierarchie: (partnerId: string) =>
+    api
+      .get<PartnerHierarchieResponse>(`/partner/${partnerId}/hierarchie`)
+      .then((r) => r.data),
+  listObjekte: (partnerId: string) =>
+    api
+      .get<PartnerObjektLinkRead[]>(`/partner/${partnerId}/objekte`)
+      .then((r) => r.data),
+  listProjekte: (partnerId: string) =>
+    api
+      .get<PartnerProjektLinkRead[]>(`/partner/${partnerId}/projekte`)
+      .then((r) => r.data),
+  listTickets: (partnerId: string, includeErledigt = false) =>
+    api
+      .get<PartnerTicketLinkRead[]>(`/partner/${partnerId}/tickets`, {
+        params: { include_erledigt: includeErledigt },
+      })
+      .then((r) => r.data),
 };
 
 export const objektApi = {

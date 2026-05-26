@@ -103,6 +103,8 @@ class PartnerBase(BaseModel):
     website: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = None
     telefon: str | None = Field(default=None, max_length=64)
+    mobil: str | None = Field(default=None, max_length=64)
+    telefax: str | None = Field(default=None, max_length=64)
     notiz: str | None = None
     typen: list[PartnerTypLiteral] = Field(default_factory=list)
 
@@ -126,6 +128,8 @@ class PartnerUpdate(BaseModel):
     website: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = None
     telefon: str | None = Field(default=None, max_length=64)
+    mobil: str | None = Field(default=None, max_length=64)
+    telefax: str | None = Field(default=None, max_length=64)
     notiz: str | None = None
     typen: list[PartnerTypLiteral] | None = None
 
@@ -162,3 +166,82 @@ class PartnerSperrenResponse(BaseModel):
 
     betroffene_partner_ids: list[UUID]
     anzahl: int
+
+
+# ----- Track 3: Hierarchie / verlinkte Listen -------------------------------
+
+
+class PartnerHierarchieKnoten(BaseModel):
+    """Knoten im Filialen-Baum. Rekursive Struktur."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    gesperrt: bool
+    ist_root: bool = False
+    ist_aktueller_partner: bool = False
+    children: list["PartnerHierarchieKnoten"] = Field(default_factory=list)
+
+
+class PartnerHierarchieResponse(BaseModel):
+    """Antwort auf GET /partner/{id}/hierarchie. `root` ist die oberste
+    erreichbare Mutter (oder der aktuelle Partner, falls keine Mutter)."""
+
+    root: PartnerHierarchieKnoten
+
+
+class PartnerObjektLinkRead(BaseModel):
+    """Objekt mit Bezug zum aktuellen Partner (Track 3, Tab 3)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    objekt_id: UUID
+    objekt_name: str
+    gesperrt: bool
+    rollen: list[str]
+    adresse_kurz: str | None = None
+
+
+class PartnerProjektLinkRead(BaseModel):
+    """Projekt mit transitivem Partner-Bezug (Track 3, Tab 4).
+
+    Track 3 / Tim 2026-04-20: Projekt hat keinen direkten Partner-FK —
+    Bezug entsteht über `ProjektObjektLink` → `Objekt` → `ObjektPartner`.
+    `rollen_an_objekten` listet die Rollen, in denen der Partner an den
+    Projekt-Objekten beteiligt ist (z. B. ['eigentuemer'] oder
+    ['eigentuemer', 'mieter'])."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    projekt_id: UUID
+    name: str
+    status_label: str
+    status_farbe: str | None = None
+    projekttyp_label: str
+    start_am: str | None = None
+    ende_am: str | None = None
+    rollen_an_objekten: list[str]
+
+
+class PartnerTicketLinkRead(BaseModel):
+    """Ticket mit Partner-Bezug (Track 3, Tab 5).
+
+    Bezug ist direkt: `Ticket.partner_id` ODER
+    `Ticket.wartet_nachunternehmer_id` zeigt auf den Partner."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    ticket_id: UUID
+    nummer: int
+    titel: str
+    status_slug: str
+    status_label: str
+    status_farbe: str | None = None
+    prioritaet_label: str
+    prioritaet_farbe: str | None = None
+    objekt_id: UUID | None = None
+    objekt_name: str | None = None
+    melder: str | None = None
+    eroeffnet_am: str
+    rolle_am_ticket: str  # 'partner' | 'wartet_nachunternehmer'

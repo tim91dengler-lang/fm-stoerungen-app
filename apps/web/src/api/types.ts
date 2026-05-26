@@ -335,6 +335,11 @@ export type PartnerTyp =
   | 'nachunternehmer'
   | 'privatperson';
 
+/** Schließt `partner_typ`-Slugs ein, die nur in der Auswahlliste, nicht
+ *  aber im Postgres-Enum existieren. Dient den Track-3-Endpoints (z. B.
+ *  Rolle eines Partners am Objekt) als breiterer Typ. */
+export type PartnerTypSlug = PartnerTyp | 'dienstleister';
+
 export interface PartnerKontaktRead {
   id: UUID;
   partner_id: UUID;
@@ -409,6 +414,8 @@ export interface PartnerRead {
   website: string | null;
   email: string | null;
   telefon: string | null;
+  mobil: string | null;
+  telefax: string | null;
   notiz: string | null;
   typen: PartnerTyp[];
   /** Backward-Compat (computed_field aus Backend): zusammengebauter Anzeigetext
@@ -435,6 +442,8 @@ export interface PartnerWriteBase {
   website?: string | null;
   email?: string | null;
   telefon?: string | null;
+  mobil?: string | null;
+  telefax?: string | null;
   notiz?: string | null;
   typen: PartnerTyp[];
 }
@@ -445,6 +454,59 @@ export type PartnerUpdate = Partial<PartnerWriteBase>;
 export interface PartnerSperrenResponse {
   betroffene_partner_ids: UUID[];
   anzahl: number;
+}
+
+// ---------------------------------------------------------------- Partner Track 3
+
+export interface PartnerHierarchieKnoten {
+  id: UUID;
+  name: string;
+  gesperrt: boolean;
+  ist_root: boolean;
+  ist_aktueller_partner: boolean;
+  children: PartnerHierarchieKnoten[];
+}
+
+export interface PartnerHierarchieResponse {
+  root: PartnerHierarchieKnoten;
+}
+
+export interface PartnerObjektLinkRead {
+  objekt_id: UUID;
+  objekt_name: string;
+  gesperrt: boolean;
+  /** Rollen-Slugs, z. B. ['eigentuemer', 'mieter'] */
+  rollen: PartnerTypSlug[];
+  adresse_kurz: string | null;
+}
+
+export interface PartnerProjektLinkRead {
+  projekt_id: UUID;
+  name: string;
+  status_label: string;
+  status_farbe: string | null;
+  projekttyp_label: string;
+  start_am: string | null;
+  ende_am: string | null;
+  /** Rollen-Slugs an den verlinkten Objekten, z. B. ['eigentuemer'] */
+  rollen_an_objekten: PartnerTypSlug[];
+}
+
+export interface PartnerTicketLinkRead {
+  ticket_id: UUID;
+  nummer: number;
+  titel: string;
+  status_slug: string;
+  status_label: string;
+  status_farbe: string | null;
+  prioritaet_label: string;
+  prioritaet_farbe: string | null;
+  objekt_id: UUID | null;
+  objekt_name: string | null;
+  melder: string | null;
+  eroeffnet_am: string;
+  /** 'partner' | 'wartet_nachunternehmer' */
+  rolle_am_ticket: string;
 }
 
 // ---------------------------------------------------------------- Objekte
