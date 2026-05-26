@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
+import { GripVertical } from 'lucide-react';
 import type { TickettypFeldRead, TickettypRead } from '../api/types';
 import { farbeClass } from './TickettypFarbe';
 import { iconFor } from './TickettypIcon';
@@ -361,12 +362,21 @@ function SortablePreviewFieldCard({ feld }: { feld: TickettypFeldRead }) {
       {...listeners}
       aria-label={`${feld.label} verschieben`}
       className={clsx(
-        'cursor-grab touch-none rounded-md p-1 -m-1 transition-shadow active:cursor-grabbing',
+        'group relative cursor-grab touch-none rounded-md p-1 -m-1 transition-shadow active:cursor-grabbing',
         isDragging
           ? 'bg-emerald-500/5 opacity-60 ring-2 ring-emerald-400/60 shadow-lg'
           : 'hover:bg-zinc-800/30',
       )}
     >
+      <GripVertical
+        aria-hidden
+        className={clsx(
+          'pointer-events-none absolute right-1 top-1 h-3.5 w-3.5 transition-colors',
+          isDragging
+            ? 'text-emerald-400'
+            : 'text-zinc-600 group-hover:text-zinc-300',
+        )}
+      />
       {renderFeld(feld)}
     </div>
   );
