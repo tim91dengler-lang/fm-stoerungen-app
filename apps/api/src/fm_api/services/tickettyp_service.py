@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,6 +15,10 @@ class TickettypNotFoundError(Exception):
 
 class SystemTickettypProtectedError(Exception):
     """Tickettyp mit ist_system=TRUE darf nicht gelöscht werden."""
+
+
+class TickettypKeyConflictError(Exception):
+    """Key ist bereits für einen anderen Tickettyp im Mandanten vergeben."""
 
 
 class TickettypFeldNotFoundError(Exception):
@@ -98,7 +103,14 @@ async def create_tickettyp(
 ) -> Tickettyp:
     item = Tickettyp(mandant_id=mandant_id, ist_system=False, **payload)
     db.add(item)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        # Häufigster Fall: UniqueConstraint uq_tickettypen_mandant_id_key
+        await db.rollback()
+        raise TickettypKeyConflictError(
+            f"Tickettyp-Key '{payload.get('key')}' ist bereits vergeben."
+        ) from exc
 
     # Seed 19 System-Felder mit Default-Konfiguration (Spec §4.1)
     for feld_key, label, sichtbar, pflicht, reihenfolge in DEFAULT_SYSTEM_FELDER:
