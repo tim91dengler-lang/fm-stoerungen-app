@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Copy,
@@ -12,18 +13,12 @@ import clsx from 'clsx';
 import { tickettypApi } from '../api/endpoints';
 import type { TickettypRead } from '../api/types';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
-import { VorlageDesignerModal } from '../components/VorlageDesignerModal';
 import { farbeClass } from '../components/TickettypFarbe';
 import { iconFor } from '../components/TickettypIcon';
 
-type DesignerState =
-  | { mode: 'closed' }
-  | { mode: 'new' }
-  | { mode: 'edit'; vorlage: TickettypRead };
-
 export function VorlagenPage() {
   const qc = useQueryClient();
-  const [designer, setDesigner] = useState<DesignerState>({ mode: 'closed' });
+  const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<TickettypRead | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
@@ -76,7 +71,7 @@ export function VorlagenPage() {
         </div>
         <button
           type="button"
-          onClick={() => setDesigner({ mode: 'new' })}
+          onClick={() => navigate('/stammdaten/vorlagen/neu')}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
           <Plus className="h-4 w-4" /> Neue Vorlage
@@ -106,7 +101,7 @@ export function VorlagenPage() {
           <VorlageKarte
             key={tt.id}
             vorlage={tt}
-            onEdit={() => setDesigner({ mode: 'edit', vorlage: tt })}
+            onEdit={() => navigate(`/stammdaten/vorlagen/${tt.id}/bearbeiten`)}
             onDuplicate={() => duplicateMut.mutate(tt.id)}
             onToggleAktiv={() => toggleAktivMut.mutate({ id: tt.id, aktiv: !tt.aktiv })}
             onDelete={() => setPendingDelete(tt)}
@@ -119,14 +114,6 @@ export function VorlagenPage() {
           </div>
         )}
       </div>
-
-      {designer.mode !== 'closed' && (
-        <VorlageDesignerModal
-          vorlage={designer.mode === 'edit' ? designer.vorlage : null}
-          onClose={() => setDesigner({ mode: 'closed' })}
-          onSaved={() => setDesigner({ mode: 'closed' })}
-        />
-      )}
 
       <ConfirmDialog
         open={pendingDelete !== null}
