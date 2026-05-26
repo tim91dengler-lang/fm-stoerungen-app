@@ -28,8 +28,10 @@ import {
   ChevronRight,
   Columns3,
   Layers,
+  Pause,
   Pencil,
   Pin,
+  Play,
   Search,
   Trash2,
   X,
@@ -126,21 +128,29 @@ export interface PowerListenViewProps<TData> {
    */
   onMassEdit?: (columnId: string, value: unknown, selectedRows: TData[]) => Promise<{ ok: number; failed: number }> | void;
   /**
-   * Standard-Aktions-Spalte (Tim R6b-Konvention).
+   * Standard-Aktions-Spalte (Tim R6b-Konvention, erweitert in R6c).
    *
    * Wenn gesetzt, fügt PowerListenView eine fixe Aktions-Spalte direkt nach
    * der Select-Spalte ein (immer links, nicht verschiebbar, nicht filterbar).
    *
-   * - `onEdit(row)` öffnet den Edit-Flow der Page (typisch: Edit-Modal)
-   * - `onDelete(rows)` bekommt eine Liste von zu löschenden Rows. PowerListenView
-   *   übergibt single-row Klicks ebenfalls als 1-elementiges Array, damit der
-   *   gleiche ConfirmDialog für Single + Bulk verwendet werden kann.
+   * - `onEdit(row)`: Edit-Flow der Page (typisch Edit-Modal)
+   * - `onDelete(rows)`: klassisches Hard-Delete (Mülleimer-Icon).
+   *   PowerListenView übergibt single-row Klicks ebenfalls als 1-elementiges
+   *   Array, damit der gleiche ConfirmDialog für Single + Bulk verwendet
+   *   werden kann.
+   * - `sperren`: Soft-Sperre statt Hard-Delete (Pause-Icon).
+   *   Pflicht für Partner + Objekt (R6c-Konvention). Schließt onDelete aus —
+   *   pro Page nur eines der beiden.
    *
    * Pages bauen damit KEINE eigene `__actions__`-Spalte mehr.
    */
   rowActions?: {
     onEdit?: (row: TData) => void;
     onDelete?: (rows: TData[]) => void;
+    sperren?: {
+      isGesperrt: (row: TData) => boolean;
+      onToggle: (row: TData) => void;
+    };
   };
 }
 
@@ -241,7 +251,7 @@ export function PowerListenView<TData>({
         ),
       });
     }
-    if (rowActions?.onEdit || rowActions?.onDelete) {
+    if (rowActions?.onEdit || rowActions?.onDelete || rowActions?.sperren) {
       prefix.push({
         id: '__actions__',
         enableSorting: false,
@@ -249,32 +259,54 @@ export function PowerListenView<TData>({
         enableHiding: false,
         enableGrouping: false,
         header: '',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-0.5">
-            {rowActions.onEdit && (
-              <button
-                type="button"
-                onClick={() => rowActions.onEdit?.(row.original)}
-                className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                title="Bearbeiten"
-                aria-label="Bearbeiten"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {rowActions.onDelete && (
-              <button
-                type="button"
-                onClick={() => rowActions.onDelete?.([row.original])}
-                className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-                title="Löschen"
-                aria-label="Löschen"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        ),
+        cell: ({ row }) => {
+          const isGesperrt = rowActions.sperren?.isGesperrt(row.original) ?? false;
+          return (
+            <div className="flex items-center gap-0.5">
+              {rowActions.onEdit && (
+                <button
+                  type="button"
+                  onClick={() => rowActions.onEdit?.(row.original)}
+                  className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                  title="Bearbeiten"
+                  aria-label="Bearbeiten"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {rowActions.sperren && (
+                <button
+                  type="button"
+                  onClick={() => rowActions.sperren?.onToggle(row.original)}
+                  className={
+                    isGesperrt
+                      ? 'rounded-md p-1.5 text-emerald-400 hover:bg-emerald-500/10'
+                      : 'rounded-md p-1.5 text-zinc-400 hover:bg-amber-500/10 hover:text-amber-400'
+                  }
+                  title={isGesperrt ? 'Entsperren' : 'Sperren'}
+                  aria-label={isGesperrt ? 'Entsperren' : 'Sperren'}
+                >
+                  {isGesperrt ? (
+                    <Play className="h-3.5 w-3.5" />
+                  ) : (
+                    <Pause className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              )}
+              {rowActions.onDelete && (
+                <button
+                  type="button"
+                  onClick={() => rowActions.onDelete?.([row.original])}
+                  className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+                  title="Löschen"
+                  aria-label="Löschen"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        },
       });
     }
     return [...prefix, ...columns];
@@ -320,7 +352,11 @@ export function PowerListenView<TData>({
   // Pages die nicht selbst kennen), prepend wir sie hier. So bleibt das
   // [Select] [Edit/Delete] Layout immer als erstes sichtbar — beide sind auch
   // nicht per Drag-Reorder verschiebbar (siehe onDrop unten).
-  const hasActions = !!(rowActions?.onEdit || rowActions?.onDelete);
+  const hasActions = !!(
+    rowActions?.onEdit ||
+    rowActions?.onDelete ||
+    rowActions?.sperren
+  );
   const effectiveColumnOrder = useMemo(() => {
     if (columnOrder.length === 0) return undefined;
     const order = [...columnOrder];

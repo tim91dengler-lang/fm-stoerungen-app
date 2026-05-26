@@ -10,6 +10,7 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
+import clsx from 'clsx';
 import { adresseApi, objektApi, partnerApi } from '../api/endpoints';
 import type {
   ObjektCreate,
@@ -20,7 +21,6 @@ import type {
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { TextFilter } from '../core/liste/columnFilters';
-import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -59,15 +59,17 @@ const EMPTY_FORM: ObjektCreate = {
   partner_links: [],
 };
 
+type GesperrtFilter = 'aktiv' | 'gesperrt' | 'alle';
+
 export function ObjektePage() {
   const [search, setSearch] = useState('');
+  const [gesperrtFilter, setGesperrtFilter] = useState<GesperrtFilter>('aktiv');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ObjektCreate>(EMPTY_FORM);
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [bulkConfirm, setBulkConfirm] = useState<ObjektRead[] | null>(null);
   const qc = useQueryClient();
 
   async function handleMassEdit(
@@ -85,8 +87,13 @@ export function ObjektePage() {
   }
 
   const listQuery = useQuery({
-    queryKey: ['objekte', search],
-    queryFn: () => objektApi.list({ search: search || undefined, limit: 100 }),
+    queryKey: ['objekte', search, gesperrtFilter],
+    queryFn: () =>
+      objektApi.list({
+        search: search || undefined,
+        gesperrt_filter: gesperrtFilter,
+        limit: 100,
+      }),
   });
 
   const adressenQuery = useQuery({
@@ -123,20 +130,10 @@ export function ObjektePage() {
     },
   });
 
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => objektApi.remove(id),
+  const sperrenMut = useMutation({
+    mutationFn: (vars: { id: string; sperren: boolean }) =>
+      vars.sperren ? objektApi.sperren(vars.id) : objektApi.entsperren(vars.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['objekte'] }),
-  });
-
-  const bulkDeleteMut = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(ids.map((id) => objektApi.remove(id)));
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['objekte'] });
-      setRowSelection({});
-      setBulkConfirm(null);
-    },
   });
 
   function openCreate() {
@@ -197,14 +194,27 @@ export function ObjektePage() {
         accessorKey: 'name',
         header: 'Name',
         filterFn: 'includesString',
-        cell: (ctx) => (
-          <Link
-            to={`/stammdaten/objekte/${ctx.row.original.id}`}
-            className="font-medium text-zinc-100 hover:text-emerald-300"
-          >
-            {ctx.row.original.name}
-          </Link>
-        ),
+        cell: (ctx) => {
+          const o = ctx.row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <Link
+                to={`/stammdaten/objekte/${o.id}`}
+                className={clsx(
+                  'font-medium hover:text-emerald-300',
+                  o.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
+                )}
+              >
+                {o.name}
+              </Link>
+              {o.gesperrt && (
+                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+                  gesperrt
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         id: 'adresse',
@@ -244,17 +254,6 @@ export function ObjektePage() {
     [],
   );
 
-  function confirmBulkDelete() {
-    if (!bulkConfirm) return;
-    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
-      deleteMut.mutate(bulkConfirm[0].id, {
-        onSuccess: () => setBulkConfirm(null),
-      });
-    } else {
-      bulkDeleteMut.mutate(bulkConfirm.map((o) => o.id));
-    }
-  }
-
   return (
     <div className="space-y-4 px-4 py-6 lg:px-8">
       <div className="flex items-center justify-between gap-3">
@@ -264,13 +263,33 @@ export function ObjektePage() {
             {listQuery.data ? `${listQuery.data.total} Objekte` : '—'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
-        >
-          <Plus className="h-4 w-4" /> Neues Objekt
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Sperren-Status-Toggle (R6c-Konvention) */}
+          <div className="inline-flex items-center gap-1 rounded-md border border-zinc-700 p-0.5">
+            {(['aktiv', 'gesperrt', 'alle'] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setGesperrtFilter(f)}
+                className={clsx(
+                  'rounded px-2.5 py-1 text-xs font-medium',
+                  gesperrtFilter === f
+                    ? 'bg-zinc-700 text-zinc-100'
+                    : 'text-zinc-400 hover:text-zinc-200',
+                )}
+              >
+                {f === 'aktiv' ? 'Aktive' : f === 'gesperrt' ? 'Gesperrte' : 'Alle'}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="flex items-center gap-2 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
+          >
+            <Plus className="h-4 w-4" /> Neues Objekt
+          </button>
+        </div>
       </div>
 
       <PowerListenView<ObjektRead>
@@ -301,17 +320,26 @@ export function ObjektePage() {
         rowSelection={rowSelection}
         rowActions={{
           onEdit: openEdit,
-          onDelete: (rows) => setBulkConfirm(rows),
+          sperren: {
+            isGesperrt: (o) => o.gesperrt,
+            onToggle: (o) =>
+              sperrenMut.mutate({ id: o.id, sperren: !o.gesperrt }),
+          },
         }}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
           <button
             type="button"
-            onClick={() => setBulkConfirm(selected)}
-            disabled={bulkDeleteMut.isPending}
-            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            onClick={() => {
+              selected.forEach((o) =>
+                sperrenMut.mutate({ id: o.id, sperren: true }),
+              );
+              setRowSelection({});
+            }}
+            disabled={sperrenMut.isPending}
+            className="rounded-md border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
           >
-            Löschen ({selected.length})
+            Sperren ({selected.length})
           </button>
         )}
         onMassEdit={handleMassEdit}
@@ -335,31 +363,6 @@ export function ObjektePage() {
         itemLabel={{ singular: 'Objekt', plural: 'Objekte' }}
       />
 
-
-      <ConfirmDialog
-        open={bulkConfirm !== null}
-        title={
-          bulkConfirm && bulkConfirm.length === 1
-            ? 'Objekt löschen?'
-            : `${bulkConfirm?.length ?? 0} Objekte löschen?`
-        }
-        message={
-          bulkConfirm && bulkConfirm.length === 1 ? (
-            <span>
-              Objekt <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen?
-              Diese Aktion kann nicht rückgängig gemacht werden.
-            </span>
-          ) : (
-            <span>
-              {bulkConfirm?.length ?? 0} ausgewählte Objekte werden
-              unwiderruflich gelöscht.
-            </span>
-          )
-        }
-        busy={deleteMut.isPending || bulkDeleteMut.isPending}
-        onConfirm={confirmBulkDelete}
-        onCancel={() => setBulkConfirm(null)}
-      />
 
       {showModal && (
         <div

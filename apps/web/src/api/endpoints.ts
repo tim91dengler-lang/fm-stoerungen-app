@@ -34,8 +34,15 @@ import type {
   ObjektRead,
   ObjektUpdate,
   PaginatedResponse,
+  PartnerAdresseCreate,
+  PartnerAdresseRead,
+  PartnerAdresseUpdate,
   PartnerCreate,
+  PartnerKontaktCreate,
+  PartnerKontaktRead,
+  PartnerKontaktUpdate,
   PartnerRead,
+  PartnerSperrenResponse,
   PartnerUpdate,
   ProjektCreate,
   ProjektListFilters,
@@ -119,6 +126,8 @@ export const partnerApi = {
     params: {
       search?: string;
       typ?: string[];
+      gesperrt_filter?: 'aktiv' | 'gesperrt' | 'alle';
+      parent_partner_id?: string;
       limit?: number;
       offset?: number;
     } = {},
@@ -132,10 +141,59 @@ export const partnerApi = {
   update: (id: string, payload: PartnerUpdate) =>
     api.patch<PartnerRead>(`/partner/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/partner/${id}`).then(() => undefined),
+  sperren: (id: string) =>
+    api
+      .post<PartnerSperrenResponse>(`/partner/${id}/sperren`)
+      .then((r) => r.data),
+  entsperren: (id: string) =>
+    api
+      .post<PartnerSperrenResponse>(`/partner/${id}/entsperren`)
+      .then((r) => r.data),
+  // Sub-Resource: Kontakte
+  listKontakte: (partnerId: string) =>
+    api
+      .get<PartnerKontaktRead[]>(`/partner/${partnerId}/kontakte`)
+      .then((r) => r.data),
+  createKontakt: (partnerId: string, payload: PartnerKontaktCreate) =>
+    api
+      .post<PartnerKontaktRead>(`/partner/${partnerId}/kontakte`, payload)
+      .then((r) => r.data),
+  updateKontakt: (kontaktId: string, payload: PartnerKontaktUpdate) =>
+    api
+      .patch<PartnerKontaktRead>(`/partner/kontakte/${kontaktId}`, payload)
+      .then((r) => r.data),
+  removeKontakt: (kontaktId: string) =>
+    api
+      .delete<void>(`/partner/kontakte/${kontaktId}`)
+      .then(() => undefined),
+  // Sub-Resource: Adress-Verknüpfungen
+  listAdressen: (partnerId: string) =>
+    api
+      .get<PartnerAdresseRead[]>(`/partner/${partnerId}/adressen`)
+      .then((r) => r.data),
+  createAdresse: (partnerId: string, payload: PartnerAdresseCreate) =>
+    api
+      .post<PartnerAdresseRead>(`/partner/${partnerId}/adressen`, payload)
+      .then((r) => r.data),
+  updateAdresse: (linkId: string, payload: PartnerAdresseUpdate) =>
+    api
+      .patch<PartnerAdresseRead>(`/partner/adressen/${linkId}`, payload)
+      .then((r) => r.data),
+  removeAdresse: (linkId: string) =>
+    api
+      .delete<void>(`/partner/adressen/${linkId}`)
+      .then(() => undefined),
 };
 
 export const objektApi = {
-  list: (params: { search?: string; limit?: number; offset?: number } = {}) =>
+  list: (
+    params: {
+      search?: string;
+      gesperrt_filter?: 'aktiv' | 'gesperrt' | 'alle';
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) =>
     api
       .get<PaginatedResponse<ObjektRead>>('/objekte', { params })
       .then((r) => r.data),
@@ -145,6 +203,10 @@ export const objektApi = {
   update: (id: string, payload: ObjektUpdate) =>
     api.patch<ObjektRead>(`/objekte/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/objekte/${id}`).then(() => undefined),
+  sperren: (id: string) =>
+    api.post<ObjektRead>(`/objekte/${id}/sperren`).then((r) => r.data),
+  entsperren: (id: string) =>
+    api.post<ObjektRead>(`/objekte/${id}/entsperren`).then((r) => r.data),
 };
 
 export const photoApi = {
