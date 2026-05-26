@@ -3,13 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import {
-  Activity,
-  AlertOctagon,
-  Binoculars,
-  Calendar,
-  Wrench,
-} from 'lucide-react';
+import { Activity, AlertOctagon } from 'lucide-react';
 import clsx from 'clsx';
 import {
   anlageApi,
@@ -24,6 +18,8 @@ import {
   userApi,
 } from '../api/endpoints';
 import type { TickettypFeldRead, TickettypRead } from '../api/types';
+import { farbeClassHover } from '../components/TickettypFarbe';
+import { iconFor } from '../components/TickettypIcon';
 
 // Schema lax — Pflichtfelder werden pro Vorlage validiert (siehe submit())
 const schema = z.object({
@@ -56,31 +52,6 @@ interface Props {
   defaultProjektId?: string | null;
 }
 
-const TYP_ICONS = {
-  wrench: Wrench,
-  calendar: Calendar,
-  binoculars: Binoculars,
-  target: Binoculars,
-} as const;
-
-function typIcon(key: string | null | undefined) {
-  if (key && key in TYP_ICONS) return TYP_ICONS[key as keyof typeof TYP_ICONS];
-  return Wrench;
-}
-
-function colorClasses(farbe: string | null | undefined): string {
-  switch (farbe) {
-    case 'emerald':
-      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20';
-    case 'blue':
-      return 'border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20';
-    case 'amber':
-      return 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20';
-    default:
-      return 'border-zinc-700 bg-zinc-800/40 text-zinc-300 hover:bg-zinc-800';
-  }
-}
-
 /** Liefert die Sichtbar/Pflicht-Map aus den Vorlage-Feldern, indexiert nach feld_key. */
 function buildFelderMap(typ: TickettypRead | null): Map<string, TickettypFeldRead> {
   const m = new Map<string, TickettypFeldRead>();
@@ -97,8 +68,8 @@ export function TicketErfassenModal({
   defaultProjektId = null,
 }: Props) {
   const { data: tickettypen = [] } = useQuery({
-    queryKey: ['tickettypen'],
-    queryFn: () => tickettypApi.list(),
+    queryKey: ['tickettypen', 'aktiv_only'],
+    queryFn: () => tickettypApi.list({ aktiv_only: true }),
     staleTime: 5 * 60_000,
   });
   const { data: users } = useQuery({
@@ -310,7 +281,7 @@ export function TicketErfassenModal({
             <label className="block text-sm font-medium text-zinc-300">Vorlage</label>
             <div className="mt-1 grid grid-cols-3 gap-2">
               {tickettypen.map((t) => {
-                const Icon = typIcon(t.icon);
+                const Icon = iconFor(t.icon);
                 const selected = t.id === selectedTypId;
                 return (
                   <button
@@ -320,7 +291,7 @@ export function TicketErfassenModal({
                     className={clsx(
                       'flex flex-col items-center justify-center gap-1 rounded-lg border px-2 py-3 text-xs font-medium transition-colors',
                       selected
-                        ? colorClasses(t.farbe) + ' ring-1 ring-emerald-400'
+                        ? farbeClassHover(t.farbe) + ' ring-1 ring-emerald-400'
                         : 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
                     )}
                   >

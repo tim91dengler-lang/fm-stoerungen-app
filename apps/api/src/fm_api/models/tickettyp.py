@@ -42,6 +42,9 @@ class Tickettyp(UuidPkMixin, TimestampMixin, Base):
     ist_system: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    aktiv: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
 
     mandant: Mapped["Mandant"] = relationship(lazy="raise")
     felder: Mapped[list["TickettypFeld"]] = relationship(
