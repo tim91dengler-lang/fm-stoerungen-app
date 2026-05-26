@@ -1,8 +1,12 @@
 """Track 3 (Sub-PR B) — Partner.typen auf Auswahlliste umstellen
 
-Revision ID: 0016
-Revises: 0015
+Revision ID: 0017
+Revises: 0016
 Create Date: 2026-05-26
+
+Hängt an der Merge-Revision 0016 (vereinheitlicht die zwei parallelen
+0015er-Migrations 0015_partner_tabs aus Sub-PR A und 0015_tickettyp_aktiv
+aus Track 2).
 
 Stellt `geschaeftspartner.typen` von einem Enum-Array (`partner_typ[]`)
 auf ein UUID-Array auf die Auswahlliste `partner_typ` (Tim-Entscheidung
@@ -29,8 +33,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0016"
-down_revision: str | None = "0015"
+revision: str = "0017"
+down_revision: str | None = "0016"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

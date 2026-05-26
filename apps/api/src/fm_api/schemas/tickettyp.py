@@ -41,6 +41,7 @@ class TickettypBase(BaseModel):
     pflichtfelder: list[Any] = Field(default_factory=list)
     default_reminder_tage: int = 0
     reihenfolge: int = 0
+    aktiv: bool = True
 
 
 class TickettypCreate(TickettypBase):
@@ -55,6 +56,7 @@ class TickettypUpdate(BaseModel):
     pflichtfelder: list[Any] | None = None
     default_reminder_tage: int | None = None
     reihenfolge: int | None = None
+    aktiv: bool | None = None
 
 
 class TickettypRead(TimestampedRead, TickettypBase):

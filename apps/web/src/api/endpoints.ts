@@ -301,8 +301,8 @@ export const ansichtenApi = {
 };
 
 export const tickettypApi = {
-  list: () =>
-    api.get<TickettypRead[]>('/tickettypen').then((r) => r.data),
+  list: (params?: { aktiv_only?: boolean }) =>
+    api.get<TickettypRead[]>('/tickettypen', { params }).then((r) => r.data),
   get: (id: UUID) =>
     api.get<TickettypRead>(`/tickettypen/${id}`).then((r) => r.data),
   create: (payload: TickettypCreate) =>
@@ -313,6 +313,8 @@ export const tickettypApi = {
     api
       .patch<TickettypRead>(`/tickettypen/${id}/felder`, payload)
       .then((r) => r.data),
+  duplicate: (id: UUID) =>
+    api.post<TickettypRead>(`/tickettypen/${id}/duplicate`).then((r) => r.data),
   remove: (id: UUID) =>
     api.delete<void>(`/tickettypen/${id}`).then(() => undefined),
 };
