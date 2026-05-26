@@ -20,6 +20,7 @@ import { ProjektePage } from './pages/ProjektePage';
 import { TicketsListePage } from './pages/TicketsListePage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
 import { UsersListePage } from './pages/UsersListePage';
+import { VorlageDesignerPage } from './pages/VorlageDesignerPage';
 import { VorlagenPage } from './pages/VorlagenPage';
 import { WartungenPage } from './pages/WartungenPage';
 
@@ -53,6 +54,8 @@ export const router = createBrowserRouter([
           { path: '/stammdaten/anlagen', element: <AnlagenPage /> },
           { path: '/stammdaten/fehlercodes', element: <FehlercodesPage /> },
           { path: '/stammdaten/vorlagen', element: <VorlagenPage /> },
+          { path: '/stammdaten/vorlagen/neu', element: <VorlageDesignerPage /> },
+          { path: '/stammdaten/vorlagen/:id/bearbeiten', element: <VorlageDesignerPage /> },
           { path: '/stammdaten/auswahllisten', element: <AuswahllistenPage /> },
           { path: '/users', element: <UsersListePage /> },
         ],
