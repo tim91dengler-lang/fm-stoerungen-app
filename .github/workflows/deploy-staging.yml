@@ -128,8 +128,12 @@ jobs:
             cd /srv/fm-stoerungen/staging
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose --env-file .env -f docker-compose.staging.yml pull
-            # pg_dump + alembic upgrade head before swapping API
-            ENV=staging ./migrate.sh || true
+            # pg_dump + alembic upgrade head before swapping API.
+            # Kein `|| true` mehr: eine fehlgeschlagene Migration darf den
+            # Deploy NICHT still durchlaufen lassen (gelernt aus Track 3 /
+            # PR-Recovery 2026-05-26 — die nicht angelaufene 0017 hat
+            # Staging-Partner-Listen unbemerkt kaputtgemacht).
+            ENV=staging ./migrate.sh
             docker compose --env-file .env -f docker-compose.staging.yml up -d
           '
 
