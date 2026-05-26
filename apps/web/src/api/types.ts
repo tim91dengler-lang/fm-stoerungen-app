@@ -326,35 +326,124 @@ export interface AdresseSuggestion {
 
 // ---------------------------------------------------------------- Partner
 
-export type PartnerTyp = 'mieter' | 'eigentuemer' | 'auftraggeber' | 'nachunternehmer';
+export type PartnerTyp =
+  | 'mieter'
+  | 'eigentuemer'
+  | 'auftraggeber'
+  | 'nachunternehmer'
+  | 'privatperson';
+
+export interface PartnerKontaktRead {
+  id: UUID;
+  partner_id: UUID;
+  anrede_id: UUID | null;
+  titel: string | null;
+  vorname: string | null;
+  nachname: string | null;
+  rollen: UUID[];
+  email: string | null;
+  telefon: string | null;
+  mobil: string | null;
+  ist_hauptkontakt: boolean;
+  gesperrt: boolean;
+  notiz: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PartnerKontaktWriteBase {
+  anrede_id?: UUID | null;
+  titel?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  rollen?: UUID[];
+  email?: string | null;
+  telefon?: string | null;
+  mobil?: string | null;
+  ist_hauptkontakt?: boolean;
+  gesperrt?: boolean;
+  notiz?: string | null;
+}
+
+export type PartnerKontaktCreate = PartnerKontaktWriteBase;
+export type PartnerKontaktUpdate = Partial<PartnerKontaktWriteBase>;
+
+export interface PartnerAdresseRead {
+  id: UUID;
+  partner_id: UUID;
+  adresse_id: UUID;
+  typ_id: UUID | null;
+  ist_primaer: boolean;
+  adresse: AdresseRead | null;
+}
+
+export interface PartnerAdresseCreate {
+  adresse_id: UUID;
+  typ_id?: UUID | null;
+  ist_primaer?: boolean;
+}
+
+export interface PartnerAdresseUpdate {
+  typ_id?: UUID | null;
+  ist_primaer?: boolean;
+}
 
 export interface PartnerRead {
   id: UUID;
   mandant_id: UUID;
+  partner_nummer: number;
   name: string;
-  ansprechpartner: string | null;
+  gesperrt: boolean;
+  parent_partner_id: UUID | null;
+  rechtsform_id: UUID | null;
+  branche_id: UUID | null;
+  anrede_id: UUID | null;
+  titel: string | null;
+  vorname: string | null;
+  nachname: string | null;
+  ust_id_nr: string | null;
+  steuer_nr: string | null;
+  hrb: string | null;
+  website: string | null;
   email: string | null;
   telefon: string | null;
-  adresse_id: UUID | null;
-  adresse: AdresseRead | null;
   notiz: string | null;
   typen: PartnerTyp[];
+  /** Backward-Compat (computed_field aus Backend): zusammengebauter Anzeigetext
+   *  des Hauptkontakts (oder der Partner-Personenfelder bei Privatperson). */
+  ansprechpartner: string | null;
+  kontakte: PartnerKontaktRead[];
+  adress_links: PartnerAdresseRead[];
   created_at: string;
   updated_at: string;
 }
 
 export interface PartnerWriteBase {
   name: string;
-  ansprechpartner?: string | null;
+  parent_partner_id?: UUID | null;
+  rechtsform_id?: UUID | null;
+  branche_id?: UUID | null;
+  anrede_id?: UUID | null;
+  titel?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  ust_id_nr?: string | null;
+  steuer_nr?: string | null;
+  hrb?: string | null;
+  website?: string | null;
   email?: string | null;
   telefon?: string | null;
-  adresse_id?: UUID | null;
   notiz?: string | null;
   typen: PartnerTyp[];
 }
 
 export type PartnerCreate = PartnerWriteBase;
 export type PartnerUpdate = Partial<PartnerWriteBase>;
+
+export interface PartnerSperrenResponse {
+  betroffene_partner_ids: UUID[];
+  anzahl: number;
+}
 
 // ---------------------------------------------------------------- Objekte
 
@@ -371,6 +460,7 @@ export interface ObjektRead {
   id: UUID;
   mandant_id: UUID;
   name: string;
+  gesperrt: boolean;
   adresse_id: UUID | null;
   adresse: AdresseRead | null;
   notiz: string | null;

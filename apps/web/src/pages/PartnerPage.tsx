@@ -9,7 +9,8 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
-import { adresseApi, partnerApi } from '../api/endpoints';
+import clsx from 'clsx';
+import { partnerApi } from '../api/endpoints';
 import type {
   PartnerCreate,
   PartnerRead,
@@ -19,7 +20,6 @@ import type {
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
-import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -32,7 +32,7 @@ interface ViewConfig {
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'name', desc: false }],
   visibility: {},
-  columnOrder: ['name', 'typen', 'ansprechpartner', 'kontakt'],
+  columnOrder: ['name', 'typen', 'gehoert_zu', 'ansprechpartner', 'kontakt'],
   columnFilters: [],
   grouping: [],
 };
@@ -42,6 +42,7 @@ const PARTNER_TYPEN: PartnerTyp[] = [
   'eigentuemer',
   'auftraggeber',
   'nachunternehmer',
+  'privatperson',
 ];
 
 const TYP_LABEL: Record<PartnerTyp, string> = {
@@ -49,14 +50,15 @@ const TYP_LABEL: Record<PartnerTyp, string> = {
   eigentuemer: 'Eigentümer',
   auftraggeber: 'Auftraggeber',
   nachunternehmer: 'Nachunternehmer',
+  privatperson: 'Privatperson',
 };
+
+type GesperrtFilter = 'aktiv' | 'gesperrt' | 'alle';
 
 const EMPTY_FORM: PartnerCreate = {
   name: '',
-  ansprechpartner: '',
   email: '',
   telefon: '',
-  adresse_id: null,
   notiz: '',
   typen: [],
 };
@@ -64,13 +66,13 @@ const EMPTY_FORM: PartnerCreate = {
 export function PartnerPage() {
   const [search, setSearch] = useState('');
   const [typenFilter, setTypenFilter] = useState<PartnerTyp[]>([]);
+  const [gesperrtFilter, setGesperrtFilter] = useState<GesperrtFilter>('aktiv');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PartnerCreate>(EMPTY_FORM);
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [bulkConfirm, setBulkConfirm] = useState<PartnerRead[] | null>(null);
   const qc = useQueryClient();
 
   async function handleMassEdit(
@@ -88,20 +90,25 @@ export function PartnerPage() {
   }
 
   const listQuery = useQuery({
-    queryKey: ['partner', search, typenFilter],
+    queryKey: ['partner', search, typenFilter, gesperrtFilter],
     queryFn: () =>
       partnerApi.list({
         search: search || undefined,
         typ: typenFilter.length > 0 ? typenFilter : undefined,
+        gesperrt_filter: gesperrtFilter,
         limit: 200,
       }),
   });
 
-  const adressenQuery = useQuery({
-    queryKey: ['adressen-for-partner'],
-    queryFn: () => adresseApi.list({ limit: 500 }),
-    staleTime: 60_000,
-  });
+  // Map id → name für „Gehört zu"-Spalte. Bei Filter-Wechsel kann
+  // ein Parent außerhalb der aktuellen Liste liegen — dann fällt der Wert
+  // auf die UUID zurück. Für die Detail-Seite (Phase 6c-Detail) wird das
+  // sauber per Backend-Resolution gelöst.
+  const partnerById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of listQuery.data?.items ?? []) m.set(p.id, p.name);
+    return m;
+  }, [listQuery.data]);
 
   const createMut = useMutation({
     mutationFn: (payload: PartnerCreate) => partnerApi.create(payload),
@@ -120,20 +127,10 @@ export function PartnerPage() {
     },
   });
 
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => partnerApi.remove(id),
+  const sperrenMut = useMutation({
+    mutationFn: (vars: { id: string; sperren: boolean }) =>
+      vars.sperren ? partnerApi.sperren(vars.id) : partnerApi.entsperren(vars.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['partner'] }),
-  });
-
-  const bulkDeleteMut = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(ids.map((id) => partnerApi.remove(id)));
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['partner'] });
-      setRowSelection({});
-      setBulkConfirm(null);
-    },
   });
 
   function openCreate() {
@@ -146,10 +143,8 @@ export function PartnerPage() {
     setEditingId(p.id);
     setForm({
       name: p.name,
-      ansprechpartner: p.ansprechpartner ?? '',
       email: p.email ?? '',
       telefon: p.telefon ?? '',
-      adresse_id: p.adresse_id,
       notiz: p.notiz ?? '',
       typen: p.typen,
     });
@@ -180,7 +175,6 @@ export function PartnerPage() {
     const payload: PartnerCreate = {
       ...form,
       email: form.email || null,
-      ansprechpartner: form.ansprechpartner || null,
       telefon: form.telefon || null,
       notiz: form.notiz || null,
     };
@@ -197,20 +191,32 @@ export function PartnerPage() {
         accessorKey: 'name',
         header: 'Name',
         filterFn: 'includesString',
-        cell: (ctx) => (
-          <span
-            className="cursor-pointer font-medium text-zinc-100 hover:text-emerald-300"
-            onClick={() => openEdit(ctx.row.original)}
-          >
-            {ctx.row.original.name}
-          </span>
-        ),
+        cell: (ctx) => {
+          const p = ctx.row.original;
+          return (
+            <div className="flex items-center gap-2">
+              <span
+                className={clsx(
+                  'cursor-pointer font-medium hover:text-emerald-300',
+                  p.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
+                )}
+                onClick={() => openEdit(p)}
+              >
+                {p.name}
+              </span>
+              {p.gesperrt && (
+                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+                  gesperrt
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         id: 'typen',
         accessorFn: (row) => row.typen,
         header: 'Typen',
-        // Multi-select filter against array column needs arrIncludesSome.
         filterFn: 'arrIncludesSome',
         meta: {
           massEdit: {
@@ -232,11 +238,29 @@ export function PartnerPage() {
         ),
       },
       {
+        id: 'gehoert_zu',
+        accessorFn: (row) => row.parent_partner_id ?? '',
+        header: 'Gehört zu',
+        cell: (ctx) => {
+          const pid = ctx.row.original.parent_partner_id;
+          if (!pid) return <span className="text-zinc-600">—</span>;
+          const name = partnerById.get(pid);
+          return (
+            <span className="text-sm text-zinc-300">
+              {name ?? <span className="font-mono text-xs">{pid.slice(0, 8)}…</span>}
+            </span>
+          );
+        },
+      },
+      {
         id: 'ansprechpartner',
         accessorKey: 'ansprechpartner',
-        header: 'Ansprechpartner',
+        header: 'Hauptkontakt',
         filterFn: 'includesString',
-        cell: (ctx) => ctx.row.original.ansprechpartner ?? <span className="text-zinc-500">—</span>,
+        cell: (ctx) =>
+          ctx.row.original.ansprechpartner ?? (
+            <span className="text-zinc-500">—</span>
+          ),
       },
       {
         id: 'kontakt',
@@ -254,19 +278,8 @@ export function PartnerPage() {
         },
       },
     ],
-    [],
+    [partnerById],
   );
-
-  function confirmBulkDelete() {
-    if (!bulkConfirm) return;
-    if (bulkConfirm.length === 1 && bulkConfirm[0] !== undefined) {
-      deleteMut.mutate(bulkConfirm[0].id, {
-        onSuccess: () => setBulkConfirm(null),
-      });
-    } else {
-      bulkDeleteMut.mutate(bulkConfirm.map((p) => p.id));
-    }
-  }
 
   return (
     <div className="space-y-4 px-4 py-6 lg:px-8">
@@ -286,21 +299,44 @@ export function PartnerPage() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-1">
-        {PARTNER_TYPEN.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => toggleTypFilter(t)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              typenFilter.includes(t)
-                ? 'bg-emerald-500 text-zinc-950'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-            }`}
-          >
-            {TYP_LABEL[t]}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Typen-Filter (Pills) */}
+        <div className="flex flex-wrap gap-1">
+          {PARTNER_TYPEN.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => toggleTypFilter(t)}
+              className={clsx(
+                'rounded-full px-3 py-1 text-xs font-medium',
+                typenFilter.includes(t)
+                  ? 'bg-emerald-500 text-zinc-950'
+                  : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700',
+              )}
+            >
+              {TYP_LABEL[t]}
+            </button>
+          ))}
+        </div>
+
+        {/* Sperren-Status-Toggle (R6c-Konvention) */}
+        <div className="ml-auto inline-flex items-center gap-1 rounded-md border border-zinc-700 p-0.5">
+          {(['aktiv', 'gesperrt', 'alle'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setGesperrtFilter(f)}
+              className={clsx(
+                'rounded px-2.5 py-1 text-xs font-medium',
+                gesperrtFilter === f
+                  ? 'bg-zinc-700 text-zinc-100'
+                  : 'text-zinc-400 hover:text-zinc-200',
+              )}
+            >
+              {f === 'aktiv' ? 'Aktive' : f === 'gesperrt' ? 'Gesperrte' : 'Alle'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <PowerListenView<PartnerRead>
@@ -325,6 +361,7 @@ export function PartnerPage() {
           name: TextFilter,
           ansprechpartner: TextFilter,
           kontakt: TextFilter,
+          gehoert_zu: TextFilter,
           typen: (props) => (
             <SelectFilter
               {...props}
@@ -338,16 +375,26 @@ export function PartnerPage() {
         onRowSelectionChange={setRowSelection}
         rowActions={{
           onEdit: openEdit,
-          onDelete: (rows) => setBulkConfirm(rows),
+          sperren: {
+            isGesperrt: (p) => p.gesperrt,
+            onToggle: (p) =>
+              sperrenMut.mutate({ id: p.id, sperren: !p.gesperrt }),
+          },
         }}
         bulkActions={(selected) => (
           <button
             type="button"
-            onClick={() => setBulkConfirm(selected)}
-            disabled={bulkDeleteMut.isPending}
-            className="rounded-md border border-red-500/30 px-3 py-1 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+            onClick={() => {
+              // Bulk-Sperren — rekursiv pro Partner über die Backend-API
+              selected.forEach((p) =>
+                sperrenMut.mutate({ id: p.id, sperren: true }),
+              );
+              setRowSelection({});
+            }}
+            disabled={sperrenMut.isPending}
+            className="rounded-md border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
           >
-            Löschen ({selected.length})
+            Sperren ({selected.length})
           </button>
         )}
         onMassEdit={handleMassEdit}
@@ -366,37 +413,10 @@ export function PartnerPage() {
             activeId={activeViewId}
           />
         }
-        searchPlaceholder="Suche in Name, Ansprechpartner, E-Mail …"
+        searchPlaceholder="Suche in Name, Kontakt, E-Mail …"
         showFooter
         itemLabel={{ singular: 'Partner', plural: 'Partner' }}
       />
-
-
-      <ConfirmDialog
-        open={bulkConfirm !== null}
-        title={
-          bulkConfirm && bulkConfirm.length === 1
-            ? 'Partner löschen?'
-            : `${bulkConfirm?.length ?? 0} Partner löschen?`
-        }
-        message={
-          bulkConfirm && bulkConfirm.length === 1 ? (
-            <span>
-              Partner <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen?
-              Diese Aktion kann nicht rückgängig gemacht werden.
-            </span>
-          ) : (
-            <span>
-              {bulkConfirm?.length ?? 0} ausgewählte Partner werden
-              unwiderruflich gelöscht.
-            </span>
-          )
-        }
-        busy={deleteMut.isPending || bulkDeleteMut.isPending}
-        onConfirm={confirmBulkDelete}
-        onCancel={() => setBulkConfirm(null)}
-      />
-
 
       {showModal && (
         <div
@@ -410,7 +430,7 @@ export function PartnerPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
+              <h2 className="text-lg font-semibold text-zinc-100">
                 {editingId ? 'Partner bearbeiten' : 'Neuer Partner'}
               </h2>
               <button
@@ -431,7 +451,7 @@ export function PartnerPage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                 />
               </div>
 
@@ -443,7 +463,7 @@ export function PartnerPage() {
                   {PARTNER_TYPEN.map((t) => (
                     <label
                       key={t}
-                      className="inline-flex cursor-pointer items-center gap-1 text-sm"
+                      className="inline-flex cursor-pointer items-center gap-1 text-sm text-zinc-200"
                     >
                       <input
                         type="checkbox"
@@ -459,15 +479,13 @@ export function PartnerPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-zinc-300">
-                    Ansprechpartner
+                    E-Mail
                   </label>
                   <input
-                    type="text"
-                    value={form.ansprechpartner ?? ''}
-                    onChange={(e) =>
-                      setForm({ ...form, ansprechpartner: e.target.value })
-                    }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    type="email"
+                    value={form.email ?? ''}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   />
                 </div>
                 <div>
@@ -480,42 +498,9 @@ export function PartnerPage() {
                     onChange={(e) =>
                       setForm({ ...form, telefon: e.target.value })
                     }
-                    className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-300">
-                  E-Mail
-                </label>
-                <input
-                  type="email"
-                  value={form.email ?? ''}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-zinc-300">
-                  Adresse (optional)
-                </label>
-                <select
-                  value={form.adresse_id ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, adresse_id: e.target.value || null })
-                  }
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
-                >
-                  <option value="">— Keine —</option>
-                  {adressenQuery.data?.items.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.strasse}
-                      {a.hausnummer ? ` ${a.hausnummer}` : ''}, {a.plz} {a.ort}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div>
@@ -526,16 +511,21 @@ export function PartnerPage() {
                   rows={2}
                   value={form.notiz ?? ''}
                   onChange={(e) => setForm({ ...form, notiz: e.target.value })}
-                  className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                 />
               </div>
+
+              <p className="text-[10px] text-zinc-500">
+                Kontaktpersonen, Adressen, Filialen und weitere Stammdaten werden
+                in der Detail-Ansicht des Partners gepflegt (folgt in Phase 6c-Detail).
+              </p>
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm"
+                className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
               >
                 Abbrechen
               </button>
