@@ -92,9 +92,7 @@ def downgrade() -> None:
         "geschaeftspartner",
         sa.Column(
             "typen_alt",
-            postgresql.ARRAY(
-                postgresql.ENUM(name="partner_typ", create_type=False)
-            ),
+            postgresql.ARRAY(postgresql.ENUM(name="partner_typ", create_type=False)),
             nullable=False,
             server_default=sa.text("'{}'::partner_typ[]"),
         ),

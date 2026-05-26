@@ -67,9 +67,7 @@ async def test_filter_partner_by_typ(client, admin_user, partner_typ_uuids) -> N
 
 
 @pytest.mark.integration
-async def test_soft_delete_partner_hides_from_list(
-    client, admin_user, partner_typ_uuids
-) -> None:
+async def test_soft_delete_partner_hides_from_list(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
@@ -99,9 +97,7 @@ async def test_partner_requires_auth(client) -> None:
 
 
 @pytest.mark.integration
-async def test_partner_hierarchie_mutter_kind(
-    client, admin_user, partner_typ_uuids
-) -> None:
+async def test_partner_hierarchie_mutter_kind(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
     eig = str(partner_typ_uuids["eigentuemer"])
@@ -136,9 +132,7 @@ async def test_partner_hierarchie_mutter_kind(
 
 
 @pytest.mark.integration
-async def test_partner_objekte_endpoint(
-    client, admin_user, partner_typ_uuids, db
-) -> None:
+async def test_partner_objekte_endpoint(client, admin_user, partner_typ_uuids, db) -> None:
     from fm_api.models import Objekt, ObjektPartner
     from fm_api.models.partner import PartnerTyp
 
@@ -209,9 +203,7 @@ async def test_partner_tickets_endpoint_filters_erledigt(
                 await db.execute(
                     select(AuswahllistenWert.id).where(
                         AuswahllistenWert.key == wert_key,
-                        AuswahllistenWert.auswahlliste.has(
-                            key=liste_key, mandant_id=mandant_id
-                        ),
+                        AuswahllistenWert.auswahlliste.has(key=liste_key, mandant_id=mandant_id),
                     )
                 )
             ).scalar_one()
@@ -306,9 +298,7 @@ async def test_partner_projekte_endpoint_transitiv(
         await db.execute(
             select(AuswahllistenWert.id).where(
                 AuswahllistenWert.key == "sanierung",
-                AuswahllistenWert.auswahlliste.has(
-                    key="projekttyp", mandant_id=mandant_id
-                ),
+                AuswahllistenWert.auswahlliste.has(key="projekttyp", mandant_id=mandant_id),
             )
         )
     ).scalar_one()
@@ -316,9 +306,7 @@ async def test_partner_projekte_endpoint_transitiv(
         await db.execute(
             select(AuswahllistenWert.id).where(
                 AuswahllistenWert.key == "aktiv",
-                AuswahllistenWert.auswahlliste.has(
-                    key="projektstatus", mandant_id=mandant_id
-                ),
+                AuswahllistenWert.auswahlliste.has(key="projektstatus", mandant_id=mandant_id),
             )
         )
     ).scalar_one()
