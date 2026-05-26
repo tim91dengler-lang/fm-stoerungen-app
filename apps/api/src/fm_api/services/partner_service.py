@@ -418,7 +418,11 @@ async def update_kontakt(
         ):
             setattr(kontakt, key, value)
     await db.flush()
-    return kontakt
+    # Nach flush sind alle Attribute expired (auch updated_at). Frisch
+    # laden, sonst MissingGreenlet beim Pydantic-Validate. Gleiche Logik
+    # wie in update_partner.
+    db.expunge(kontakt)
+    return await get_kontakt(db, kontakt_id, mandant_id)
 
 
 async def delete_kontakt(db: AsyncSession, kontakt_id: UUID, mandant_id: UUID) -> None:
@@ -516,7 +520,8 @@ async def update_partner_adresse(
         if value is not None:
             setattr(link, key, value)
     await db.flush()
-    return link
+    db.expunge(link)
+    return await get_partner_adresse(db, link_id, mandant_id)
 
 
 async def delete_partner_adresse(db: AsyncSession, link_id: UUID, mandant_id: UUID) -> None:
