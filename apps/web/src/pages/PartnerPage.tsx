@@ -21,6 +21,7 @@ import type {
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -74,6 +75,9 @@ export function PartnerPage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [deaktivierenConfirm, setDeaktivierenConfirm] = useState<PartnerRead[] | null>(
+    null,
+  );
   const qc = useQueryClient();
 
   async function handleMassEdit(
@@ -207,7 +211,7 @@ export function PartnerPage() {
               </Link>
               {p.gesperrt && (
                 <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
-                  gesperrt
+                  deaktiviert
                 </span>
               )}
             </div>
@@ -334,7 +338,7 @@ export function PartnerPage() {
                   : 'text-zinc-400 hover:text-zinc-200',
               )}
             >
-              {f === 'aktiv' ? 'Aktive' : f === 'gesperrt' ? 'Gesperrte' : 'Alle'}
+              {f === 'aktiv' ? 'Aktive' : f === 'gesperrt' ? 'Deaktivierte' : 'Alle'}
             </button>
           ))}
         </div>
@@ -378,24 +382,24 @@ export function PartnerPage() {
           onEdit: openEdit,
           sperren: {
             isGesperrt: (p) => p.gesperrt,
-            onToggle: (p) =>
-              sperrenMut.mutate({ id: p.id, sperren: !p.gesperrt }),
+            onToggle: (p) => {
+              if (p.gesperrt) {
+                // Aktivieren erfordert keine Bestätigung
+                sperrenMut.mutate({ id: p.id, sperren: false });
+              } else {
+                setDeaktivierenConfirm([p]);
+              }
+            },
           },
         }}
         bulkActions={(selected) => (
           <button
             type="button"
-            onClick={() => {
-              // Bulk-Sperren — rekursiv pro Partner über die Backend-API
-              selected.forEach((p) =>
-                sperrenMut.mutate({ id: p.id, sperren: true }),
-              );
-              setRowSelection({});
-            }}
+            onClick={() => setDeaktivierenConfirm(selected)}
             disabled={sperrenMut.isPending}
             className="rounded-md border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
           >
-            Sperren ({selected.length})
+            Deaktivieren ({selected.length})
           </button>
         )}
         onMassEdit={handleMassEdit}
@@ -417,6 +421,42 @@ export function PartnerPage() {
         searchPlaceholder="Suche in Name, Kontakt, E-Mail …"
         showFooter
         itemLabel={{ singular: 'Partner', plural: 'Partner' }}
+      />
+
+      <ConfirmDialog
+        open={deaktivierenConfirm !== null}
+        title={
+          deaktivierenConfirm && deaktivierenConfirm.length === 1
+            ? 'Partner deaktivieren?'
+            : `${deaktivierenConfirm?.length ?? 0} Partner deaktivieren?`
+        }
+        message={
+          deaktivierenConfirm && deaktivierenConfirm.length === 1 ? (
+            <span>
+              <strong>{deaktivierenConfirm[0]?.name}</strong> wird deaktiviert
+              und ist nicht mehr für neue Verknüpfungen verfügbar. Bestehende
+              Verknüpfungen bleiben. Du kannst jederzeit wieder aktivieren.
+            </span>
+          ) : (
+            <span>
+              {deaktivierenConfirm?.length ?? 0} ausgewählte Partner werden
+              deaktiviert (inkl. ihrer Filialen). Du kannst jederzeit wieder
+              aktivieren.
+            </span>
+          )
+        }
+        tone="danger"
+        confirmLabel="Deaktivieren"
+        busy={sperrenMut.isPending}
+        onConfirm={() => {
+          if (!deaktivierenConfirm) return;
+          deaktivierenConfirm.forEach((p) =>
+            sperrenMut.mutate({ id: p.id, sperren: true }),
+          );
+          setRowSelection({});
+          setDeaktivierenConfirm(null);
+        }}
+        onCancel={() => setDeaktivierenConfirm(null)}
       />
 
       {showModal && (

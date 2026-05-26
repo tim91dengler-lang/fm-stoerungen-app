@@ -283,8 +283,8 @@ export function PowerListenView<TData>({
                       ? 'rounded-md p-1.5 text-emerald-400 hover:bg-emerald-500/10'
                       : 'rounded-md p-1.5 text-zinc-400 hover:bg-amber-500/10 hover:text-amber-400'
                   }
-                  title={isGesperrt ? 'Entsperren' : 'Sperren'}
-                  aria-label={isGesperrt ? 'Entsperren' : 'Sperren'}
+                  title={isGesperrt ? 'Aktivieren' : 'Deaktivieren'}
+                  aria-label={isGesperrt ? 'Aktivieren' : 'Deaktivieren'}
                 >
                   {isGesperrt ? (
                     <Play className="h-3.5 w-3.5" />

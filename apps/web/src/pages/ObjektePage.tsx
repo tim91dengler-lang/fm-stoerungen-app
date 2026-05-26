@@ -12,6 +12,7 @@ import {
 import { Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { adresseApi, objektApi, partnerApi } from '../api/endpoints';
+import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 import type {
   ObjektCreate,
   ObjektRead,
@@ -72,6 +73,9 @@ export function ObjektePage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [deaktivierenConfirm, setDeaktivierenConfirm] = useState<ObjektRead[] | null>(
+    null,
+  );
   const qc = useQueryClient();
 
   async function handleMassEdit(
@@ -211,7 +215,7 @@ export function ObjektePage() {
               </Link>
               {o.gesperrt && (
                 <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
-                  gesperrt
+                  deaktiviert
                 </span>
               )}
             </div>
@@ -280,7 +284,7 @@ export function ObjektePage() {
                     : 'text-zinc-400 hover:text-zinc-200',
                 )}
               >
-                {f === 'aktiv' ? 'Aktive' : f === 'gesperrt' ? 'Gesperrte' : 'Alle'}
+                {f === 'aktiv' ? 'Aktive' : f === 'gesperrt' ? 'Deaktivierte' : 'Alle'}
               </button>
             ))}
           </div>
@@ -324,24 +328,24 @@ export function ObjektePage() {
           onEdit: openEdit,
           sperren: {
             isGesperrt: (o) => o.gesperrt,
-            onToggle: (o) =>
-              sperrenMut.mutate({ id: o.id, sperren: !o.gesperrt }),
+            onToggle: (o) => {
+              if (o.gesperrt) {
+                sperrenMut.mutate({ id: o.id, sperren: false });
+              } else {
+                setDeaktivierenConfirm([o]);
+              }
+            },
           },
         }}
         onRowSelectionChange={setRowSelection}
         bulkActions={(selected) => (
           <button
             type="button"
-            onClick={() => {
-              selected.forEach((o) =>
-                sperrenMut.mutate({ id: o.id, sperren: true }),
-              );
-              setRowSelection({});
-            }}
+            onClick={() => setDeaktivierenConfirm(selected)}
             disabled={sperrenMut.isPending}
             className="rounded-md border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
           >
-            Sperren ({selected.length})
+            Deaktivieren ({selected.length})
           </button>
         )}
         onMassEdit={handleMassEdit}
@@ -365,6 +369,41 @@ export function ObjektePage() {
         itemLabel={{ singular: 'Objekt', plural: 'Objekte' }}
       />
 
+
+      <ConfirmDialog
+        open={deaktivierenConfirm !== null}
+        title={
+          deaktivierenConfirm && deaktivierenConfirm.length === 1
+            ? 'Objekt deaktivieren?'
+            : `${deaktivierenConfirm?.length ?? 0} Objekte deaktivieren?`
+        }
+        message={
+          deaktivierenConfirm && deaktivierenConfirm.length === 1 ? (
+            <span>
+              <strong>{deaktivierenConfirm[0]?.name}</strong> wird deaktiviert
+              und ist nicht mehr für neue Verknüpfungen verfügbar. Bestehende
+              Verknüpfungen bleiben.
+            </span>
+          ) : (
+            <span>
+              {deaktivierenConfirm?.length ?? 0} ausgewählte Objekte werden
+              deaktiviert.
+            </span>
+          )
+        }
+        tone="danger"
+        confirmLabel="Deaktivieren"
+        busy={sperrenMut.isPending}
+        onConfirm={() => {
+          if (!deaktivierenConfirm) return;
+          deaktivierenConfirm.forEach((o) =>
+            sperrenMut.mutate({ id: o.id, sperren: true }),
+          );
+          setRowSelection({});
+          setDeaktivierenConfirm(null);
+        }}
+        onCancel={() => setDeaktivierenConfirm(null)}
+      />
 
       {showModal && (
         <div
