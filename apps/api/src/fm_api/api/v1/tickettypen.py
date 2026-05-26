@@ -20,8 +20,10 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[TickettypRead])
-async def list_tickettypen(db: AuditedDbSession, current: CurrentUserDep) -> list[TickettypRead]:
-    items = await tickettyp_service.list_tickettypen(db, current.mandant_id)
+async def list_tickettypen(
+    db: AuditedDbSession, current: CurrentUserDep, aktiv_only: bool = False
+) -> list[TickettypRead]:
+    items = await tickettyp_service.list_tickettypen(db, current.mandant_id, aktiv_only=aktiv_only)
     return [TickettypRead.model_validate(i) for i in items]
 
 
@@ -80,6 +82,21 @@ async def delete_tickettyp(
     except SystemTickettypProtectedError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     return None
+
+
+@router.post(
+    "/{tickettyp_id}/duplicate",
+    response_model=TickettypRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def duplicate_tickettyp(
+    tickettyp_id: UUID, db: AuditedDbSession, current: CurrentUserDep
+) -> TickettypRead:
+    try:
+        item = await tickettyp_service.duplicate_tickettyp(db, current.mandant_id, tickettyp_id)
+    except TickettypNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return TickettypRead.model_validate(item)
 
 
 @router.patch("/{tickettyp_id}/felder", response_model=TickettypRead)
