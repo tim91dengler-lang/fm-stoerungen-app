@@ -19,12 +19,16 @@ async def _create_partner(client, headers, name: str, typen: list[str]) -> str:
 
 
 @pytest.mark.integration
-async def test_create_objekt_with_partner_links(client, admin_user) -> None:
+async def test_create_objekt_with_partner_links(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
-    mieter_id = await _create_partner(client, headers, "Mieter X", ["mieter"])
-    eig_id = await _create_partner(client, headers, "Eigentümer Y", ["eigentuemer"])
+    mieter_id = await _create_partner(
+        client, headers, "Mieter X", [str(partner_typ_uuids["mieter"])]
+    )
+    eig_id = await _create_partner(
+        client, headers, "Eigentümer Y", [str(partner_typ_uuids["eigentuemer"])]
+    )
 
     res = await client.post(
         "/api/v1/objekte",
@@ -64,12 +68,12 @@ async def test_invalid_partner_link_returns_400(client, admin_user) -> None:
 
 
 @pytest.mark.integration
-async def test_update_objekt_replaces_partner_links(client, admin_user) -> None:
+async def test_update_objekt_replaces_partner_links(client, admin_user, partner_typ_uuids) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
-    p1 = await _create_partner(client, headers, "P1", ["mieter"])
-    p2 = await _create_partner(client, headers, "P2", ["nachunternehmer"])
+    p1 = await _create_partner(client, headers, "P1", [str(partner_typ_uuids["mieter"])])
+    p2 = await _create_partner(client, headers, "P2", [str(partner_typ_uuids["nachunternehmer"])])
 
     create = await client.post(
         "/api/v1/objekte",
