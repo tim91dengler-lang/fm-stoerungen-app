@@ -41,6 +41,35 @@ function slugify(s: string): string {
     .slice(0, 64);
 }
 
+// Default-Felder für Live-Vorschau beim Anlegen einer neuen Vorlage.
+// Muss synchron bleiben mit DEFAULT_SYSTEM_FELDER in
+// apps/api/src/fm_api/services/tickettyp_service.py — Backend ist die
+// Source-of-Truth und seedet die echten Datensätze.
+// IDs sind Pseudo-Slugs (statt UUIDs), nur für React-Keys und
+// DnD-Identifier; werden nach erfolgreichem Anlegen durch Backend-Werte
+// ersetzt.
+const DEFAULT_FELDER_PREVIEW: TickettypFeldRead[] = [
+  { id: 'default-titel', feld_key: 'titel', label: 'Titel', ist_system_feld: true, sichtbar: true, pflicht: true, nur_admin_sichtbar: false, reihenfolge: 0 },
+  { id: 'default-objekt', feld_key: 'objekt', label: 'Objekt', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 1 },
+  { id: 'default-haus', feld_key: 'haus', label: 'Haus', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 2 },
+  { id: 'default-stockwerk', feld_key: 'stockwerk', label: 'Stockwerk', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 3 },
+  { id: 'default-einheit', feld_key: 'einheit', label: 'Einheit', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 4 },
+  { id: 'default-anlage', feld_key: 'anlage', label: 'Anlage', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 5 },
+  { id: 'default-partner', feld_key: 'partner', label: 'Partner', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 6 },
+  { id: 'default-kategorie', feld_key: 'kategorie', label: 'Kategorie', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 7 },
+  { id: 'default-prio', feld_key: 'prio', label: 'Priorität', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 8 },
+  { id: 'default-pin', feld_key: 'pin', label: 'Foto-Pin', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 9 },
+  { id: 'default-melder', feld_key: 'melder', label: 'Melder', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 10 },
+  { id: 'default-quelle', feld_key: 'quelle', label: 'Eingangskanal', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 11 },
+  { id: 'default-beschreibung', feld_key: 'beschreibung', label: 'Beschreibung', ist_system_feld: true, sichtbar: true, pflicht: true, nur_admin_sichtbar: false, reihenfolge: 12 },
+  { id: 'default-foto', feld_key: 'foto', label: 'Foto', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 13 },
+  { id: 'default-dokumente', feld_key: 'dokumente', label: 'Dokumente', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 14 },
+  { id: 'default-projekt', feld_key: 'projekt', label: 'Projekt', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 15 },
+  { id: 'default-faelligkeit_am', feld_key: 'faelligkeit_am', label: 'Fälligkeitsdatum', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 16 },
+  { id: 'default-wiederholung', feld_key: 'wiederholung', label: 'Wiederholung', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 17 },
+  { id: 'default-fehlercode', feld_key: 'fehlercode', label: 'Fehlercode', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 18 },
+];
+
 export function VorlageDesignerModal({ vorlage, onClose, onSaved }: Props) {
   const qc = useQueryClient();
   const isNew = vorlage === null;
@@ -52,7 +81,9 @@ export function VorlageDesignerModal({ vorlage, onClose, onSaved }: Props) {
     icon: vorlage?.icon ?? 'wrench',
     farbe: vorlage?.farbe ?? 'emerald',
   }));
-  const [felder, setFelder] = useState<TickettypFeldRead[]>(vorlage?.felder ?? []);
+  const [felder, setFelder] = useState<TickettypFeldRead[]>(
+    vorlage?.felder ?? DEFAULT_FELDER_PREVIEW,
+  );
   const [keyTouched, setKeyTouched] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showAbortConfirm, setShowAbortConfirm] = useState(false);
