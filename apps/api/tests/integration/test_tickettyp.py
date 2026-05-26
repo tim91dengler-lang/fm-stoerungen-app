@@ -85,7 +85,10 @@ async def test_duplicate_tickettyp_kloniert_komplett(client, admin_user, db, man
     assert body["key"] == "reparatur-kopie-1"
     assert body["ist_system"] is False
     assert body["aktiv"] is True
-    assert len(body["felder"]) == len(src.felder)
+    # Helper seedet genau 1 Feld; Duplicate muss es klonen.
+    assert len(body["felder"]) == 1
+    assert body["felder"][0]["feld_key"] == "titel"
+    assert body["felder"][0]["pflicht"] is True
 
     # Zweite Duplikation → kopie-2
     res2 = await client.post(
