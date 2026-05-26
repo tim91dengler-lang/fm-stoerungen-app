@@ -144,6 +144,27 @@ async def test_system_tickettyp_kann_deaktiviert_werden(client, admin_user, db, 
 
 
 @pytest.mark.integration
+async def test_create_tickettyp_duplikat_key_gibt_409(client, admin_user) -> None:
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+
+    first = await client.post(
+        "/api/v1/tickettypen",
+        headers=headers,
+        json={"key": "duplikat-test", "label": "Erste"},
+    )
+    assert first.status_code == 201, first.text
+
+    second = await client.post(
+        "/api/v1/tickettypen",
+        headers=headers,
+        json={"key": "duplikat-test", "label": "Zweite"},
+    )
+    assert second.status_code == 409, second.text
+    assert "duplikat-test" in second.json()["detail"]
+
+
+@pytest.mark.integration
 async def test_aktiv_only_filtert_deaktivierte_vorlagen(client, admin_user) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)

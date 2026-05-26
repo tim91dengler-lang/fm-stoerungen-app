@@ -13,6 +13,7 @@ from fm_api.services import tickettyp_service
 from fm_api.services.tickettyp_service import (
     SystemTickettypProtectedError,
     TickettypFeldNotFoundError,
+    TickettypKeyConflictError,
     TickettypNotFoundError,
 )
 
@@ -46,9 +47,12 @@ async def get_tickettyp(
 async def create_tickettyp(
     payload: TickettypCreate, db: AuditedDbSession, current: CurrentUserDep
 ) -> TickettypRead:
-    item = await tickettyp_service.create_tickettyp(
-        db, current.mandant_id, payload=payload.model_dump()
-    )
+    try:
+        item = await tickettyp_service.create_tickettyp(
+            db, current.mandant_id, payload=payload.model_dump()
+        )
+    except TickettypKeyConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return TickettypRead.model_validate(item)
 
 
