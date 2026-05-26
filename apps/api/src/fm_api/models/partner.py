@@ -120,6 +120,8 @@ class GeschaeftsPartner(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     # wenn keine separaten Kontakte gepflegt werden).
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     telefon: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mobil: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    telefax: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Relationships
     mandant: Mapped["Mandant"] = relationship(lazy="raise")

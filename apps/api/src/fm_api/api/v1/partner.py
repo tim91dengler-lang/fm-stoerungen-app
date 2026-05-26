@@ -16,11 +16,15 @@ from fm_api.schemas.partner import (
     PartnerAdresseRead,
     PartnerAdresseUpdate,
     PartnerCreate,
+    PartnerHierarchieResponse,
     PartnerKontaktCreate,
     PartnerKontaktRead,
     PartnerKontaktUpdate,
+    PartnerObjektLinkRead,
+    PartnerProjektLinkRead,
     PartnerRead,
     PartnerSperrenResponse,
+    PartnerTicketLinkRead,
     PartnerUpdate,
 )
 from fm_api.services import partner_service
@@ -347,3 +351,81 @@ async def delete_partner_adresse(
         await partner_service.delete_partner_adresse(db, link_id, current.mandant_id)
     except PartnerAdresseNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+# ----- Track 3: Hierarchie / verlinkte Listen ------------------------------
+
+
+@router.get(
+    "/{partner_id}/hierarchie",
+    response_model=PartnerHierarchieResponse,
+    summary="Filialen-Baum: Mutter + alle Töchter rekursiv",
+)
+async def get_partner_hierarchie(
+    partner_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> PartnerHierarchieResponse:
+    try:
+        tree = await partner_service.get_hierarchie(db, partner_id, current.mandant_id)
+    except PartnerNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return PartnerHierarchieResponse.model_validate(tree)
+
+
+@router.get(
+    "/{partner_id}/objekte",
+    response_model=list[PartnerObjektLinkRead],
+    summary="Objekte mit Bezug zum Partner",
+)
+async def get_partner_objekte(
+    partner_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> list[PartnerObjektLinkRead]:
+    try:
+        rows = await partner_service.list_objekte_fuer_partner(
+            db, partner_id, current.mandant_id
+        )
+    except PartnerNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return [PartnerObjektLinkRead.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{partner_id}/projekte",
+    response_model=list[PartnerProjektLinkRead],
+    summary="Projekte mit transitivem Partner-Bezug (über Objekte)",
+)
+async def get_partner_projekte(
+    partner_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> list[PartnerProjektLinkRead]:
+    try:
+        rows = await partner_service.list_projekte_fuer_partner(
+            db, partner_id, current.mandant_id
+        )
+    except PartnerNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return [PartnerProjektLinkRead.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{partner_id}/tickets",
+    response_model=list[PartnerTicketLinkRead],
+    summary="Tickets mit Partner-Bezug (direkter FK)",
+)
+async def get_partner_tickets(
+    partner_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+    include_erledigt: bool = Query(default=False),
+) -> list[PartnerTicketLinkRead]:
+    try:
+        rows = await partner_service.list_tickets_fuer_partner(
+            db, partner_id, current.mandant_id, include_erledigt=include_erledigt
+        )
+    except PartnerNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return [PartnerTicketLinkRead.model_validate(r) for r in rows]
