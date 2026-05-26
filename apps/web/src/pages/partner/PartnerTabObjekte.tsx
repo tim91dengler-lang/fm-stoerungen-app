@@ -43,7 +43,8 @@ export function PartnerTabObjekte({ partnerId, partnerName }: Props) {
 
   const filtered = useMemo<PartnerObjektLinkRead[]>(() => {
     let rows = q.data ?? [];
-    if (rolleFilter) rows = rows.filter((r) => r.rollen.includes(rolleFilter));
+    if (rolleFilter)
+      rows = rows.filter((r) => (r.rollen as readonly string[]).includes(rolleFilter));
     if (search) {
       const needle = search.toLowerCase();
       rows = rows.filter((r) =>
