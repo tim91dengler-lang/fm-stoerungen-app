@@ -303,11 +303,7 @@ async def test_partner_projekte_endpoint_transitiv(client, admin_user, db) -> No
     )
     db.add(projekt)
     await db.flush()
-    db.add(
-        ProjektObjektLink(
-            projekt_id=projekt.id, objekt_id=obj.id, mandant_id=mandant_id
-        )
-    )
+    db.add(ProjektObjektLink(projekt_id=projekt.id, objekt_id=obj.id, mandant_id=mandant_id))
     await db.commit()
 
     res = await client.get(f"/api/v1/partner/{partner['id']}/projekte", headers=headers)

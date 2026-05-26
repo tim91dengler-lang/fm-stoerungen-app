@@ -549,9 +549,7 @@ async def delete_partner_adresse(db: AsyncSession, link_id: UUID, mandant_id: UU
 _HIERARCHIE_MAX_DEPTH = 10
 
 
-async def get_hierarchie(
-    db: AsyncSession, partner_id: UUID, mandant_id: UUID
-) -> dict[str, Any]:
+async def get_hierarchie(db: AsyncSession, partner_id: UUID, mandant_id: UUID) -> dict[str, Any]:
     """Liefert root-Vorfahren + alle Nachfahren als Baum.
 
     Schritte:

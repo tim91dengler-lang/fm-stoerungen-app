@@ -384,9 +384,7 @@ async def get_partner_objekte(
     current: CurrentUserDep,
 ) -> list[PartnerObjektLinkRead]:
     try:
-        rows = await partner_service.list_objekte_fuer_partner(
-            db, partner_id, current.mandant_id
-        )
+        rows = await partner_service.list_objekte_fuer_partner(db, partner_id, current.mandant_id)
     except PartnerNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return [PartnerObjektLinkRead.model_validate(r) for r in rows]
@@ -403,9 +401,7 @@ async def get_partner_projekte(
     current: CurrentUserDep,
 ) -> list[PartnerProjektLinkRead]:
     try:
-        rows = await partner_service.list_projekte_fuer_partner(
-            db, partner_id, current.mandant_id
-        )
+        rows = await partner_service.list_projekte_fuer_partner(db, partner_id, current.mandant_id)
     except PartnerNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return [PartnerProjektLinkRead.model_validate(r) for r in rows]
