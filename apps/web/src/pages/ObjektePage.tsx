@@ -43,6 +43,7 @@ const PARTNER_TYPEN: PartnerTyp[] = [
   'eigentuemer',
   'auftraggeber',
   'nachunternehmer',
+  'privatperson',
 ];
 
 const TYP_LABEL: Record<PartnerTyp, string> = {
@@ -50,6 +51,7 @@ const TYP_LABEL: Record<PartnerTyp, string> = {
   eigentuemer: 'Eigentümer',
   auftraggeber: 'Auftraggeber',
   nachunternehmer: 'Nachunternehmer',
+  privatperson: 'Privatperson',
 };
 
 const EMPTY_FORM: ObjektCreate = {
