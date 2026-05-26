@@ -1,16 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * E2E-Tests für den Vorlagen-Designer (Track 2).
+ * E2E-Tests für den Vorlagen-Designer (Track 2 inkl. Page-Refactor).
  *
  * Deckt die Hauptpfade aus Spec §7 ab: Anlegen, Live-Vorschau,
  * Sichtbar/Pflicht-Toggles, Duplizieren, Aktiv-Toggle inkl. Filterung
  * im Erfassungs-Modal, Löschen mit ConfirmDialog.
  *
- * Drag-and-Drop wird bewusst ausgespart: die @dnd-kit-Library erwartet
- * eine sehr spezifische Maus-Bewegungs-Sequenz, die in Playwright nur
- * mit `dispatchEvent`-Tricks zuverlässig läuft. Lieber abgegrenzt und
- * separat testbar.
+ * Drag-and-Drop wird bewusst ausgespart: @dnd-kit erwartet eine sehr
+ * spezifische Maus-Bewegungs-Sequenz, die in Playwright nur mit
+ * dispatchEvent-Tricks zuverlässig läuft.
  */
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@fm-staging.local';
@@ -30,80 +29,75 @@ async function gotoVorlagen(page: Page): Promise<void> {
 }
 
 test.describe('Vorlagen-Designer', () => {
-  test('Neue Vorlage anlegen → erscheint in der Karten-Liste', async ({ page }) => {
+  test('„Neue Vorlage" navigiert auf eigene Page und legt eine Vorlage an', async ({ page }) => {
     await login(page);
     await gotoVorlagen(page);
 
     const name = `E2E-Anlage ${Date.now()}`;
 
     await page.getByRole('button', { name: 'Neue Vorlage' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.waitForURL(/\/stammdaten\/vorlagen\/neu/);
+    await expect(page.getByRole('heading', { name: /Neue Vorlage/ })).toBeVisible();
 
     await page.getByLabel('Bezeichnung').fill(name);
     await page.getByLabel('Beschreibung').fill('Smoke-Test über Playwright.');
 
     await page.getByRole('button', { name: 'Speichern' }).click();
 
-    // Modal schließt + Karte mit dem Namen erscheint
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 });
+    // Redirect auf /:id/bearbeiten
+    await page.waitForURL(/\/stammdaten\/vorlagen\/[0-9a-f-]+\/bearbeiten/, { timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: new RegExp(name) })).toBeVisible();
+
+    // Liste zeigt die neue Vorlage
+    await gotoVorlagen(page);
     await expect(page.getByText(name).first()).toBeVisible();
   });
 
   test('Live-Vorschau zeigt Default-Felder beim Anlegen', async ({ page }) => {
     await login(page);
-    await gotoVorlagen(page);
-
-    await page.getByRole('button', { name: 'Neue Vorlage' }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
+    await page.goto('/stammdaten/vorlagen/neu');
 
     // Header der Vorschau muss da sein
-    await expect(dialog.getByText(/LIVE-VORSCHAU/i)).toBeVisible();
+    await expect(page.getByText(/LIVE-VORSCHAU/i)).toBeVisible();
 
-    // Mindestens diese System-Felder müssen in der Vorschau gerendert sein
-    // (Pflicht-Defaults: Titel + Beschreibung). Wir prüfen ihre Labels.
-    await expect(dialog.getByLabel('Titel', { exact: false }).first()).toBeVisible();
-    await expect(dialog.getByLabel('Beschreibung', { exact: false }).first()).toBeVisible();
+    // Default-Pflicht-Felder müssen sichtbar sein (mindestens Titel + Beschreibung).
+    await expect(page.getByText('Titel', { exact: false }).first()).toBeVisible();
+    await expect(page.getByText('Beschreibung', { exact: false }).first()).toBeVisible();
   });
 
-  test('Bestehende Vorlage bearbeiten → Modal mit Felder-Liste', async ({ page }) => {
+  test('Bestehende Vorlage öffnet als Page mit Stammdaten-Block und Vorschau', async ({ page }) => {
     await login(page);
     await gotoVorlagen(page);
 
-    // Erste Karte öffnen (egal welche — System-Vorlagen sind immer da)
+    // Klick auf erste Karte navigiert
     const firstCard = page.locator('[class*="cursor-pointer"]').first();
     await firstCard.click();
 
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('heading', { name: /Vorlage bearbeiten/ })).toBeVisible();
+    await page.waitForURL(/\/stammdaten\/vorlagen\/[0-9a-f-]+\/bearbeiten/);
+    await expect(page.getByRole('heading', { name: /Vorlage bearbeiten:/ })).toBeVisible();
 
-    // Es muss mindestens einen Sichtbar/Versteckt-Button geben
-    const sichtbarButtons = dialog.getByRole('button', { name: /Sichtbar|Versteckt/ });
-    await expect(sichtbarButtons.first()).toBeVisible();
+    // Versteckte-Felder-Sektion und Live-Vorschau müssen da sein
+    await expect(page.getByText(/Versteckte Felder/)).toBeVisible();
+    await expect(page.getByText(/LIVE-VORSCHAU/i)).toBeVisible();
 
-    await dialog.getByRole('button', { name: 'Abbrechen' }).click();
-    // Falls ConfirmDialog wegen unsaved auftaucht (sollte hier nicht, weil
-    // wir nichts geändert haben), abfangen
-    const verwerfen = page.getByRole('button', { name: 'Verwerfen' });
-    if (await verwerfen.isVisible().catch(() => false)) {
-      await verwerfen.click();
-    }
-    await expect(dialog).not.toBeVisible();
+    // Zurück zur Liste via Link
+    await page.getByRole('link', { name: /Vorlagen/ }).first().click();
+    await page.waitForURL(/\/stammdaten\/vorlagen$/);
   });
 
   test('Duplizieren erzeugt eine Kopie mit "(Kopie)"-Suffix', async ({ page }) => {
     await login(page);
     await gotoVorlagen(page);
 
-    // Wir legen erst eine eigene Vorlage an, damit der Test isoliert ist
+    // Eigene Quell-Vorlage anlegen, damit der Test isoliert ist
     const baseName = `E2E-Quelle ${Date.now()}`;
     await page.getByRole('button', { name: 'Neue Vorlage' }).click();
     await page.getByLabel('Bezeichnung').fill(baseName);
     await page.getByRole('button', { name: 'Speichern' }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 });
+    await page.waitForURL(/\/stammdaten\/vorlagen\/[0-9a-f-]+\/bearbeiten/, { timeout: 10_000 });
 
-    // Karte mit baseName finden + duplizieren-Button hover-clicken
+    // Zurück zur Liste, dort duplizieren
+    await gotoVorlagen(page);
     const card = page
       .locator(`div:has-text("${baseName}")`)
       .filter({ has: page.getByLabel('Duplizieren') })
@@ -111,7 +105,6 @@ test.describe('Vorlagen-Designer', () => {
     await card.hover();
     await card.getByLabel('Duplizieren').click();
 
-    // Kopie erscheint
     await expect(page.getByText(`${baseName} (Kopie)`)).toBeVisible({ timeout: 5_000 });
   });
 
@@ -119,15 +112,14 @@ test.describe('Vorlagen-Designer', () => {
     await login(page);
     await gotoVorlagen(page);
 
-    // Anlegen
     const name = `E2E-Inaktiv ${Date.now()}`;
     await page.getByRole('button', { name: 'Neue Vorlage' }).click();
     await page.getByLabel('Bezeichnung').fill(name);
     await page.getByRole('button', { name: 'Speichern' }).click();
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(name)).toBeVisible();
+    await page.waitForURL(/\/stammdaten\/vorlagen\/[0-9a-f-]+\/bearbeiten/, { timeout: 10_000 });
 
-    // Deaktivieren
+    // Zurück zur Liste, deaktivieren
+    await gotoVorlagen(page);
     const card = page
       .locator(`div:has-text("${name}")`)
       .filter({ has: page.getByLabel('Deaktivieren') })
@@ -135,8 +127,7 @@ test.describe('Vorlagen-Designer', () => {
     await card.hover();
     await card.getByLabel('Deaktivieren').click();
 
-    // Auf der VorlagenPage darf sie default ausgeblendet sein
-    // (Filter "Inaktive einblenden" ist initial aus)
+    // Filter "Inaktive einblenden" ist initial aus → Vorlage verschwindet
     await expect(page.getByText(name)).not.toBeVisible({ timeout: 3_000 });
 
     // Im Erfassungs-Modal darf die deaktivierte Vorlage nicht erscheinen
@@ -151,13 +142,35 @@ test.describe('Vorlagen-Designer', () => {
     await login(page);
     await gotoVorlagen(page);
 
-    // System-Vorlagen sind erkennbar am "System"-Badge. Wir prüfen,
-    // dass auf einer solchen Karte kein Löschen-Aktions-Button ist.
     const systemCard = page
       .locator(`div:has-text("System"):has(div.font-semibold)`)
       .first();
     await expect(systemCard).toBeVisible();
     await systemCard.hover();
     await expect(systemCard.getByLabel('Löschen')).toHaveCount(0);
+  });
+
+  test('Pflicht-Toggle und Verbergen-Button funktionieren direkt in der Vorschau', async ({ page }) => {
+    await login(page);
+    await gotoVorlagen(page);
+
+    // Eigene Vorlage anlegen
+    const name = `E2E-Inline ${Date.now()}`;
+    await page.getByRole('button', { name: 'Neue Vorlage' }).click();
+    await page.getByLabel('Bezeichnung').fill(name);
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.waitForURL(/\/stammdaten\/vorlagen\/[0-9a-f-]+\/bearbeiten/, { timeout: 10_000 });
+
+    // Auf der Bearbeiten-Seite: ein Feld ausblenden via Verbergen-Button.
+    // Vorher sind 19 sichtbar.
+    const counterBefore = await page.getByText(/\d+ sichtbar/).first().textContent();
+
+    // Verbergen-Button am ersten sichtbaren Feld klicken
+    const firstVerbergen = page.getByLabel('Verbergen').first();
+    await firstVerbergen.click();
+
+    // Counter muss runter, Pool-Section bekommt einen +-Eintrag
+    const counterAfter = await page.getByText(/\d+ sichtbar/).first().textContent();
+    expect(counterAfter).not.toBe(counterBefore);
   });
 });
