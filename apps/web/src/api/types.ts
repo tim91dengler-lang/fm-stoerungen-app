@@ -220,6 +220,8 @@ export interface TicketListFilters {
   status?: TicketStatusSlug[];
   prioritaet?: TicketPrioritaetSlug[];
   zugewiesen_an_id?: UUID;
+  partner_id?: UUID;
+  objekt_id?: UUID;
   limit?: number;
   offset?: number;
 }

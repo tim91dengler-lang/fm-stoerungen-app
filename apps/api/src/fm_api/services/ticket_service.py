@@ -132,6 +132,8 @@ async def list_tickets(
     status_filter: list[str] | None = None,
     prioritaet_filter: list[str] | None = None,
     zugewiesen_an_id: UUID | None = None,
+    partner_id: UUID | None = None,
+    objekt_id: UUID | None = None,
     include_deleted: bool = False,
     limit: int = 50,
     offset: int = 0,
@@ -173,6 +175,12 @@ async def list_tickets(
 
     if zugewiesen_an_id is not None:
         base = base.where(Ticket.zugewiesen_an_id == zugewiesen_an_id)
+
+    if partner_id is not None:
+        base = base.where(Ticket.partner_id == partner_id)
+
+    if objekt_id is not None:
+        base = base.where(Ticket.objekt_id == objekt_id)
 
     count_stmt = select(func.count()).select_from(base.subquery())
     total = (await db.execute(count_stmt)).scalar_one()

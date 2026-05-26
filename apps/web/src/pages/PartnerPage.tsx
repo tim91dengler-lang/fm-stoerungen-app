@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   type ColumnDef,
@@ -195,15 +196,15 @@ export function PartnerPage() {
           const p = ctx.row.original;
           return (
             <div className="flex items-center gap-2">
-              <span
+              <Link
+                to={`/stammdaten/partner/${p.id}`}
                 className={clsx(
-                  'cursor-pointer font-medium hover:text-emerald-300',
+                  'font-medium hover:text-emerald-300',
                   p.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
                 )}
-                onClick={() => openEdit(p)}
               >
                 {p.name}
-              </span>
+              </Link>
               {p.gesperrt && (
                 <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
                   gesperrt

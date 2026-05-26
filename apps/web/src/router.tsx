@@ -13,6 +13,7 @@ import { MeineTicketsPage } from './pages/MeineTicketsPage';
 import { MobileDemoPage } from './pages/MobileDemoPage';
 import { ObjektDetailPage } from './pages/ObjektDetailPage';
 import { ObjektePage } from './pages/ObjektePage';
+import { PartnerDetailPage } from './pages/PartnerDetailPage';
 import { PartnerPage } from './pages/PartnerPage';
 import { ProjektDetailPage } from './pages/ProjektDetailPage';
 import { ProjektePage } from './pages/ProjektePage';
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
           { path: '/stammdaten/objekte', element: <ObjektePage /> },
           { path: '/stammdaten/objekte/:id', element: <ObjektDetailPage /> },
           { path: '/stammdaten/partner', element: <PartnerPage /> },
+          { path: '/stammdaten/partner/:id', element: <PartnerDetailPage /> },
           { path: '/stammdaten/anlagen', element: <AnlagenPage /> },
           { path: '/stammdaten/fehlercodes', element: <FehlercodesPage /> },
           { path: '/stammdaten/vorlagen', element: <VorlagenPage /> },
