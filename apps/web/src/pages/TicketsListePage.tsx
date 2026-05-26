@@ -31,6 +31,7 @@ import type {
   TicketStatusSlug,
 } from '../api/types';
 import { PrioBadge, StatusBadge } from '../components/StatusBadge';
+import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
 import { TicketErfassenModal } from './TicketErfassenModal';
 import {
   PRIO_SLUGS,
@@ -93,24 +94,32 @@ const GROUPABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'zugewiesen_an', label: 'nach Bearbeiter' },
 ];
 
-const PARTNER_TYP_LABEL: Record<string, string> = {
-  mieter: 'Mieter',
-  eigentuemer: 'Eigentümer',
-  auftraggeber: 'Auftraggeber',
-  nachunternehmer: 'Nachunternehmer',
-};
-
-const PARTNER_TYP_TONE: Record<string, string> = {
+// Slug-basierter Fallback für Tone — kommt zum Tragen, wenn die Auswahlliste
+// keine Farbe gesetzt hat. Reihenfolge: w.farbe → SLUG-Tabelle → neutral.
+const PARTNER_TYP_TONE_BY_SLUG: Record<string, string> = {
   mieter: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
   eigentuemer: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
   auftraggeber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  nachunternehmer: 'bg-zinc-700/40 text-zinc-300 border-zinc-700',
+  dienstleister: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  nachunternehmer: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+  privatperson: 'bg-zinc-700/40 text-zinc-300 border-zinc-700',
 };
+const PARTNER_TYP_TONE_NEUTRAL = 'bg-zinc-700/40 text-zinc-300 border-zinc-700';
 
-function PartnerTypPill({ typ }: { typ: string }) {
-  const label = PARTNER_TYP_LABEL[typ] ?? typ;
-  const tone =
-    PARTNER_TYP_TONE[typ] ?? 'bg-zinc-700/40 text-zinc-300 border-zinc-700';
+function toneForSlug(slug: string | null): string {
+  if (!slug) return PARTNER_TYP_TONE_NEUTRAL;
+  return PARTNER_TYP_TONE_BY_SLUG[slug] ?? PARTNER_TYP_TONE_NEUTRAL;
+}
+
+function PartnerTypPill({
+  typId,
+  lookup,
+}: {
+  typId: string;
+  lookup: ReturnType<typeof usePartnerTypLookup>;
+}) {
+  const label = lookup.labelFor(typId) || '—';
+  const tone = toneForSlug(lookup.slugFor(typId));
   return (
     <span
       className={`inline-flex w-fit items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${tone}`}
@@ -142,6 +151,7 @@ interface MassEditOptions {
 function buildColumns(
   onOpen: (ticketId: string) => void,
   massEditOptions: MassEditOptions,
+  partnerTypLookup: ReturnType<typeof usePartnerTypLookup>,
 ): ColumnDef<TicketRead>[] {
   return [
     {
@@ -248,7 +258,9 @@ function buildColumns(
         return (
           <div className="flex flex-col gap-0.5">
             <span className="truncate text-zinc-200">{p.name}</span>
-            {firstTyp && <PartnerTypPill typ={firstTyp} />}
+            {firstTyp && (
+              <PartnerTypPill typId={firstTyp} lookup={partnerTypLookup} />
+            )}
           </div>
         );
       },
@@ -416,9 +428,10 @@ export function TicketsListePage() {
     usersQuery.data,
   ]);
 
+  const partnerTypLookup = usePartnerTypLookup();
   const columns = useMemo(
-    () => buildColumns(openTicket, massEditOptions),
-    [massEditOptions], // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildColumns(openTicket, massEditOptions, partnerTypLookup),
+    [massEditOptions, partnerTypLookup], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // Inline-Mass-Edit-Handler. Mapped die Combobox-/Auswahl-Werte auf den

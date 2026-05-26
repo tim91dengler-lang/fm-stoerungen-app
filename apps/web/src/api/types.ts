@@ -59,7 +59,9 @@ export interface ObjektRef {
 export interface PartnerRef {
   id: UUID;
   name: string;
-  typen: string[];
+  /** UUIDs auf Auswahllisten-Werte der Liste `partner_typ`
+   *  (umgestellt in Track 3 Sub-PR B / Migration 0016). */
+  typen: UUID[];
 }
 
 // Bekannte System-Slugs (in Migration als ist_system=TRUE geseedet).
@@ -328,6 +330,8 @@ export interface AdresseSuggestion {
 
 // ---------------------------------------------------------------- Partner
 
+/** Slugs des Postgres-Enums `partner_typ` — werden u. a. in
+ *  `ObjektPartner.rolle` weiter genutzt (Junction-Tabelle). */
 export type PartnerTyp =
   | 'mieter'
   | 'eigentuemer'
@@ -335,9 +339,9 @@ export type PartnerTyp =
   | 'nachunternehmer'
   | 'privatperson';
 
-/** Schließt `partner_typ`-Slugs ein, die nur in der Auswahlliste, nicht
- *  aber im Postgres-Enum existieren. Dient den Track-3-Endpoints (z. B.
- *  Rolle eines Partners am Objekt) als breiterer Typ. */
+/** Schließt zusätzlich Slugs ein, die nur in der `partner_typ`-Auswahlliste
+ *  existieren (z. B. `dienstleister`) — relevant für die Anzeige von
+ *  `GeschaeftsPartner.typen` (UUID-Array) und Track-3-Endpoints. */
 export type PartnerTypSlug = PartnerTyp | 'dienstleister';
 
 export interface PartnerKontaktRead {
@@ -417,7 +421,10 @@ export interface PartnerRead {
   mobil: string | null;
   telefax: string | null;
   notiz: string | null;
-  typen: PartnerTyp[];
+  /** UUIDs auf Auswahllisten-Werte der Liste `partner_typ`
+   *  (umgestellt in Track 3 Sub-PR B / Migration 0016).
+   *  Für die Anzeige Label/Farbe via `usePartnerTypLookup`-Hook auflösen. */
+  typen: UUID[];
   /** Backward-Compat (computed_field aus Backend): zusammengebauter Anzeigetext
    *  des Hauptkontakts (oder der Partner-Personenfelder bei Privatperson). */
   ansprechpartner: string | null;
@@ -445,7 +452,7 @@ export interface PartnerWriteBase {
   mobil?: string | null;
   telefax?: string | null;
   notiz?: string | null;
-  typen: PartnerTyp[];
+  typen: UUID[];
 }
 
 export type PartnerCreate = PartnerWriteBase;

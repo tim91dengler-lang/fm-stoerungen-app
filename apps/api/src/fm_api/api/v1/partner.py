@@ -51,7 +51,7 @@ async def list_partner(
     db: AuditedDbSession,
     current: CurrentUserDep,
     search: str | None = Query(default=None, max_length=200),
-    typ: list[str] | None = Query(default=None),
+    typ: list[UUID] | None = Query(default=None),
     gesperrt_filter: str = Query(default="aktiv", pattern="^(aktiv|gesperrt|alle)$"),
     parent_partner_id: UUID | None = Query(default=None),
     include_deleted: bool = Query(default=False),

@@ -23,8 +23,44 @@ from fm_api.core.security import hash_password
 from fm_api.db.base import Base
 from fm_api.db.session import SessionLocal
 from fm_api.main import create_app
-from fm_api.models import Mandant, Role, User
+from fm_api.models import Auswahlliste, AuswahllistenWert, Mandant, Role, User
 from fm_api.services.auswahlliste_service import ensure_system_auswahllisten
+
+# Partner-bezogene Auswahllisten werden in Production via Migration 0013
+# pro Mandant geseedet. Im Test-Setup (Base.metadata.create_all umgeht die
+# Alembic-Pipeline) müssen wir sie hier nachstellen. Bewusst minimal —
+# Tests brauchen nur `partner_typ`-Werte.
+_PARTNER_TYP_WERTE: list[tuple[str, str, int]] = [
+    ("mieter", "Mieter", 10),
+    ("eigentuemer", "Eigentümer", 20),
+    ("auftraggeber", "Auftraggeber", 30),
+    ("dienstleister", "Dienstleister", 40),
+    ("nachunternehmer", "Nachunternehmer", 50),
+    ("privatperson", "Privatperson", 60),
+]
+
+
+async def _seed_partner_typ_liste(db: AsyncSession, mandant_id: UUID) -> None:
+    liste = Auswahlliste(
+        mandant_id=mandant_id,
+        key="partner_typ",
+        label="Partner-Typ",
+        beschreibung="Funktionale Rolle eines Geschäftspartners",
+        ist_system=False,
+    )
+    db.add(liste)
+    await db.flush()
+    for wert_key, label, reihenfolge in _PARTNER_TYP_WERTE:
+        db.add(
+            AuswahllistenWert(
+                auswahlliste_id=liste.id,
+                key=wert_key,
+                label=label,
+                reihenfolge=reihenfolge,
+                ist_system=False,
+            )
+        )
+    await db.flush()
 
 
 def _engine():
@@ -114,9 +150,26 @@ async def mandant(db: AsyncSession) -> Mandant:
     db.add(m)
     await db.flush()
     await ensure_system_auswahllisten(db, m.id)
+    await _seed_partner_typ_liste(db, m.id)
     await db.commit()
     await db.refresh(m)
     return m
+
+
+@pytest.fixture
+async def partner_typ_uuids(db: AsyncSession, mandant: Mandant) -> dict[str, UUID]:
+    """Lookup-Dict slug → UUID für die `partner_typ`-Liste des Mandanten."""
+    rows = (
+        await db.execute(
+            text(
+                "SELECT w.key, w.id "
+                "FROM auswahllisten_werte w "
+                "JOIN auswahllisten l ON l.id = w.auswahlliste_id "
+                "WHERE l.mandant_id = :mid AND l.key = 'partner_typ'"
+            ).bindparams(mid=mandant.id)
+        )
+    ).all()
+    return {r[0]: r[1] for r in rows}
 
 
 @pytest.fixture

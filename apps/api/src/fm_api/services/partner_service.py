@@ -35,7 +35,6 @@ from fm_api.models.objektstruktur import (
     StockwerkEigentuemer,
     StockwerkMieter,
 )
-from fm_api.models.partner import PartnerTyp
 
 
 class PartnerNotFoundError(Exception):
@@ -76,7 +75,7 @@ async def list_partner(
     mandant_id: UUID,
     *,
     search: str | None = None,
-    typ_filter: list[str] | None = None,
+    typ_filter: list[UUID] | None = None,
     gesperrt_filter: str = "aktiv",  # 'aktiv' | 'gesperrt' | 'alle'
     parent_partner_id: UUID | None = None,
     include_deleted: bool = False,
@@ -104,9 +103,9 @@ async def list_partner(
             )
         )
     if typ_filter:
-        valid = [PartnerTyp(t) for t in typ_filter if t in PartnerTyp.__members__.values()]
-        if valid:
-            base = base.where(GeschaeftsPartner.typen.op("&&")(valid))
+        # typen ist seit 0016 ein UUID-Array auf die `partner_typ`-Liste.
+        # PostgreSQL-Operator `&&` (array overlap).
+        base = base.where(GeschaeftsPartner.typen.op("&&")(typ_filter))
 
     if parent_partner_id is not None:
         base = base.where(GeschaeftsPartner.parent_partner_id == parent_partner_id)
@@ -176,8 +175,7 @@ async def _check_circular_hierarchy(
 async def create_partner(
     db: AsyncSession, mandant_id: UUID, *, payload: dict[str, Any]
 ) -> GeschaeftsPartner:
-    typen_str = payload.pop("typen", []) or []
-    typen = [PartnerTyp(t) for t in typen_str]
+    typen: list[UUID] = list(payload.pop("typen", []) or [])
     parent_id = payload.get("parent_partner_id")
     if parent_id is not None:
         # Beim Anlegen: temporärer Self-Check entfällt (Partner hat noch keine ID),
@@ -213,7 +211,7 @@ async def update_partner(
         await _check_circular_hierarchy(db, mandant_id, partner_id, new_parent)
 
     if "typen" in updates and updates["typen"] is not None:
-        partner.typen = [PartnerTyp(t) for t in updates.pop("typen")]
+        partner.typen = list(updates.pop("typen"))
     elif "typen" in updates and updates["typen"] is None:
         updates.pop("typen")
 
