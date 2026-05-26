@@ -51,6 +51,36 @@ function nullIfEmpty(v: string | null | undefined): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
+/** Simple Email-Validation. Leer ist ok (wird als null geschickt). */
+function isValidEmailOrEmpty(v: string | null | undefined): boolean {
+  if (!v || v.trim().length === 0) return true;
+  // Minimal-Check: enthält genau einen @, links und rechts mind. 1 Zeichen,
+  // rechts mindestens einen Punkt. Pydantic EmailStr ist strenger, aber
+  // dieser Check fängt das häufigste „kein @"-Problem ab.
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+}
+
+/** Extrahiert die Fehlermeldung aus einer Mutation-Error (Axios 422-Detail). */
+function extractMutationError(err: unknown): string | null {
+  if (!err || typeof err !== 'object') return null;
+  const axiosErr = err as {
+    response?: { data?: { detail?: unknown; message?: string } };
+    message?: string;
+  };
+  const detail = axiosErr.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d: { loc?: string[]; msg?: string }) => {
+        const field = d.loc?.filter((x) => x !== 'body').join('.') ?? '?';
+        return `${field}: ${d.msg ?? '?'}`;
+      })
+      .join('; ');
+  }
+  if (typeof detail === 'string') return detail;
+  if (axiosErr.response?.data?.message) return axiosErr.response.data.message;
+  return axiosErr.message ?? null;
+}
+
 // ============================================================================
 // Hauptseite
 // ============================================================================
@@ -296,6 +326,8 @@ function StammdatenSection({
     );
   }, [form, partner]);
 
+  const emailInvalid = !isValidEmailOrEmpty(form.email);
+
   // Beim Verlassen der Seite warnen, wenn ungespeicherte Änderungen
   // (Pattern: useBlocker aus react-router v6 Data API + beforeunload).
   useDirtyFormWarning(isDirty);
@@ -497,8 +529,16 @@ function StammdatenSection({
             type="email"
             value={form.email ?? ''}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className={baseInputCls}
+            className={clsx(
+              baseInputCls,
+              emailInvalid && 'border-amber-500/50',
+            )}
           />
+          {emailInvalid && (
+            <p className="mt-1 text-[10px] text-amber-400">
+              Ungültige E-Mail (muss ein @ enthalten oder leer sein).
+            </p>
+          )}
         </Field>
         <Field label="Telefon">
           <input
@@ -552,7 +592,7 @@ function StammdatenSection({
           </button>
           <button
             type="button"
-            disabled={!isDirty || updateMut.isPending}
+            disabled={!isDirty || emailInvalid || updateMut.isPending}
             onClick={() => updateMut.mutate()}
             className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
           >
@@ -560,6 +600,12 @@ function StammdatenSection({
           </button>
         </div>
       </div>
+      {updateMut.error && (
+        <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">
+          <div className="font-semibold">Speichern fehlgeschlagen:</div>
+          <div className="mt-0.5">{extractMutationError(updateMut.error)}</div>
+        </div>
+      )}
     </Section>
   );
 }
@@ -1281,7 +1327,12 @@ function KontaktModal({
   }
 
   const isPending = createMut.isPending || updateMut.isPending;
-  const isInvalid = !nullIfEmpty(form.vorname) && !nullIfEmpty(form.nachname);
+  const nameMissing = !nullIfEmpty(form.vorname) && !nullIfEmpty(form.nachname);
+  const emailInvalid = !isValidEmailOrEmpty(form.email);
+  const isInvalid = nameMissing || emailInvalid;
+  const submitError = extractMutationError(
+    createMut.error ?? updateMut.error,
+  );
 
   return (
     <div
@@ -1435,10 +1486,21 @@ function KontaktModal({
             />
           </Field>
 
-          {isInvalid && (
+          {nameMissing && (
             <p className="text-xs text-amber-400">
               Bitte mindestens Vorname oder Nachname angeben.
             </p>
+          )}
+          {emailInvalid && (
+            <p className="text-xs text-amber-400">
+              E-Mail-Adresse ist ungültig (muss ein @ enthalten oder leer sein).
+            </p>
+          )}
+          {submitError && (
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">
+              <div className="font-semibold">Speichern fehlgeschlagen:</div>
+              <div className="mt-0.5">{submitError}</div>
+            </div>
           )}
         </div>
 
