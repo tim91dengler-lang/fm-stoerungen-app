@@ -346,7 +346,7 @@ export function VorlageDesignerModal({ vorlage, onClose, onSaved }: Props) {
               <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
                 Live-Vorschau Erfassungs-Formular
               </div>
-              <VorlagePreviewFelder tickettyp={previewTickettyp} />
+              <VorlagePreviewFelder tickettyp={previewTickettyp} onReorder={setFelder} />
             </div>
           </div>
 
