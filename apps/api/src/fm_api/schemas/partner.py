@@ -1,9 +1,22 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
 
 from fm_api.schemas.adresse import AdresseRead
 from fm_api.schemas.common import TimestampedRead
+
+# Slug-Literal für `ObjektPartner.rolle` (Postgres-Enum bleibt erhalten,
+# auch nach Track 3 Sub-PR B — Tim-Entscheidung 2026-04-20). Wird von
+# `schemas.objekt` importiert.
+PartnerTypLiteral = Literal[
+    "mieter",
+    "eigentuemer",
+    "auftraggeber",
+    "nachunternehmer",
+    "privatperson",
+]
+
 
 # ----- Sub-Resources: Kontakt -----------------------------------------------
 
