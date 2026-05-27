@@ -79,3 +79,6 @@ SCRATCH_*
 # Backup-Dateien
 *.bak
 *.backup
+
+# pnpm — auto-generated build-approval file, nicht für VCS
+apps/web/pnpm-workspace.yaml
