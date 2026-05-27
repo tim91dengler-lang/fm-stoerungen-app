@@ -32,10 +32,67 @@ import {
   Pencil,
   Pin,
   Play,
+  Rows3,
   Search,
+  Settings2,
   Trash2,
   X,
 } from 'lucide-react';
+
+// Listen-Power 2.0 (W1) — Opt-in-Polish-Optionen. Pages aktivieren einzelne
+// Polish-Verhalten gezielt; ohne polish-Prop bleibt das bisherige Verhalten
+// unverändert (Roll-out via W2 auf alle Listen).
+export interface ListenPolishOptions {
+  /** B1.1: Edit/Delete/Sperren-Icons erst beim Zeilen-Hover sichtbar. */
+  actionVisibility?: 'always' | 'hover';
+  /** B1.3: Gruppen-Header bleibt beim Scrollen oben sichtbar. */
+  stickyGroupHeaders?: boolean;
+  /** B1.4: Gruppen-Inhalt sichtbar abgesetzt (Einrückung + Schattierung + dickerer Trenner). */
+  groupSeparators?: boolean;
+  /** B1.6: Density-Toggle (compact / comfortable / spacious). Persistiert pro viewKey in LocalStorage. */
+  densityToggle?: boolean;
+  /** B3.3: Spalten/Gruppen/Density in einem Zahnrad-Popover statt drei Buttons. */
+  consolidatedSettingsMenu?: boolean;
+  /** B3.5: `/` fokussiert die Volltextsuche (außerhalb von Eingabefeldern). */
+  searchShortcut?: boolean;
+}
+
+type Density = 'compact' | 'comfortable' | 'spacious';
+const DENSITY_VALUES: Density[] = ['compact', 'comfortable', 'spacious'];
+const DENSITY_LABELS: Record<Density, string> = {
+  compact: 'Kompakt',
+  comfortable: 'Komfort',
+  spacious: 'Luftig',
+};
+
+// Tailwind-Klassen pro Density für die zentralen Layout-Stellen. Body-Cell,
+// Header-Cell und GroupRow folgen demselben Schritt — sonst „springt" die
+// Tabelle bei Toggle.
+const DENSITY_BODY_TD: Record<Density, string> = {
+  compact: 'px-3 py-1',
+  comfortable: 'px-3 py-2',
+  spacious: 'px-3 py-3.5',
+};
+const DENSITY_GROUP_TD: Record<Density, string> = {
+  compact: 'px-3 py-1.5',
+  comfortable: 'px-3 py-2',
+  spacious: 'px-3 py-3',
+};
+
+function densityStorageKey(viewKey: string): string {
+  return `fm-list-density:${viewKey}`;
+}
+
+function readDensity(viewKey: string): Density {
+  if (typeof window === 'undefined') return 'comfortable';
+  try {
+    const raw = window.localStorage.getItem(densityStorageKey(viewKey));
+    if (raw && (DENSITY_VALUES as string[]).includes(raw)) return raw as Density;
+  } catch {
+    // LocalStorage kann blockiert sein (Private-Mode / SecurityError) — Fallback.
+  }
+  return 'comfortable';
+}
 
 // Dataset-Mime-Type für Drag-Group: das Drop-Target unterscheidet so
 // zwischen Header-Reorder (text/plain) und Group-Drop (text/group-col).
@@ -152,6 +209,8 @@ export interface PowerListenViewProps<TData> {
       onToggle: (row: TData) => void;
     };
   };
+  /** Listen-Power-2.0-Polish (W1). Pro Page einzeln aktivierbar. */
+  polish?: ListenPolishOptions;
 }
 
 /** Spec für eine spalten-spezifische Mass-Edit-Eingabe.
@@ -173,6 +232,7 @@ export interface MassEditSpec {
 }
 
 export function PowerListenView<TData>({
+  viewKey,
   columns,
   data,
   search,
@@ -203,9 +263,60 @@ export function PowerListenView<TData>({
   itemLabel,
   onMassEdit,
   rowActions,
+  polish,
 }: PowerListenViewProps<TData>) {
+  // Polish-Defaults: ohne polish-Prop bleibt alles wie bisher.
+  const polishActionVisibility = polish?.actionVisibility ?? 'always';
+  const polishStickyGroupHeaders = polish?.stickyGroupHeaders ?? false;
+  const polishGroupSeparators = polish?.groupSeparators ?? false;
+  const polishDensityToggle = polish?.densityToggle ?? false;
+  const polishConsolidatedMenu = polish?.consolidatedSettingsMenu ?? false;
+  const polishSearchShortcut = polish?.searchShortcut ?? false;
+
+  // Density wird nur dann persistiert, wenn der Toggle auch aktiv ist.
+  // Sonst bleibt jede Liste in 'comfortable' (heutiges Verhalten).
+  const [density, setDensityState] = useState<Density>(() =>
+    polishDensityToggle ? readDensity(viewKey) : 'comfortable',
+  );
+  function setDensity(next: Density) {
+    setDensityState(next);
+    try {
+      window.localStorage.setItem(densityStorageKey(viewKey), next);
+    } catch {
+      // Persistierung optional — UI-State bleibt sessionintern korrekt.
+    }
+  }
+  const bodyTdClass = DENSITY_BODY_TD[density];
+  const groupTdClass = DENSITY_GROUP_TD[density];
+
+  // `/`-Shortcut: fokussiert die Volltextsuche, wenn der User nicht gerade
+  // tippt (Input/Textarea/contenteditable werden respektiert).
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!polishSearchShortcut) return;
+    function handler(e: KeyboardEvent) {
+      if (e.key !== '/') return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+      e.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [polishSearchShortcut]);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
+  // B3.3 konsolidiertes Zahnrad-Menü mit Tabs Spalten | Gruppen | Ansicht.
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<
+    'spalten' | 'gruppen' | 'ansicht'
+  >('spalten');
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
   const [draggingCol, setDraggingCol] = useState<string | null>(null);
   const [dropZoneHover, setDropZoneHover] = useState(false);
   const [massEditStatus, setMassEditStatus] = useState<string | null>(null);
@@ -252,6 +363,14 @@ export function PowerListenView<TData>({
       });
     }
     if (rowActions?.onEdit || rowActions?.onDelete || rowActions?.sperren) {
+      // B1.1: bei polishActionVisibility='hover' sind die Icons nur per
+      // Maus-Hover oder Tastatur-Fokus auf der Zeile sichtbar — auf Mobile
+      // (< md) bleiben sie sichtbar, damit Touch-User sie weiterhin
+      // erreichen (Long-Press-Menü kommt in B5/später).
+      const actionWrapperClass =
+        polishActionVisibility === 'hover'
+          ? 'flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'
+          : 'flex items-center gap-0.5';
       prefix.push({
         id: '__actions__',
         enableSorting: false,
@@ -262,7 +381,7 @@ export function PowerListenView<TData>({
         cell: ({ row }) => {
           const isGesperrt = rowActions.sperren?.isGesperrt(row.original) ?? false;
           return (
-            <div className="flex items-center gap-0.5">
+            <div className={actionWrapperClass}>
               {rowActions.onEdit && (
                 <button
                   type="button"
@@ -310,7 +429,7 @@ export function PowerListenView<TData>({
       });
     }
     return [...prefix, ...columns];
-  }, [columns, enableRowSelection, rowActions]);
+  }, [columns, enableRowSelection, rowActions, polishActionVisibility]);
 
   // Dropdown beim Außerhalb-Klick schließen
   useEffect(() => {
@@ -333,6 +452,16 @@ export function PowerListenView<TData>({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showGroupPicker]);
+  useEffect(() => {
+    if (!showSettingsMenu) return;
+    function handler(e: MouseEvent) {
+      if (!settingsMenuRef.current?.contains(e.target as Node)) {
+        setShowSettingsMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showSettingsMenu]);
 
   // Stabile Default-Konstanten — sonst erzeugt jedes Render einer dieser
   // Inline-Werte (z. B. `rowSelection ?? {}`) ein neues Object, was
@@ -651,14 +780,20 @@ export function PowerListenView<TData>({
         <div className="relative min-w-[18rem] max-w-md flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <input
+            ref={searchInputRef}
             type="search"
-            placeholder={searchPlaceholder}
+            placeholder={
+              polishSearchShortcut
+                ? `${searchPlaceholder}  (/)`
+                : searchPlaceholder
+            }
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full rounded-md border border-zinc-700 bg-zinc-950 py-1.5 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
           />
         </div>
         {filterButton}
+        {!polishConsolidatedMenu && (
         <div className="relative" ref={columnPickerRef}>
           <button
             type="button"
@@ -691,7 +826,8 @@ export function PowerListenView<TData>({
             </div>
           )}
         </div>
-        {onGroupingChange && groupableColumns && groupableColumns.length > 0 && (
+        )}
+        {!polishConsolidatedMenu && onGroupingChange && groupableColumns && groupableColumns.length > 0 && (
           <div className="relative" ref={groupPickerRef}>
             <button
               type="button"
@@ -759,6 +895,184 @@ export function PowerListenView<TData>({
                     </button>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+        {/* B3.3 Zahnrad-Menü: ersetzt Spalten- + Group-Picker (oben hinter
+            !polishConsolidatedMenu versteckt). Drei Tabs: Spalten | Gruppen
+            | Ansicht (Density). Der Gruppen-Tab erscheint nur, wenn die
+            Page Grouping aktiv hat, der Ansicht-Tab nur bei densityToggle. */}
+        {polishConsolidatedMenu && (
+          <div className="relative" ref={settingsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setShowSettingsMenu((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs ${
+                grouping.length > 0
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                  : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+              }`}
+              title="Ansicht anpassen — Spalten · Gruppen · Density"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              Ansicht
+              {grouping.length > 0 && (
+                <span className="rounded bg-emerald-500/30 px-1 font-mono text-[10px]">
+                  {grouping.length}
+                </span>
+              )}
+            </button>
+            {showSettingsMenu && (
+              <div className="absolute right-0 z-30 mt-1 w-72 overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 shadow-2xl">
+                <div className="flex border-b border-zinc-800 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setSettingsTab('spalten')}
+                    className={`flex-1 px-3 py-2 ${
+                      settingsTab === 'spalten'
+                        ? 'border-b-2 border-emerald-500 text-emerald-300'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    Spalten
+                  </button>
+                  {onGroupingChange &&
+                    groupableColumns &&
+                    groupableColumns.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSettingsTab('gruppen')}
+                        className={`flex-1 px-3 py-2 ${
+                          settingsTab === 'gruppen'
+                            ? 'border-b-2 border-emerald-500 text-emerald-300'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        Gruppen
+                        {grouping.length > 0 && (
+                          <span className="ml-1 font-mono text-[10px] text-emerald-400/80">
+                            {grouping.length}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  {polishDensityToggle && (
+                    <button
+                      type="button"
+                      onClick={() => setSettingsTab('ansicht')}
+                      className={`flex-1 px-3 py-2 ${
+                        settingsTab === 'ansicht'
+                          ? 'border-b-2 border-emerald-500 text-emerald-300'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      Ansicht
+                    </button>
+                  )}
+                </div>
+                {settingsTab === 'spalten' && (
+                  <div className="max-h-72 overflow-y-auto p-2">
+                    {table
+                      .getAllLeafColumns()
+                      .filter(
+                        (col) =>
+                          col.id !== '__select__' && col.id !== '__actions__',
+                      )
+                      .map((col) => (
+                        <label
+                          key={col.id}
+                          className="flex items-center gap-2 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={col.getIsVisible()}
+                            onChange={col.getToggleVisibilityHandler()}
+                          />
+                          {typeof col.columnDef.header === 'string'
+                            ? col.columnDef.header
+                            : col.id}
+                        </label>
+                      ))}
+                  </div>
+                )}
+                {settingsTab === 'gruppen' &&
+                  onGroupingChange &&
+                  groupableColumns && (
+                    <div className="max-h-72 overflow-y-auto p-1">
+                      <button
+                        type="button"
+                        onClick={() => onGroupingChange([])}
+                        className={`block w-full rounded px-2 py-1.5 text-left text-sm ${
+                          grouping.length === 0
+                            ? 'bg-zinc-800 text-emerald-300'
+                            : 'text-zinc-300 hover:bg-zinc-800'
+                        }`}
+                      >
+                        Keine Gruppierung
+                      </button>
+                      <div className="my-1 border-t border-zinc-800" />
+                      {groupableColumns.map((g) => {
+                        const idx = grouping.indexOf(g.id);
+                        const active = idx >= 0;
+                        return (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => {
+                              if (active) {
+                                onGroupingChange(
+                                  grouping.filter((x) => x !== g.id),
+                                );
+                              } else {
+                                onGroupingChange([...grouping, g.id]);
+                              }
+                            }}
+                            className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${
+                              active
+                                ? 'bg-emerald-500/10 text-emerald-300'
+                                : 'text-zinc-300 hover:bg-zinc-800'
+                            }`}
+                          >
+                            <span>{g.label}</span>
+                            {active && (
+                              <span className="font-mono text-[10px] text-emerald-300">
+                                {idx + 1}.
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                {settingsTab === 'ansicht' && polishDensityToggle && (
+                  <div className="p-3">
+                    <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                      <Rows3 className="h-3 w-3" />
+                      Zeilen-H&ouml;he
+                    </div>
+                    <div className="flex gap-1">
+                      {DENSITY_VALUES.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setDensity(d)}
+                          className={`flex-1 rounded-md border px-2 py-1.5 text-xs ${
+                            density === d
+                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                              : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
+                          }`}
+                        >
+                          {DENSITY_LABELS[d]}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-zinc-500">
+                      Pers&ouml;nliche Einstellung — wird f&uuml;r diese
+                      Liste gespeichert.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -971,18 +1285,28 @@ export function PowerListenView<TData>({
                     row={row}
                     colSpan={visibleLeafColumns.length}
                     groupableColumns={groupableColumns}
+                    sticky={polishStickyGroupHeaders}
+                    separators={polishGroupSeparators}
+                    tdClass={groupTdClass}
                   />
                 );
               }
+              // B1.4: Kinder einer Gruppe (row.depth > 0) bekommen eine dezente
+              // Schattierung, damit Gruppen optisch als Block lesbar werden.
+              const isGroupedChild = polishGroupSeparators && row.depth > 0;
               return (
                 <tr
                   key={row.id}
-                  className={`border-b border-zinc-800/60 last:border-b-0 hover:bg-zinc-800/40 ${
-                    row.getIsSelected() ? 'bg-emerald-500/5' : ''
+                  className={`group border-b border-zinc-800/60 last:border-b-0 hover:bg-zinc-800/40 ${
+                    row.getIsSelected()
+                      ? 'bg-emerald-500/5'
+                      : isGroupedChild
+                        ? 'bg-zinc-900/30'
+                        : ''
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-3 py-2 align-top">
+                    <td key={cell.id} className={`${bodyTdClass} align-top`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -1283,10 +1607,16 @@ function GroupRow<TData>({
   row,
   colSpan,
   groupableColumns,
+  sticky = false,
+  separators = false,
+  tdClass = 'px-3 py-2',
 }: {
   row: Row<TData>;
   colSpan: number;
   groupableColumns?: { id: string; label: string }[];
+  sticky?: boolean;
+  separators?: boolean;
+  tdClass?: string;
 }) {
   const value = row.groupingValue;
   const colId = row.groupingColumnId;
@@ -1296,12 +1626,20 @@ function GroupRow<TData>({
     value === '' || value === null || value === undefined
       ? '— (leer)'
       : String(value);
+  // B1.3 sticky: <tr> selbst ist nicht sticky-fähig in vielen Browsern, daher
+  // wird die <td> sticky gesetzt. Hintergrund opak halten, damit darunter
+  // liegende Body-Rows nicht durchscheinen.
+  // B1.4 separators: dickerer Top-Border + mehr Saturation, damit der
+  // Gruppen-Wechsel klar erkennbar ist.
+  const trClass = separators
+    ? 'border-t-2 border-emerald-500/30 bg-zinc-900'
+    : 'border-y border-zinc-800 bg-zinc-900/70';
+  const tdStickyClass = sticky
+    ? 'sticky top-0 z-10 bg-zinc-900 shadow-[0_1px_0_0_rgb(39_39_42)]'
+    : '';
   return (
-    <tr className="border-y border-zinc-800 bg-zinc-900/70">
-      <td
-        colSpan={colSpan}
-        className="px-3 py-2"
-      >
+    <tr className={trClass}>
+      <td colSpan={colSpan} className={`${tdClass} ${tdStickyClass}`}>
         <button
           type="button"
           onClick={row.getToggleExpandedHandler()}
