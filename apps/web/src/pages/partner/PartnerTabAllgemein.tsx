@@ -9,8 +9,8 @@ import type {
   PartnerUpdate,
 } from '../../api/types';
 import type { PartnerTypLookup } from '../../lib/usePartnerTypLookup';
-import { FilialenBaum } from './FilialenBaum';
 import { HauptsitzBlock } from './HauptsitzBlock';
+import { StrukturBlock } from './StrukturBlock';
 import { TypenMultiSelect } from './TypenMultiSelect';
 import type { EditBuffer } from './useEditBuffer';
 
@@ -31,9 +31,11 @@ const inputCls =
  * Weitere Stammdaten, Notizen. Rechts: Filialen-Baum + Typen-Klassifikation.
  */
 export function PartnerTabAllgemein({ partner, listen, partnerTypLookup, edit }: Props) {
-  const hierarchieQuery = useQuery({
+  // useQuery teilt sich den Cache mit PartnerDetailPage über den queryKey
+  // (kein zusätzlicher Request).
+  const hierarchieQuery = useQuery<PartnerHierarchieResponse>({
     queryKey: ['partner', partner.id, 'hierarchie'],
-    queryFn: () => partnerApi.getHierarchie(partner.id) as Promise<PartnerHierarchieResponse>,
+    queryFn: () => partnerApi.getHierarchie(partner.id),
   });
 
   const anreden = listen.get('anrede')?.werte ?? [];
@@ -341,6 +343,17 @@ export function PartnerTabAllgemein({ partner, listen, partnerTypLookup, edit }:
           </div>
         </Block>
 
+        <Block title="Klassifikation">
+          <Field label="Typen">
+            <TypenMultiSelect
+              value={isEdit ? (v.typen as string[]) : (partner.typen as string[])}
+              onChange={(next) => edit.update({ typen: next })}
+              lookup={partnerTypLookup}
+              readOnly={!isEdit}
+            />
+          </Field>
+        </Block>
+
         <Block title="Notizen">
           {isEdit ? (
             <textarea
@@ -359,30 +372,13 @@ export function PartnerTabAllgemein({ partner, listen, partnerTypLookup, edit }:
 
       {/* Rechte Spalte */}
       <div className="space-y-6">
-        <Block title="Struktur">
-          {hierarchieQuery.isLoading && (
-            <div className="text-xs text-zinc-500">Lade Filialen-Baum …</div>
-          )}
-          {hierarchieQuery.isError && (
-            <div className="text-xs text-red-400">
-              Konnte Filialen-Baum nicht laden.
-            </div>
-          )}
-          {hierarchieQuery.data && (
-            <FilialenBaum root={hierarchieQuery.data.root} />
-          )}
-        </Block>
-
-        <Block title="Klassifikation">
-          <Field label="Typen">
-            <TypenMultiSelect
-              value={isEdit ? (v.typen as string[]) : (partner.typen as string[])}
-              onChange={(next) => edit.update({ typen: next })}
-              lookup={partnerTypLookup}
-              readOnly={!isEdit}
-            />
-          </Field>
-        </Block>
+        <StrukturBlock
+          partner={partner}
+          partnerTypLookup={partnerTypLookup}
+          hierarchie={hierarchieQuery.data}
+          isLoading={hierarchieQuery.isLoading}
+          isError={hierarchieQuery.isError}
+        />
       </div>
     </div>
   );
