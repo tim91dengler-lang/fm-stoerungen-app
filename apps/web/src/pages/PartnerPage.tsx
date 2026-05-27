@@ -18,6 +18,7 @@ import type {
   PartnerUpdate,
   UUID,
 } from '../api/types';
+import { MultiSelectCombobox } from '../components/MultiSelectCombobox';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
@@ -149,15 +150,6 @@ export function PartnerPage() {
   function closeModal() {
     setShowModal(false);
     setEditingId(null);
-  }
-
-  function toggleTypInForm(id: UUID) {
-    setForm((prev) => ({
-      ...prev,
-      typen: prev.typen.includes(id)
-        ? prev.typen.filter((x) => x !== id)
-        : [...prev.typen, id],
-    }));
   }
 
   function toggleTypFilter(id: UUID) {
@@ -491,21 +483,12 @@ export function PartnerPage() {
                 <label className="mb-1 block text-xs font-medium text-zinc-300">
                   Typen
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {partnerTypLookup.werte.map((w) => (
-                    <label
-                      key={w.id}
-                      className="inline-flex cursor-pointer items-center gap-1 text-sm text-zinc-200"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.typen.includes(w.id)}
-                        onChange={() => toggleTypInForm(w.id)}
-                      />
-                      {w.label}
-                    </label>
-                  ))}
-                </div>
+                <MultiSelectCombobox
+                  value={form.typen}
+                  onChange={(next) => setForm((f) => ({ ...f, typen: next }))}
+                  options={typOptions}
+                  placeholder="Typ wählen …"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

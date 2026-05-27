@@ -8,6 +8,7 @@ import type {
   PartnerKontaktCreate,
   PartnerKontaktRead,
 } from '../../api/types';
+import { MultiSelectCombobox } from '../../components/MultiSelectCombobox';
 import {
   extractMutationError,
   isValidEmailOrEmpty,
@@ -27,15 +28,19 @@ const inputCls =
 /**
  * Modal: Kontakt anlegen / bearbeiten (Spec §5.1).
  *
- * Felder folgen der bestehenden Backend-Sub-Resource POST /partner/{id}/kontakte
- * und PATCH /partner/kontakte/{id}. Validierung minimal (Name, Email-Format),
- * Backend validiert final.
+ * Layout (Polish 2026-05-26): flex-col mit max-h-screen, scrollbarer Body,
+ * sticky Footer mit Buttons — verhindert dass Speichern/Abbrechen unter
+ * dem Viewport verschwindet bei vielen Feldern / kleiner Bildhöhe.
+ *
+ * Rollen-Auswahl: Multi-Select-Combobox (Track 3 Polish: Tim wollte
+ * Dropdown statt Checkbox-Grid).
  */
 export function KontaktModal({ partnerId, listen, initial, onClose }: Props) {
   const qc = useQueryClient();
   const anreden = listen.get('anrede')?.werte ?? [];
   const titelWerte = listen.get('titel')?.werte ?? [];
   const rollenWerte = listen.get('kontakt_rolle')?.werte ?? [];
+  const rollenOptions = rollenWerte.map((r) => ({ value: r.id, label: r.label }));
 
   const [form, setForm] = useState<PartnerKontaktCreate>(
     initial
@@ -72,15 +77,6 @@ export function KontaktModal({ partnerId, listen, initial, onClose }: Props) {
     },
   });
 
-  function toggleRolle(rid: string) {
-    setForm((f) => ({
-      ...f,
-      rollen: (f.rollen ?? []).includes(rid)
-        ? (f.rollen ?? []).filter((x) => x !== rid)
-        : [...(f.rollen ?? []), rid],
-    }));
-  }
-
   function handleSubmit() {
     const payload: PartnerKontaktCreate = {
       ...form,
@@ -110,10 +106,11 @@ export function KontaktModal({ partnerId, listen, initial, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl bg-zinc-900 p-6 shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-zinc-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
+        {/* Sticky Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-6 py-4">
           <h2 className="text-lg font-semibold text-zinc-100">
             {initial ? 'Kontakt bearbeiten' : 'Neuer Kontakt'}
           </h2>
@@ -127,7 +124,8 @@ export function KontaktModal({ partnerId, listen, initial, onClose }: Props) {
           </button>
         </div>
 
-        <div className="max-h-[70vh] space-y-3 overflow-y-auto">
+        {/* Scrollbarer Body */}
+        <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
           <FieldRow label="Anrede">
             <select
               value={form.anrede_id ?? ''}
@@ -158,49 +156,38 @@ export function KontaktModal({ partnerId, listen, initial, onClose }: Props) {
             </select>
           </FieldRow>
 
-          <FieldRow label="Vorname">
-            <input
-              type="text"
-              value={form.vorname ?? ''}
-              onChange={(e) => setForm({ ...form, vorname: e.target.value })}
-              className={inputCls}
-            />
-          </FieldRow>
-          <FieldRow label="Nachname">
-            <input
-              type="text"
-              value={form.nachname ?? ''}
-              onChange={(e) => setForm({ ...form, nachname: e.target.value })}
-              className={inputCls}
-            />
-          </FieldRow>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label="Vorname">
+              <input
+                type="text"
+                value={form.vorname ?? ''}
+                onChange={(e) => setForm({ ...form, vorname: e.target.value })}
+                className={inputCls}
+              />
+            </FieldRow>
+            <FieldRow label="Nachname">
+              <input
+                type="text"
+                value={form.nachname ?? ''}
+                onChange={(e) => setForm({ ...form, nachname: e.target.value })}
+                className={inputCls}
+              />
+            </FieldRow>
+          </div>
 
           <FieldRow label="Rollen (Mehrfachauswahl)">
             {rollenWerte.length === 0 ? (
               <p className="text-xs text-zinc-500">
-                Keine Rollen in der Auswahlliste — bitte Werte unter Stammdaten →
+                Keine Rollen in der Auswahlliste — bitte unter Stammdaten →
                 Auswahllisten → „kontakt_rolle&ldquo; pflegen.
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-1 rounded-md border border-zinc-800 bg-zinc-950/30 p-2">
-                {rollenWerte.map((r) => {
-                  const active = (form.rollen ?? []).includes(r.id);
-                  return (
-                    <label
-                      key={r.id}
-                      className="inline-flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={active}
-                        onChange={() => toggleRolle(r.id)}
-                        className="accent-emerald-500"
-                      />
-                      {r.label}
-                    </label>
-                  );
-                })}
-              </div>
+              <MultiSelectCombobox
+                value={form.rollen ?? []}
+                onChange={(next) => setForm((f) => ({ ...f, rollen: next }))}
+                options={rollenOptions}
+                placeholder="Rolle wählen …"
+              />
             )}
           </FieldRow>
 
@@ -212,22 +199,24 @@ export function KontaktModal({ partnerId, listen, initial, onClose }: Props) {
               className={inputCls}
             />
           </FieldRow>
-          <FieldRow label="Telefon">
-            <input
-              type="text"
-              value={form.telefon ?? ''}
-              onChange={(e) => setForm({ ...form, telefon: e.target.value })}
-              className={inputCls}
-            />
-          </FieldRow>
-          <FieldRow label="Mobil">
-            <input
-              type="text"
-              value={form.mobil ?? ''}
-              onChange={(e) => setForm({ ...form, mobil: e.target.value })}
-              className={inputCls}
-            />
-          </FieldRow>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label="Telefon">
+              <input
+                type="text"
+                value={form.telefon ?? ''}
+                onChange={(e) => setForm({ ...form, telefon: e.target.value })}
+                className={inputCls}
+              />
+            </FieldRow>
+            <FieldRow label="Mobil">
+              <input
+                type="text"
+                value={form.mobil ?? ''}
+                onChange={(e) => setForm({ ...form, mobil: e.target.value })}
+                className={inputCls}
+              />
+            </FieldRow>
+          </div>
 
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-zinc-200">
             <input
@@ -268,7 +257,8 @@ export function KontaktModal({ partnerId, listen, initial, onClose }: Props) {
           )}
         </div>
 
-        <div className="mt-5 flex justify-end gap-2">
+        {/* Sticky Footer mit Buttons */}
+        <div className="flex shrink-0 justify-end gap-2 border-t border-zinc-800 bg-zinc-900 px-6 py-3">
           <button
             type="button"
             onClick={onClose}

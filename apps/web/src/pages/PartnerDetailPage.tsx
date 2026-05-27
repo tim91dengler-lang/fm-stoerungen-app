@@ -5,34 +5,34 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { auswahllistenApi, partnerApi } from '../api/endpoints';
 import type {
   AuswahllisteRead,
+  PartnerHierarchieResponse,
   PartnerRead,
   PartnerUpdate,
 } from '../api/types';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
+import { PartnerBreadcrumb } from './partner/PartnerBreadcrumb';
 import { PartnerDetailHeader } from './partner/PartnerDetailHeader';
 import {
   PartnerDetailTabBar,
   type PartnerTabKey,
 } from './partner/PartnerDetailTabBar';
 import { PartnerTabAllgemein } from './partner/PartnerTabAllgemein';
+import { PartnerTabDokumente } from './partner/PartnerTabDokumente';
 import { PartnerTabKontakte } from './partner/PartnerTabKontakte';
 import { PartnerTabObjekte } from './partner/PartnerTabObjekte';
 import { PartnerTabProjekte } from './partner/PartnerTabProjekte';
 import { PartnerTabTickets } from './partner/PartnerTabTickets';
-import {
-  extractMutationError,
-  nullIfEmpty,
-} from './partner/helpers';
+import { extractMutationError, nullIfEmpty } from './partner/helpers';
 import { useEditBuffer } from './partner/useEditBuffer';
 
 /**
- * Partner-Detail-Page (Track 3 Sub-PR B Refactor).
+ * Partner-Detail-Page (Track 3 Sub-PR B Refactor + Polish 2026-05-26).
  *
- * Trägt nur den Layout-Rahmen (Header + TabBar + aktiver Tab) und das
- * gemeinsame Datenmodell (Partner laden, Edit-Buffer, Sperren-Mutation,
- * Save-Mutation). Die eigentliche UI-Logik liegt in den Tab-Komponenten
- * unter `pages/partner/` (Spec §5.1).
+ * Trägt nur den Layout-Rahmen (Breadcrumb + Header + TabBar + aktiver Tab)
+ * und das gemeinsame Datenmodell (Partner laden, Edit-Buffer, Sperren-
+ * Mutation, Save-Mutation). Die eigentliche UI-Logik liegt in den Tab-
+ * Komponenten unter `pages/partner/` (Spec §5.1).
  */
 export function PartnerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -50,6 +50,14 @@ export function PartnerDetailPage() {
     queryKey: ['auswahllisten'],
     queryFn: () => auswahllistenApi.list(),
     staleTime: 60_000,
+  });
+
+  // Hierarchie wird hier zentral geladen (Breadcrumb + FilialenBaum nutzen
+  // sie). React Query teilt das Ergebnis automatisch über den queryKey.
+  const hierarchieQuery = useQuery<PartnerHierarchieResponse>({
+    queryKey: ['partner', partnerId, 'hierarchie'],
+    queryFn: () => partnerApi.getHierarchie(partnerId),
+    enabled: !!partnerId,
   });
 
   const listen = useMemo(() => {
@@ -98,6 +106,11 @@ export function PartnerDetailPage() {
 
   return (
     <div className="min-h-full">
+      <PartnerBreadcrumb
+        root={hierarchieQuery.data?.root ?? null}
+        currentPartnerId={partner.id}
+      />
+
       <PartnerDetailHeader
         partner={partner}
         partnerTypLookup={partnerTypLookup}
@@ -137,6 +150,9 @@ export function PartnerDetailPage() {
       )}
       {activeTab === 'tickets' && (
         <PartnerTabTickets partnerId={partner.id} partnerName={partner.name} />
+      )}
+      {activeTab === 'dokumente' && (
+        <PartnerTabDokumente partnerId={partner.id} partnerName={partner.name} />
       )}
 
       <ConfirmDialog
