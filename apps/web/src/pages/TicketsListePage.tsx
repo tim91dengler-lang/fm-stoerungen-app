@@ -36,6 +36,7 @@ import { TicketErfassenModal } from './TicketErfassenModal';
 import {
   PRIO_SLUGS,
   STATUS_SLUGS,
+  formatDateTime,
   formatRelativeDateTime,
   labelForPrioSlug,
   labelForStatusSlug,
@@ -174,15 +175,27 @@ function buildColumns(
       header: 'Titel',
       cell: ({ row }) => {
         const Icon = iconForKategorie(row.original.kategorie?.key);
+        // B1.2 (Listen-Power 2.0): Titel kräftig, Beschreibungs-Snippet als
+        // dezente Sekundärinfo darunter — gibt Verdichtung ohne extra Spalte.
+        const desc = row.original.beschreibung?.trim() ?? '';
+        const descSnippet =
+          desc.length > 80 ? `${desc.slice(0, 80).trimEnd()}…` : desc;
         return (
           <button
             type="button"
             onClick={() => onOpen(row.original.id)}
-            className="flex max-w-[20rem] items-center gap-2 text-left"
+            className="flex max-w-[24rem] items-start gap-2 text-left"
           >
-            <Icon className="h-4 w-4 shrink-0 text-zinc-500" />
-            <span className="truncate font-medium text-emerald-300 hover:text-emerald-200 hover:underline">
-              {row.original.titel}
+            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate font-medium text-emerald-300 hover:text-emerald-200 hover:underline">
+                {row.original.titel}
+              </span>
+              {descSnippet && (
+                <span className="truncate text-[11px] text-zinc-500">
+                  {descSnippet}
+                </span>
+              )}
             </span>
           </button>
         );
@@ -303,9 +316,16 @@ function buildColumns(
       id: 'eroeffnet_am',
       accessorKey: 'eroeffnet_am',
       header: 'Eröffnet am',
+      // B1.2 (Listen-Power 2.0): relative Zeit kräftig, absolutes Datum
+      // klein darunter — beide Informationen ohne Tooltip-Klick.
       cell: ({ row }) => (
-        <span className="text-zinc-400">
-          {formatRelativeDateTime(row.original.eroeffnet_am)}
+        <span className="flex flex-col gap-0.5 leading-tight">
+          <span className="text-zinc-300">
+            {formatRelativeDateTime(row.original.eroeffnet_am)}
+          </span>
+          <span className="text-[11px] text-zinc-500">
+            {formatDateTime(row.original.eroeffnet_am)}
+          </span>
         </span>
       ),
     },
@@ -597,6 +617,16 @@ export function TicketsListePage() {
 
       <PowerListenView<TicketRead>
         viewKey="tickets"
+        // Listen-Power 2.0 — W1-Pilot. In W2 ziehen die Defaults auf alle
+        // Listen um; bis dahin nur hier aktiv.
+        polish={{
+          actionVisibility: 'hover',
+          stickyGroupHeaders: true,
+          groupSeparators: true,
+          densityToggle: true,
+          consolidatedSettingsMenu: true,
+          searchShortcut: true,
+        }}
         columns={columns}
         data={ticketsQuery.data?.items ?? []}
         search={search}

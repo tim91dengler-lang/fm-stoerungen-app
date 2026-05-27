@@ -18,6 +18,7 @@ Wiederverwendbare Patterns aus dem FM-Projekt, die als Plattform-Bausteine in k�
 | Pattern | Kurzfassung | Status |
 |---------|-------------|--------|
 | [power-layout.md](power-layout.md) | Listenansichten mit Drag-Reorder, Multi-Sort, Bulk-Edit, gespeicherten Ansichten | Konzept |
+| [listen-power-2.md](listen-power-2.md) | UX-Polish auf Power-Layout: visuelle Ruhe, Schaltflächen-Diät, Skalierungs-Fundament, Sperren-vs-Delete | Konzept (Pilot TicketsListePage) |
 | [auswahllisten-default.md](auswahllisten-default.md) | Stammdaten in Tabellen, nicht im Code — pflegbar zur Laufzeit | Konzept |
 | [filter-passend-zum-feldtyp.md](filter-passend-zum-feldtyp.md) | UI-Filter automatisch aus Feldtyp ableiten (Auswahlliste → Multi-Select) | Konzept |
 | [konsistente-migration.md](konsistente-migration.md) | Bei Feld-Änderungen alle Referenzen (Formular, Filter, Suche, Mobile) mitziehen | Konzept |
