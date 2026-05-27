@@ -208,7 +208,7 @@ jobs:
             README.md
 
       - name: Tote Markdown-Links prüfen
-        uses: lycheeverse/lychee-action@v1
+        uses: lycheeverse/lychee-action@v2
         continue-on-error: true
         with:
           args: --no-progress --max-concurrency 5 --exclude-mail './**/*.md'
