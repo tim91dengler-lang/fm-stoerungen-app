@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal, Plus, Star, Trash2 } from 'lucide-react';
 
@@ -144,58 +144,44 @@ export function PartnerTabKontakte({ partner, listen }: Props) {
                   <Td>{k.telefon ?? '—'}</Td>
                   <Td>{k.mobil ?? '—'}</Td>
                   <Td>{k.email ?? '—'}</Td>
-                  <Td className="relative">
-                    <button
-                      type="button"
-                      onClick={() =>
+                  <Td>
+                    <RowActionsMenu
+                      isOpen={openMenuId === k.id}
+                      onToggle={() =>
                         setOpenMenuId(openMenuId === k.id ? null : k.id)
                       }
-                      className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                      aria-label="Aktionen"
+                      onClose={() => setOpenMenuId(null)}
                     >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-                    {openMenuId === k.id && (
-                      <div
-                        className="absolute right-2 z-10 mt-1 w-48 rounded-md border border-zinc-700 bg-zinc-900 shadow-lg"
-                        onMouseLeave={() => setOpenMenuId(null)}
+                      <MenuItem
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          setEditing(k);
+                          setShowModal(true);
+                        }}
                       >
-                        <button
-                          type="button"
+                        Bearbeiten
+                      </MenuItem>
+                      {!k.ist_hauptkontakt && (
+                        <MenuItem
                           onClick={() => {
                             setOpenMenuId(null);
-                            setEditing(k);
-                            setShowModal(true);
+                            setHauptmut.mutate(k);
                           }}
-                          className="block w-full px-3 py-1.5 text-left text-xs text-zinc-200 hover:bg-zinc-800"
                         >
-                          Bearbeiten
-                        </button>
-                        {!k.ist_hauptkontakt && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              setHauptmut.mutate(k);
-                            }}
-                            className="block w-full px-3 py-1.5 text-left text-xs text-zinc-200 hover:bg-zinc-800"
-                          >
-                            Als Hauptkontakt setzen
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            setDeleteConfirm(k);
-                          }}
-                          className="block w-full px-3 py-1.5 text-left text-xs text-red-300 hover:bg-red-500/15"
-                        >
-                          <Trash2 className="mr-1 inline h-3 w-3" />
-                          Löschen
-                        </button>
-                      </div>
-                    )}
+                          Als Hauptkontakt setzen
+                        </MenuItem>
+                      )}
+                      <MenuItem
+                        tone="danger"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          setDeleteConfirm(k);
+                        }}
+                      >
+                        <Trash2 className="mr-1 inline h-3 w-3" />
+                        Löschen
+                      </MenuItem>
+                    </RowActionsMenu>
                   </Td>
                 </tr>
               ))
@@ -238,4 +224,95 @@ function Th({ children, className }: { children?: React.ReactNode; className?: s
 }
 function Td({ children, className }: { children?: React.ReactNode; className?: string }) {
   return <td className={`px-3 py-2 text-zinc-300 ${className ?? ''}`}>{children}</td>;
+}
+
+/**
+ * ⋯-Menü pro Tabellen-Zeile (Track 3 Polish 2 — Tim 2026-05-27).
+ *
+ * Vorher: `onMouseLeave={() => setOpenMenuId(null)}` — das Menü schloss
+ * sofort, wenn die Maus zwischen Button und Menü kurz daneben kam, oder
+ * wenn der Browser nicht den Hover-Track sauber weitergab. Bug auf
+ * Tims Screenshot war ein „leeres Menü" / Menü unsichtbar.
+ *
+ * Neu: globaler Click-Outside-Handler + Escape, z-index 40, position
+ * absolute relativ zum Button-Wrapper. Verhalten wie native Dropdown.
+ */
+function RowActionsMenu({
+  isOpen,
+  onToggle,
+  onClose,
+  children,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [isOpen, onClose]);
+
+  return (
+    <div ref={wrapRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        aria-label="Aktionen"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {isOpen && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-40 mt-1 w-52 overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-xl"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  children,
+  onClick,
+  tone = 'default',
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  tone?: 'default' | 'danger';
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={
+        tone === 'danger'
+          ? 'block w-full px-3 py-2 text-left text-xs text-red-300 hover:bg-red-500/15'
+          : 'block w-full px-3 py-2 text-left text-xs text-zinc-200 hover:bg-zinc-800'
+      }
+    >
+      {children}
+    </button>
+  );
 }
