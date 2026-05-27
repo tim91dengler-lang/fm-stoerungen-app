@@ -10,6 +10,7 @@ import type {
 } from '../../api/types';
 import type { PartnerTypLookup } from '../../lib/usePartnerTypLookup';
 import { FilialenBaum } from './FilialenBaum';
+import { HauptsitzBlock } from './HauptsitzBlock';
 import { TypenMultiSelect } from './TypenMultiSelect';
 import type { EditBuffer } from './useEditBuffer';
 
@@ -84,10 +85,8 @@ export function PartnerTabAllgemein({ partner, listen, partnerTypLookup, edit }:
         typen: partner.typen,
       };
 
-  // Hauptsitz: erste Adresse mit ist_primaer=true; sonst erste, sonst null.
-  const hauptsitzLink =
-    partner.adress_links.find((a) => a.ist_primaer) ?? partner.adress_links[0] ?? null;
-  const hauptsitz = hauptsitzLink?.adresse ?? null;
+  // Hauptsitz wird im `HauptsitzBlock` selbst behandelt — inkl. Aktions-
+  // Buttons (+ / ✎ / 🗑) und Modal zur Adress-Pflege.
 
   return (
     <div className="grid gap-6 px-4 py-6 lg:grid-cols-2 lg:px-8">
@@ -180,26 +179,7 @@ export function PartnerTabAllgemein({ partner, listen, partnerTypLookup, edit }:
           </div>
         </Block>
 
-        <Block title="Hauptsitz">
-          {hauptsitz ? (
-            <div className="text-sm text-zinc-300">
-              <div>
-                {hauptsitz.strasse} {hauptsitz.hausnummer ?? ''}
-              </div>
-              <div>
-                {hauptsitz.plz} {hauptsitz.ort}
-              </div>
-              {hauptsitz.land && hauptsitz.land !== 'DE' && (
-                <div>{hauptsitz.land}</div>
-              )}
-              <div className="mt-1 text-[11px] text-zinc-500">
-                Adressen pflegst du via Tab &bdquo;Adressen&ldquo; (Folge-Release).
-              </div>
-            </div>
-          ) : (
-            <span className="text-sm text-zinc-500">Keine Hauptsitz-Adresse hinterlegt.</span>
-          )}
-        </Block>
+        <HauptsitzBlock partner={partner} listen={listen} />
 
         <Block title="Kommunikation">
           <div className="grid grid-cols-2 gap-3">

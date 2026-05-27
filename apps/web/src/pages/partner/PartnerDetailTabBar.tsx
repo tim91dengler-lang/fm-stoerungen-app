@@ -1,12 +1,20 @@
 import clsx from 'clsx';
-import { Briefcase, Building2, FileText, Ticket as TicketIcon, User } from 'lucide-react';
+import {
+  Briefcase,
+  Building2,
+  FileText,
+  Files,
+  Ticket as TicketIcon,
+  User,
+} from 'lucide-react';
 
 export type PartnerTabKey =
   | 'allgemein'
   | 'kontakte'
   | 'objekte'
   | 'projekte'
-  | 'tickets';
+  | 'tickets'
+  | 'dokumente';
 
 interface TabDef {
   key: PartnerTabKey;
@@ -20,6 +28,7 @@ const TABS: TabDef[] = [
   { key: 'objekte', label: 'Objekte', icon: Building2 },
   { key: 'projekte', label: 'Projekte', icon: Briefcase },
   { key: 'tickets', label: 'Tickets', icon: TicketIcon },
+  { key: 'dokumente', label: 'Dokumente', icon: Files },
 ];
 
 interface Props {
