@@ -15,9 +15,9 @@ services:
     environment:
       POSTGRES_DB: fm_stoerungen
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # SEC: only localhost
     volumes:
       - pg_data_dev:/var/lib/postgresql/data
       - ./postgres-init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
@@ -40,7 +40,7 @@ services:
     environment:
       ENV: dev
       DEBUG: "true"
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/fm_stoerungen
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:?required}@postgres:5432/fm_stoerungen
       JWT_SECRET: dev-only-secret-min-32-chars-not-for-prod
       CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
       UPLOAD_DIR: /var/uploads/fm
