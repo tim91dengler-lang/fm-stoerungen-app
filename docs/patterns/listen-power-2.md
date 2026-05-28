@@ -104,6 +104,17 @@ Nicht Teil der ersten Rollout-Wellen — erst nach Pilot-Validierung:
 
 Block 5: erst nach W1–W5 stabil.
 
+## Offene Architektur-Frage (entdeckt während W1-Acceptance)
+
+**Doppel-State zwischen Toolbar-Filter und Spalten-Filtern auf der TicketsListePage:**
+
+- Das **Filter-Panel oben** (Status-Chips + Prio-Chips) schreibt in `config.statusFilter` / `config.prioFilter` → wandert als Query-Parameter an die **API** (Backend-Filter, `limit: 200`).
+- Die **Spalten-Filter unter den Headern** schreiben in `columnFilters` → **clientseitiger** TanStack-Filter auf den schon geladenen Daten.
+
+Beide State-Bereiche kennen sich nicht: wer oben filtert, sieht keine Reaktion in den Spalten-Filtern und umgekehrt. Quick-Fix (Filter-Panel rausnehmen) entfernt das Problem optisch, killt aber den Backend-Filter — bei >200 Tickets fehlen Daten.
+
+**Sauberer Fix:** Backend-Filter aus `columnFilters` ableiten (column „Status: [neu, prüfung]" → API-Call mit `?status=neu,pruefung`). Gehört zusammen mit W3 (Combobox-Refactor / Server-Side-Search), nicht in einen W1-Polish-PR. Tracking-Issue: [#86](https://github.com/tim91dengler-lang/fm-stoerungen-app/issues/86).
+
 ## Stolperfallen
 
 - **Hover-Aktionen + Touch:** Reines `:hover` reicht nicht für Tablet/Mobile. Long-Press-Detect oder Kontext-Menü zusätzlich nötig.
