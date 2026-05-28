@@ -620,7 +620,8 @@ export function TicketsListePage() {
         // Listen-Power 2.0 — W1-Pilot. In W2 ziehen die Defaults auf alle
         // Listen um; bis dahin nur hier aktiv.
         polish={{
-          actionVisibility: 'hover',
+          actionVisibility: 'kebab',
+          stickyHeader: true,
           stickyGroupHeaders: true,
           groupSeparators: true,
           densityToggle: true,
@@ -660,6 +661,7 @@ export function TicketsListePage() {
           onEdit: (row) => openTicket(row.id),
           onDelete: (rows) => setBulkDeleteConfirm(rows),
         }}
+        onRowClick={(row) => openTicket(row.id)}
         bulkActions={(selected) => (
           <button
             type="button"

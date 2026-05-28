@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import {
   flexRender,
   getCoreRowModel,
@@ -28,6 +36,7 @@ import {
   ChevronRight,
   Columns3,
   Layers,
+  MoreVertical,
   Pause,
   Pencil,
   Pin,
@@ -43,10 +52,15 @@ import {
 // Polish-Verhalten gezielt; ohne polish-Prop bleibt das bisherige Verhalten
 // unverändert (Roll-out via W2 auf alle Listen).
 export interface ListenPolishOptions {
-  /** B1.1: Edit/Delete/Sperren-Icons erst beim Zeilen-Hover sichtbar. */
-  actionVisibility?: 'always' | 'hover';
+  /** B1.1 / Polish-3: Zeilen-Aktionen.
+   *  - 'always': Edit/Delete/Sperren-Icons fest links sichtbar (Default).
+   *  - 'hover' : Icons als rechts-bündiges Overlay, nur bei Maus-Hover (W1.5, Desktop-only).
+   *  - 'kebab' : EIN ⋮-Menü links nach der Checkbox, immer antippbar (Touch + Desktop). */
+  actionVisibility?: 'always' | 'hover' | 'kebab';
   /** B1.3: Gruppen-Header bleibt beim Scrollen oben sichtbar. */
   stickyGroupHeaders?: boolean;
+  /** Polish-3: Spalten-Header-Zeile bleibt beim Scrollen oben sichtbar. */
+  stickyHeader?: boolean;
   /** B1.4: Gruppen-Inhalt sichtbar abgesetzt (Einrückung + Schattierung + dickerer Trenner). */
   groupSeparators?: boolean;
   /** B1.6: Density-Toggle (compact / comfortable / spacious). Persistiert pro viewKey in LocalStorage. */
@@ -134,6 +148,148 @@ function renderRowActionButtons<TData>(
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
+    </>
+  );
+}
+
+// Polish-3: EIN ⋮-Knopf links neben der Checkbox, der ein kleines Popover mit
+// Bearbeiten/Sperren/Löschen öffnet. Ersetzt das W1.5-Hover-Overlay (das auf
+// Touch-Stationen unsichtbar/unerreichbar war). Der Knopf ist IMMER antippbar
+// (Touch), am Desktop dezent (opacity-40) und voll bei Row-Hover/Focus.
+// Das Popover wird per Portal an document.body gerendert — sonst klippt es im
+// `overflow`-Container der Tabelle.
+function RowActionMenu<TData>({
+  rowActions,
+  rowData,
+}: {
+  rowActions: NonNullable<PowerListenViewProps<TData>['rowActions']>;
+  rowData: TData;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isGesperrt = rowActions.sperren?.isGesperrt(rowData) ?? false;
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (!menuRef.current?.contains(t) && !btnRef.current?.contains(t)) {
+        setOpen(false);
+      }
+    }
+    function onScrollOrResize() {
+      setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    // Scroll/Resize → Position wäre stale, daher schließen.
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [open]);
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      // Menü öffnet rechts-unterhalb des Knopfs, Breite 11rem (176px).
+      const menuWidth = 176;
+      const left = Math.min(r.left, window.innerWidth - menuWidth - 8);
+      setPos({ top: r.bottom + 4, left });
+    }
+    setOpen(true);
+  }
+
+  const itemClass =
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800';
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        data-no-row-click
+        onClick={(e) => {
+          e.stopPropagation();
+          toggle();
+        }}
+        className={`rounded-md p-1.5 text-zinc-400 opacity-100 transition-opacity hover:bg-zinc-800 hover:text-zinc-200 md:opacity-40 md:group-hover:opacity-100 md:group-focus-within:opacity-100 ${
+          open ? 'bg-zinc-800 text-zinc-200 md:opacity-100' : ''
+        }`}
+        title="Aktionen"
+        aria-label="Aktionen"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            data-no-row-click
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: 176 }}
+            className="z-50 overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 py-1 shadow-2xl"
+          >
+            {rowActions.onEdit && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  rowActions.onEdit?.(rowData);
+                }}
+                className={itemClass}
+              >
+                <Pencil className="h-3.5 w-3.5 text-zinc-400" />
+                Bearbeiten
+              </button>
+            )}
+            {rowActions.sperren && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  rowActions.sperren?.onToggle(rowData);
+                }}
+                className={itemClass}
+              >
+                {isGesperrt ? (
+                  <Play className="h-3.5 w-3.5 text-emerald-400" />
+                ) : (
+                  <Pause className="h-3.5 w-3.5 text-amber-400" />
+                )}
+                {isGesperrt ? 'Aktivieren' : 'Deaktivieren'}
+              </button>
+            )}
+            {rowActions.onDelete && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  rowActions.onDelete?.([rowData]);
+                }}
+                className={`${itemClass} hover:bg-red-500/10 hover:text-red-300`}
+              >
+                <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                Löschen
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -264,6 +420,9 @@ export interface PowerListenViewProps<TData> {
       onToggle: (row: TData) => void;
     };
   };
+  /** Polish-3: Klick auf eine Daten-Zeile (außerhalb von Buttons/Inputs/Checkbox/
+   *  Kebab) löst diesen Callback aus — typisch „Detail/Edit-Panel öffnen". */
+  onRowClick?: (row: TData) => void;
   /** Listen-Power-2.0-Polish (W1). Pro Page einzeln aktivierbar. */
   polish?: ListenPolishOptions;
 }
@@ -318,11 +477,13 @@ export function PowerListenView<TData>({
   itemLabel,
   onMassEdit,
   rowActions,
+  onRowClick,
   polish,
 }: PowerListenViewProps<TData>) {
   // Polish-Defaults: ohne polish-Prop bleibt alles wie bisher.
   const polishActionVisibility = polish?.actionVisibility ?? 'always';
   const polishStickyGroupHeaders = polish?.stickyGroupHeaders ?? false;
+  const polishStickyHeader = polish?.stickyHeader ?? false;
   const polishGroupSeparators = polish?.groupSeparators ?? false;
   const polishDensityToggle = polish?.densityToggle ?? false;
   const polishConsolidatedMenu = polish?.consolidatedSettingsMenu ?? false;
@@ -352,6 +513,9 @@ export function PowerListenView<TData>({
   );
   const useActionOverlay =
     polishActionVisibility === 'hover' && hasRowActionsHandler;
+  // Polish-3: Kebab-Modus — ⋮-Spalte links nach der Checkbox, immer antippbar.
+  const useKebab =
+    polishActionVisibility === 'kebab' && hasRowActionsHandler;
 
   // `/`-Shortcut: fokussiert die Volltextsuche, wenn der User nicht gerade
   // tippt (Input/Textarea/contenteditable werden respektiert).
@@ -395,6 +559,21 @@ export function PowerListenView<TData>({
   const columnPickerRef = useRef<HTMLDivElement>(null);
   const groupPickerRef = useRef<HTMLDivElement>(null);
 
+  // Polish-3 Sticky-Header: thead-Höhe messen, damit (ebenfalls sticky)
+  // Group-Header DARUNTER kleben statt den Spalten-Header zu überdecken.
+  const theadRef = useRef<HTMLTableSectionElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (!polishStickyHeader) return;
+    const el = theadRef.current;
+    if (!el) return;
+    const update = () => setHeaderHeight(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [polishStickyHeader]);
+
   // Spezial-Spalten vorne anhängen (Tim R6b-Konvention):
   //   [__select__]  ← bei enableRowSelection, Mehrfachauswahl
   //   [__actions__] ← bei rowActions, Edit + Delete fest links
@@ -426,11 +605,10 @@ export function PowerListenView<TData>({
         ),
       });
     }
-    // W1.5: Bei polishActionVisibility='hover' wird die __actions__-Spalte
-    // GAR NICHT mehr eingefügt — die Aktions-Buttons erscheinen stattdessen
-    // als Row-Overlay (rechts in der letzten Daten-Cell, on hover sichtbar).
-    // So verschwendet die Spalte keinen Platz mehr.
-    // Mobile (<md): kein hover möglich → Stretch in B5 (Long-Press-Menü).
+    // Aktions-Spalte links (nach __select__):
+    //  - 'always' → feste Edit/Sperren/Delete-Icons (Legacy-Default)
+    //  - 'kebab'  → EIN ⋮-Menü, immer antippbar (Polish-3, Touch + Desktop)
+    //  - 'hover'  → KEINE Spalte; Buttons als rechts-bündiges Row-Overlay (W1.5)
     if (hasRowActionsHandler && !useActionOverlay) {
       prefix.push({
         id: '__actions__',
@@ -439,11 +617,14 @@ export function PowerListenView<TData>({
         enableHiding: false,
         enableGrouping: false,
         header: '',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-0.5">
-            {renderRowActionButtons(rowActions!, row.original)}
-          </div>
-        ),
+        cell: ({ row }) =>
+          useKebab ? (
+            <RowActionMenu rowActions={rowActions!} rowData={row.original} />
+          ) : (
+            <div className="flex items-center gap-0.5">
+              {renderRowActionButtons(rowActions!, row.original)}
+            </div>
+          ),
       });
     }
     return [...prefix, ...columns];
@@ -453,6 +634,7 @@ export function PowerListenView<TData>({
     rowActions,
     hasRowActionsHandler,
     useActionOverlay,
+    useKebab,
   ]);
 
   // Dropdown beim Außerhalb-Klick schließen
@@ -1139,7 +1321,14 @@ export function PowerListenView<TData>({
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-zinc-800 text-sm">
-          <thead className="bg-zinc-900/50 text-left text-xs uppercase tracking-wide text-zinc-500">
+          <thead
+            ref={theadRef}
+            className={`text-left text-xs uppercase tracking-wide text-zinc-500 ${
+              polishStickyHeader
+                ? 'sticky top-0 z-20 bg-zinc-900'
+                : 'bg-zinc-900/50'
+            }`}
+          >
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -1310,27 +1499,42 @@ export function PowerListenView<TData>({
                     colSpan={visibleLeafColumns.length}
                     groupableColumns={groupableColumns}
                     sticky={polishStickyGroupHeaders}
+                    stickyTop={polishStickyHeader ? headerHeight : 0}
                     separators={polishGroupSeparators}
                     tdClass={groupTdClass}
                   />
                 );
               }
-              // B1.4 / W1.5: Kinder einer Gruppe (row.depth > 0) bekommen
-              // dezente Schattierung + Einrückung pro Hierarchie-Stufe, damit
-              // mehrstufige Gruppierung als „Baum" lesbar wird. Indent landet
-              // nur auf der ersten regulären Daten-Zelle (__select__ /
-              // __actions__ bleiben in Spur).
+              // Polish-3: Kinder einer Gruppe (row.depth > 0) bekommen nur noch
+              // dezente Schattierung — KEINE Einrückung mehr. Die Daten-Zellen
+              // (Checkbox, Nummer, …) bleiben spaltentreu linksbündig (Tim-
+              // Feedback Feldtest); die Hierarchie tragen allein die Group-
+              // Header + die Schattierung.
               const isGroupedChild = polishGroupSeparators && row.depth > 0;
-              const indentRem = isGroupedChild ? row.depth * 1.25 : 0;
               const visibleCells = row.getVisibleCells();
-              const firstNormalCellIdx = visibleCells.findIndex(
-                (c) =>
-                  c.column.id !== '__select__' && c.column.id !== '__actions__',
-              );
               return (
                 <tr
                   key={row.id}
+                  onClick={
+                    onRowClick
+                      ? (e) => {
+                          // Guard: Klicks auf interaktive Elemente (Checkbox,
+                          // Kebab, Buttons, Links, Inputs) NICHT als Row-Klick
+                          // werten — sonst feuert z. B. die Checkbox doppelt.
+                          if (
+                            (e.target as HTMLElement).closest(
+                              'button, a, input, label, select, textarea, [data-no-row-click]',
+                            )
+                          ) {
+                            return;
+                          }
+                          onRowClick(row.original);
+                        }
+                      : undefined
+                  }
                   className={`group border-b border-zinc-800/60 last:border-b-0 hover:bg-zinc-800/40 ${
+                    onRowClick ? 'cursor-pointer' : ''
+                  } ${
                     row.getIsSelected()
                       ? 'bg-emerald-500/5'
                       : isGroupedChild
@@ -1339,10 +1543,6 @@ export function PowerListenView<TData>({
                   }`}
                 >
                   {visibleCells.map((cell, cellIdx) => {
-                    const style =
-                      indentRem > 0 && cellIdx === firstNormalCellIdx
-                        ? { paddingLeft: `${indentRem + 0.75}rem` }
-                        : undefined;
                     const isLastCell = cellIdx === visibleCells.length - 1;
                     const renderOverlay = isLastCell && useActionOverlay;
                     return (
@@ -1351,7 +1551,6 @@ export function PowerListenView<TData>({
                         className={`${bodyTdClass} align-top ${
                           renderOverlay ? 'relative' : ''
                         }`}
-                        style={style}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -1663,6 +1862,7 @@ function GroupRow<TData>({
   colSpan,
   groupableColumns,
   sticky = false,
+  stickyTop = 0,
   separators = false,
   tdClass = 'px-3 py-2',
 }: {
@@ -1670,6 +1870,9 @@ function GroupRow<TData>({
   colSpan: number;
   groupableColumns?: { id: string; label: string }[];
   sticky?: boolean;
+  /** Polish-3: y-Offset (px), damit Group-Header UNTER dem (ebenfalls sticky)
+   *  Spalten-Header kleben, statt ihn zu überdecken. */
+  stickyTop?: number;
   separators?: boolean;
   tdClass?: string;
 }) {
@@ -1690,19 +1893,20 @@ function GroupRow<TData>({
     ? 'border-t-2 border-emerald-500/30 bg-zinc-900'
     : 'border-y border-zinc-800 bg-zinc-900/70';
   const tdStickyClass = sticky
-    ? 'sticky top-0 z-10 bg-zinc-900 shadow-[0_1px_0_0_rgb(39_39_42)]'
+    ? 'sticky z-10 bg-zinc-900 shadow-[0_1px_0_0_rgb(39_39_42)]'
     : '';
   // W1.5 Indent: bei mehrstufiger Gruppierung rückt der Header pro Tiefe ein,
   // sodass die Hierarchie (z. B. Status → Priorität) optisch lesbar wird.
   const indentRem = separators ? row.depth * 1.25 : 0;
-  const indentStyle =
-    indentRem > 0 ? { paddingLeft: `${indentRem + 0.75}rem` } : undefined;
+  const tdStyle: Record<string, string | number> = {};
+  if (indentRem > 0) tdStyle.paddingLeft = `${indentRem + 0.75}rem`;
+  if (sticky) tdStyle.top = stickyTop;
   return (
     <tr className={trClass}>
       <td
         colSpan={colSpan}
         className={`${tdClass} ${tdStickyClass}`}
-        style={indentStyle}
+        style={Object.keys(tdStyle).length > 0 ? tdStyle : undefined}
       >
         <button
           type="button"
