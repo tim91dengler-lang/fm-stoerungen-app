@@ -83,6 +83,61 @@ function densityStorageKey(viewKey: string): string {
   return `fm-list-density:${viewKey}`;
 }
 
+// W1.5 Helper: rendert die Edit/Sperren/Delete-Buttons für eine Zeile.
+// Wird aus zwei Stellen genutzt: der klassischen __actions__-Spalte (always-
+// Modus) und dem Row-Overlay (hover-Modus).
+function renderRowActionButtons<TData>(
+  rowActions: NonNullable<PowerListenViewProps<TData>['rowActions']>,
+  rowData: TData,
+): ReactNode {
+  const isGesperrt = rowActions.sperren?.isGesperrt(rowData) ?? false;
+  return (
+    <>
+      {rowActions.onEdit && (
+        <button
+          type="button"
+          onClick={() => rowActions.onEdit?.(rowData)}
+          className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+          title="Bearbeiten"
+          aria-label="Bearbeiten"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {rowActions.sperren && (
+        <button
+          type="button"
+          onClick={() => rowActions.sperren?.onToggle(rowData)}
+          className={
+            isGesperrt
+              ? 'rounded-md p-1.5 text-emerald-400 hover:bg-emerald-500/10'
+              : 'rounded-md p-1.5 text-zinc-400 hover:bg-amber-500/10 hover:text-amber-400'
+          }
+          title={isGesperrt ? 'Aktivieren' : 'Deaktivieren'}
+          aria-label={isGesperrt ? 'Aktivieren' : 'Deaktivieren'}
+        >
+          {isGesperrt ? (
+            <Play className="h-3.5 w-3.5" />
+          ) : (
+            <Pause className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
+      {rowActions.onDelete && (
+        <button
+          type="button"
+          onClick={() => rowActions.onDelete?.([rowData])}
+          className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+          title="Löschen"
+          aria-label="Löschen"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </>
+  );
+}
+
 function readDensity(viewKey: string): Density {
   if (typeof window === 'undefined') return 'comfortable';
   try {
@@ -289,6 +344,15 @@ export function PowerListenView<TData>({
   const bodyTdClass = DENSITY_BODY_TD[density];
   const groupTdClass = DENSITY_GROUP_TD[density];
 
+  // W1.5 Action-Overlay-Modus: bei polishActionVisibility='hover' fällt die
+  // Aktions-Spalte weg, die Buttons werden als rechts-bündiges Overlay in
+  // der letzten Daten-Zelle gerendert (nur auf >= md sichtbar).
+  const hasRowActionsHandler = Boolean(
+    rowActions?.onEdit || rowActions?.onDelete || rowActions?.sperren,
+  );
+  const useActionOverlay =
+    polishActionVisibility === 'hover' && hasRowActionsHandler;
+
   // `/`-Shortcut: fokussiert die Volltextsuche, wenn der User nicht gerade
   // tippt (Input/Textarea/contenteditable werden respektiert).
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -362,15 +426,12 @@ export function PowerListenView<TData>({
         ),
       });
     }
-    if (rowActions?.onEdit || rowActions?.onDelete || rowActions?.sperren) {
-      // B1.1: bei polishActionVisibility='hover' sind die Icons nur per
-      // Maus-Hover oder Tastatur-Fokus auf der Zeile sichtbar — auf Mobile
-      // (< md) bleiben sie sichtbar, damit Touch-User sie weiterhin
-      // erreichen (Long-Press-Menü kommt in B5/später).
-      const actionWrapperClass =
-        polishActionVisibility === 'hover'
-          ? 'flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'
-          : 'flex items-center gap-0.5';
+    // W1.5: Bei polishActionVisibility='hover' wird die __actions__-Spalte
+    // GAR NICHT mehr eingefügt — die Aktions-Buttons erscheinen stattdessen
+    // als Row-Overlay (rechts in der letzten Daten-Cell, on hover sichtbar).
+    // So verschwendet die Spalte keinen Platz mehr.
+    // Mobile (<md): kein hover möglich → Stretch in B5 (Long-Press-Menü).
+    if (hasRowActionsHandler && !useActionOverlay) {
       prefix.push({
         id: '__actions__',
         enableSorting: false,
@@ -378,58 +439,21 @@ export function PowerListenView<TData>({
         enableHiding: false,
         enableGrouping: false,
         header: '',
-        cell: ({ row }) => {
-          const isGesperrt = rowActions.sperren?.isGesperrt(row.original) ?? false;
-          return (
-            <div className={actionWrapperClass}>
-              {rowActions.onEdit && (
-                <button
-                  type="button"
-                  onClick={() => rowActions.onEdit?.(row.original)}
-                  className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                  title="Bearbeiten"
-                  aria-label="Bearbeiten"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {rowActions.sperren && (
-                <button
-                  type="button"
-                  onClick={() => rowActions.sperren?.onToggle(row.original)}
-                  className={
-                    isGesperrt
-                      ? 'rounded-md p-1.5 text-emerald-400 hover:bg-emerald-500/10'
-                      : 'rounded-md p-1.5 text-zinc-400 hover:bg-amber-500/10 hover:text-amber-400'
-                  }
-                  title={isGesperrt ? 'Aktivieren' : 'Deaktivieren'}
-                  aria-label={isGesperrt ? 'Aktivieren' : 'Deaktivieren'}
-                >
-                  {isGesperrt ? (
-                    <Play className="h-3.5 w-3.5" />
-                  ) : (
-                    <Pause className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              )}
-              {rowActions.onDelete && (
-                <button
-                  type="button"
-                  onClick={() => rowActions.onDelete?.([row.original])}
-                  className="rounded-md p-1.5 text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-                  title="Löschen"
-                  aria-label="Löschen"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <div className="flex items-center gap-0.5">
+            {renderRowActionButtons(rowActions!, row.original)}
+          </div>
+        ),
       });
     }
     return [...prefix, ...columns];
-  }, [columns, enableRowSelection, rowActions, polishActionVisibility]);
+  }, [
+    columns,
+    enableRowSelection,
+    rowActions,
+    hasRowActionsHandler,
+    useActionOverlay,
+  ]);
 
   // Dropdown beim Außerhalb-Klick schließen
   useEffect(() => {
@@ -1291,9 +1315,18 @@ export function PowerListenView<TData>({
                   />
                 );
               }
-              // B1.4: Kinder einer Gruppe (row.depth > 0) bekommen eine dezente
-              // Schattierung, damit Gruppen optisch als Block lesbar werden.
+              // B1.4 / W1.5: Kinder einer Gruppe (row.depth > 0) bekommen
+              // dezente Schattierung + Einrückung pro Hierarchie-Stufe, damit
+              // mehrstufige Gruppierung als „Baum" lesbar wird. Indent landet
+              // nur auf der ersten regulären Daten-Zelle (__select__ /
+              // __actions__ bleiben in Spur).
               const isGroupedChild = polishGroupSeparators && row.depth > 0;
+              const indentRem = isGroupedChild ? row.depth * 1.25 : 0;
+              const visibleCells = row.getVisibleCells();
+              const firstNormalCellIdx = visibleCells.findIndex(
+                (c) =>
+                  c.column.id !== '__select__' && c.column.id !== '__actions__',
+              );
               return (
                 <tr
                   key={row.id}
@@ -1305,11 +1338,33 @@ export function PowerListenView<TData>({
                         : ''
                   }`}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className={`${bodyTdClass} align-top`}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                  {visibleCells.map((cell, cellIdx) => {
+                    const style =
+                      indentRem > 0 && cellIdx === firstNormalCellIdx
+                        ? { paddingLeft: `${indentRem + 0.75}rem` }
+                        : undefined;
+                    const isLastCell = cellIdx === visibleCells.length - 1;
+                    const renderOverlay = isLastCell && useActionOverlay;
+                    return (
+                      <td
+                        key={cell.id}
+                        className={`${bodyTdClass} align-top ${
+                          renderOverlay ? 'relative' : ''
+                        }`}
+                        style={style}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                        {renderOverlay && rowActions && (
+                          <div className="pointer-events-none absolute right-1 top-1/2 z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-md bg-zinc-900/95 px-1 py-0.5 opacity-0 shadow-lg ring-1 ring-zinc-700/80 transition-opacity md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-focus-within:pointer-events-auto md:group-focus-within:opacity-100">
+                            {renderRowActionButtons(rowActions, row.original)}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}
@@ -1637,9 +1692,18 @@ function GroupRow<TData>({
   const tdStickyClass = sticky
     ? 'sticky top-0 z-10 bg-zinc-900 shadow-[0_1px_0_0_rgb(39_39_42)]'
     : '';
+  // W1.5 Indent: bei mehrstufiger Gruppierung rückt der Header pro Tiefe ein,
+  // sodass die Hierarchie (z. B. Status → Priorität) optisch lesbar wird.
+  const indentRem = separators ? row.depth * 1.25 : 0;
+  const indentStyle =
+    indentRem > 0 ? { paddingLeft: `${indentRem + 0.75}rem` } : undefined;
   return (
     <tr className={trClass}>
-      <td colSpan={colSpan} className={`${tdClass} ${tdStickyClass}`}>
+      <td
+        colSpan={colSpan}
+        className={`${tdClass} ${tdStickyClass}`}
+        style={indentStyle}
+      >
         <button
           type="button"
           onClick={row.getToggleExpandedHandler()}
