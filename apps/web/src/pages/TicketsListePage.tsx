@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
-  Filter,
   Flame,
   LayoutGrid,
   MapPin,
@@ -55,8 +54,6 @@ import {
 } from '../core/liste/columnFilters';
 
 interface TicketsViewConfig {
-  statusFilter: TicketStatusSlug[];
-  prioFilter: TicketPrioritaetSlug[];
   sorting: SortingState;
   visibility: VisibilityState;
   columnFilters: ColumnFiltersState;
@@ -65,14 +62,18 @@ interface TicketsViewConfig {
 }
 
 const DEFAULT_CONFIG: TicketsViewConfig = {
-  statusFilter: ['neu', 'pruefung', 'bearbeitung', 'wartet'],
-  prioFilter: [],
   sorting: [{ id: 'eroeffnet_am', desc: true }],
   // Mockup-Layout: Nr., Titel (mit Kategorie-Icon), Objekt, Partner, Prio, Status,
   // Bearbeiter, Erstellt. Kategorie ist als eigene Spalte default ausgeblendet,
   // weil sie als Icon vor dem Titel sichtbar ist.
   visibility: { kategorie: false },
-  columnFilters: [],
+  // #86: Spalten-Filter sind die EINZIGE Filter-Quelle. Der Default „nur offene
+  // Tickets" lebt jetzt als Start-Filter auf der Status-Spalte (statt im früheren
+  // separaten Top-Panel). Status/Prio werden daraus ans Backend abgeleitet
+  // (siehe `filters`-useMemo); alle anderen Spalten-Filter wirken clientseitig.
+  columnFilters: [
+    { id: 'status', value: ['neu', 'pruefung', 'bearbeitung', 'wartet'] },
+  ],
   columnOrder: [
     'nummer',
     'titel',
@@ -332,6 +333,18 @@ function buildColumns(
   ];
 }
 
+// #86: liest den (Multi-Select-)Wert eines Spalten-Filters als Slug-Liste aus.
+// SelectFilter speichert ein Array von Slugs; leer/fehlt → undefined (= kein
+// Backend-Param). Wird für die Ableitung der API-Filter genutzt.
+function columnFilterSlugs<T extends string>(
+  columnFilters: ColumnFiltersState,
+  id: string,
+): T[] | undefined {
+  const entry = columnFilters.find((f) => f.id === id);
+  const value = entry?.value;
+  return Array.isArray(value) && value.length > 0 ? (value as T[]) : undefined;
+}
+
 const filterRenderers = {
   titel: TextFilter,
   status: (props: { value: unknown; onChange: (v: unknown) => void }) => (
@@ -351,26 +364,12 @@ export function TicketsListePage() {
   const [config, setConfig] = useState<TicketsViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showErfassen, setShowErfassen] = useState(false);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const filterPanelRef = useRef<HTMLDivElement>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<TicketRead[] | null>(
     null,
   );
   const [searchParams, setSearchParams] = useSearchParams();
   const openTicketId = searchParams.get('ticket');
-
-  // Filter-Panel beim Außerhalb-Klick schließen
-  useEffect(() => {
-    if (!showFilterPanel) return;
-    function handler(e: MouseEvent) {
-      if (!filterPanelRef.current?.contains(e.target as Node)) {
-        setShowFilterPanel(false);
-      }
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showFilterPanel]);
 
   function openTicket(id: string) {
     searchParams.set('ticket', id);
@@ -489,14 +488,21 @@ export function TicketsListePage() {
     }
   }, [searchParams, setSearchParams]);
 
+  // #86: Backend-Filter aus den Spalten-Filtern ableiten. Status + Priorität
+  // kann das Backend filtern (eigene Query-Params) → wir reichen sie durch,
+  // damit bei >200 Tickets nicht clientseitig abgeschnitten wird. Alle anderen
+  // Spalten-Filter (Titel, Objekt, …) bleiben clientseitiger TanStack-Filter.
   const filters = useMemo(
     () => ({
       search: search.trim() || undefined,
-      status: config.statusFilter.length > 0 ? config.statusFilter : undefined,
-      prioritaet: config.prioFilter.length > 0 ? config.prioFilter : undefined,
+      status: columnFilterSlugs<TicketStatusSlug>(config.columnFilters, 'status'),
+      prioritaet: columnFilterSlugs<TicketPrioritaetSlug>(
+        config.columnFilters,
+        'prioritaet',
+      ),
       limit: 200,
     }),
-    [search, config.statusFilter, config.prioFilter],
+    [search, config.columnFilters],
   );
 
   const ticketsQuery = useQuery({
@@ -571,23 +577,6 @@ export function TicketsListePage() {
       setRowSelection({});
     },
   });
-
-  function toggleStatus(s: TicketStatusSlug) {
-    setConfig((prev) => ({
-      ...prev,
-      statusFilter: prev.statusFilter.includes(s)
-        ? prev.statusFilter.filter((x) => x !== s)
-        : [...prev.statusFilter, s],
-    }));
-  }
-  function togglePrio(p: TicketPrioritaetSlug) {
-    setConfig((prev) => ({
-      ...prev,
-      prioFilter: prev.prioFilter.includes(p)
-        ? prev.prioFilter.filter((x) => x !== p)
-        : [...prev.prioFilter, p],
-    }));
-  }
 
   function applySavedConfig(rawConfig: Record<string, unknown>) {
     setConfig({ ...DEFAULT_CONFIG, ...(rawConfig as Partial<TicketsViewConfig>) });
@@ -694,90 +683,6 @@ export function TicketsListePage() {
         searchPlaceholder="Suche in allen Feldern …"
         showFooter
         itemLabel={{ singular: 'Ticket', plural: 'Tickets' }}
-        filterButton={
-          <div className="relative" ref={filterPanelRef}>
-            <button
-              type="button"
-              onClick={() => setShowFilterPanel((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs ${
-                config.statusFilter.length > 0 || config.prioFilter.length > 0
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                  : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800'
-              }`}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              Filter
-              {(config.statusFilter.length > 0 ||
-                config.prioFilter.length > 0) && (
-                <span className="rounded bg-emerald-500/30 px-1 font-mono text-[10px]">
-                  {config.statusFilter.length + config.prioFilter.length}
-                </span>
-              )}
-            </button>
-            {showFilterPanel && (
-              <div className="absolute left-0 z-30 mt-1 w-72 rounded-md border border-zinc-800 bg-zinc-900 p-3 shadow-2xl">
-                <div>
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Status
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {STATUS_SLUGS.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => toggleStatus(s)}
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          config.statusFilter.includes(s)
-                            ? 'bg-emerald-500 text-zinc-950'
-                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                        }`}
-                      >
-                        {labelForStatusSlug(s)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Priorität
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {PRIO_SLUGS.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => togglePrio(p)}
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          config.prioFilter.includes(p)
-                            ? 'bg-orange-500 text-zinc-950'
-                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                        }`}
-                      >
-                        {labelForPrioSlug(p)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {(config.statusFilter.length > 0 ||
-                  config.prioFilter.length > 0) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        statusFilter: [],
-                        prioFilter: [],
-                      }))
-                    }
-                    className="mt-3 w-full rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-                  >
-                    Filter zurücksetzen
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        }
       />
 
       {showErfassen && (
