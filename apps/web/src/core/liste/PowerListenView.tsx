@@ -722,6 +722,12 @@ export function PowerListenView<TData>({
     enableRowSelection,
     enableGrouping: groupingEnabled,
     autoResetExpanded: false,
+    // Wir nutzen keine Pagination (keine getPaginationRowModel, Server-Limit).
+    // TanStacks Default `autoResetPageIndex: true` ruft bei Daten-/Filter-/
+    // Re-Render-Zyklen `onPaginationChange`→setState MITTEN im Render auf — das
+    // löst Reacts „state update on a component that hasn't mounted yet"-Warnung
+    // aus (z. B. beim Öffnen des Detail-Panels). Abschalten = Warnung weg.
+    autoResetPageIndex: false,
     getRowId: getRowId ? (row) => getRowId(row) : undefined,
     getCoreRowModel: stableCoreRowModel,
     getSortedRowModel: stableSortedRowModel,
