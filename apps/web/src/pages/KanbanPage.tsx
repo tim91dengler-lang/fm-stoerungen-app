@@ -1,20 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  AlertCircle,
-  Clock,
-  ListIcon,
-  Search,
-} from 'lucide-react';
+import { ListIcon, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { ticketApi } from '../api/endpoints';
-import type {
-  TicketRead,
-  TicketStatusSlug,
-} from '../api/types';
-import { InitialAvatar } from '../components/InitialAvatar';
-import { PrioBadge } from '../components/StatusBadge';
+import type { TicketStatusSlug } from '../api/types';
+import { TicketCard } from '../components/TicketCard';
 import { TicketDetailPanel } from '../components/TicketDetailPanel';
 
 const COLUMNS: { status: TicketStatusSlug; label: string; color: string }[] = [
@@ -130,7 +121,12 @@ export function KanbanPage() {
               </div>
               <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto">
                 {cards.map((t) => (
-                  <KanbanCard key={t.id} ticket={t} onOpen={() => openTicket(t.id)} />
+                  <TicketCard
+                    key={t.id}
+                    ticket={t}
+                    dragId={t.id}
+                    onOpen={() => openTicket(t.id)}
+                  />
                 ))}
                 {cards.length === 0 && (
                   <div className="rounded-md border border-dashed border-zinc-800 py-6 text-center text-xs text-zinc-600">
@@ -144,65 +140,6 @@ export function KanbanPage() {
       </div>
 
       <TicketDetailPanel ticketId={openTicketId} onClose={closeTicket} />
-    </div>
-  );
-}
-
-function KanbanCard({ ticket, onOpen }: { ticket: TicketRead; onOpen: () => void }) {
-  const overdue =
-    ticket.faelligkeit_am &&
-    new Date(ticket.faelligkeit_am) < new Date() &&
-    ticket.status.key !== 'erledigt';
-  return (
-    <div
-      draggable
-      onDragStart={(e) => e.dataTransfer.setData('ticket-id', ticket.id)}
-      onClick={onOpen}
-      role="button"
-      className="cursor-grab rounded-md border border-zinc-800 bg-zinc-950 p-2 text-xs hover:border-zinc-700 active:cursor-grabbing"
-    >
-      <div className="mb-1 flex items-center justify-between">
-        <span className="font-mono text-zinc-500">#{ticket.nummer}</span>
-        <PrioBadge prioritaet={ticket.prioritaet} />
-      </div>
-      <div className="text-sm font-medium text-zinc-100" title={ticket.titel}>
-        <span className="line-clamp-2">{ticket.titel}</span>
-      </div>
-      {ticket.tickettyp && (
-        <span
-          className={clsx(
-            'mt-1 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider',
-            ticket.tickettyp.farbe === 'emerald'
-              ? 'bg-emerald-500/10 text-emerald-300'
-              : ticket.tickettyp.farbe === 'blue'
-                ? 'bg-sky-500/10 text-sky-300'
-                : 'bg-amber-500/10 text-amber-300',
-          )}
-        >
-          {ticket.tickettyp.label}
-        </span>
-      )}
-      <div className="mt-2 flex items-center justify-between gap-1 text-[10px] text-zinc-500">
-        <span className="truncate">
-          {ticket.objekt?.name ?? '—'}
-          {ticket.haus && ` · ${ticket.haus.bezeichnung}`}
-        </span>
-        {ticket.zugewiesen_an ? (
-          <InitialAvatar fullName={ticket.zugewiesen_an.full_name} size="xs" />
-        ) : (
-          <span className="text-zinc-600">offen</span>
-        )}
-      </div>
-      {overdue && (
-        <div className="mt-1 flex items-center gap-1 rounded bg-red-500/10 px-1 py-0.5 text-[10px] text-red-300">
-          <AlertCircle className="h-2.5 w-2.5" /> überfällig
-        </div>
-      )}
-      {ticket.faelligkeit_am && !overdue && (
-        <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-300">
-          <Clock className="h-2.5 w-2.5" /> {ticket.faelligkeit_am}
-        </div>
-      )}
     </div>
   );
 }
