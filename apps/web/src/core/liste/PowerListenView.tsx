@@ -28,6 +28,7 @@ import {
 } from '@tanstack/react-table';
 import { comboboxFilterFn } from './columnFilters';
 import { ConfirmDialog } from './ConfirmDialog';
+import { useIsDesktop } from '../../hooks/useMediaQuery';
 import {
   ArrowDown,
   ArrowUp,
@@ -423,6 +424,11 @@ export interface PowerListenViewProps<TData> {
   /** Polish-3: Klick auf eine Daten-Zeile (außerhalb von Buttons/Inputs/Checkbox/
    *  Kebab) löst diesen Callback aus — typisch „Detail/Edit-Panel öffnen". */
   onRowClick?: (row: TData) => void;
+  /** Wenn gesetzt UND Viewport < lg (M2): rendert statt der Tabelle eine
+   *  Karten-Liste. Bekommt die gefilterten/sortierten Leaf-Rows (row.original)
+   *  in Tabellen-Reihenfolge — Suche/Filter/Sortierung greifen 1:1. Power-
+   *  Features (Drag-Reorder, Multi-Sort, Spalten-Ablage, Bulk) sind mobil aus. */
+  renderMobileCard?: (row: TData) => ReactNode;
   /** Listen-Power-2.0-Polish (W1). Pro Page einzeln aktivierbar. */
   polish?: ListenPolishOptions;
 }
@@ -478,8 +484,20 @@ export function PowerListenView<TData>({
   onMassEdit,
   rowActions,
   onRowClick,
+  renderMobileCard,
   polish,
 }: PowerListenViewProps<TData>) {
+  // M2: unter lg Karten statt Tabelle (wenn die Page renderMobileCard liefert).
+  // useReactTable + RowModels laufen UNVERÄNDERT immer — wir branchen nur das
+  // JSX, nie die Hooks. Karten lesen aus demselben getRowModel().
+  const isDesktop = useIsDesktop();
+  const showMobileCards = !isDesktop && !!renderMobileCard;
+  // Beim Wechsel in den Mobile-Karten-Modus die (mobil unsichtbare und nicht
+  // aufhebbare) Bulk-Auswahl leeren, damit keine „geisternde" Selektion
+  // zurückbleibt, wenn der Viewport unter lg fällt.
+  useEffect(() => {
+    if (showMobileCards) onRowSelectionChange?.({});
+  }, [showMobileCards, onRowSelectionChange]);
   // Polish-Defaults: ohne polish-Prop bleibt alles wie bisher.
   const polishActionVisibility = polish?.actionVisibility ?? 'always';
   const polishStickyGroupHeaders = polish?.stickyGroupHeaders ?? false;
@@ -985,10 +1003,20 @@ export function PowerListenView<TData>({
     </div>
   ) : null;
 
+  // M2: flache, gefilterte+sortierte Leaf-Rows für die Karten-Liste — bei
+  // aktiver Gruppierung liefert getRowModel().rows nur Gruppen-Header (Leaf-
+  // Rows liegen in subRows und nur bei expandierter Gruppe in .rows). flatRows
+  // enthält die Leafs unabhängig vom Expand-Zustand.
+  const mobileLeafRows = showMobileCards
+    ? table.getRowModel().flatRows.filter((r) => !r.getIsGrouped())
+    : [];
+
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-sm">
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-3 py-2.5">
-        <div className="flex items-center gap-2">{toolbarLeft}</div>
+        {!showMobileCards && (
+          <div className="flex items-center gap-2">{toolbarLeft}</div>
+        )}
         <div className="relative min-w-[18rem] max-w-md flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <input
@@ -1004,8 +1032,8 @@ export function PowerListenView<TData>({
             className="w-full rounded-md border border-zinc-700 bg-zinc-950 py-1.5 pl-9 pr-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
           />
         </div>
-        {filterButton}
-        {!polishConsolidatedMenu && (
+        {!showMobileCards && filterButton}
+        {!showMobileCards && !polishConsolidatedMenu && (
         <div className="relative" ref={columnPickerRef}>
           <button
             type="button"
@@ -1039,7 +1067,7 @@ export function PowerListenView<TData>({
           )}
         </div>
         )}
-        {!polishConsolidatedMenu && onGroupingChange && groupableColumns && groupableColumns.length > 0 && (
+        {!showMobileCards && !polishConsolidatedMenu && onGroupingChange && groupableColumns && groupableColumns.length > 0 && (
           <div className="relative" ref={groupPickerRef}>
             <button
               type="button"
@@ -1115,7 +1143,7 @@ export function PowerListenView<TData>({
             !polishConsolidatedMenu versteckt). Drei Tabs: Spalten | Gruppen
             | Ansicht (Density). Der Gruppen-Tab erscheint nur, wenn die
             Page Grouping aktiv hat, der Ansicht-Tab nur bei densityToggle. */}
-        {polishConsolidatedMenu && (
+        {!showMobileCards && polishConsolidatedMenu && (
           <div className="relative" ref={settingsMenuRef}>
             <button
               type="button"
@@ -1305,7 +1333,7 @@ export function PowerListenView<TData>({
         </div>
       </div>
 
-      {enableRowSelection && selectedRows.length > 0 && (
+      {enableRowSelection && !showMobileCards && selectedRows.length > 0 && (
         <div className="flex items-center justify-between border-b border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
           <span>
             <strong>{selectedRows.length}</strong> ausgewählt
@@ -1323,8 +1351,22 @@ export function PowerListenView<TData>({
         </div>
       )}
 
-      {dropZone}
+      {!showMobileCards && dropZone}
 
+      {showMobileCards && (
+        <div className="flex flex-col gap-2 p-3">
+          {mobileLeafRows.length === 0 && (
+            <p className="py-8 text-center text-sm text-zinc-500">
+              Keine Treffer.
+            </p>
+          )}
+          {mobileLeafRows.map((row) => (
+            <div key={row.id}>{renderMobileCard?.(row.original)}</div>
+          ))}
+        </div>
+      )}
+
+      {!showMobileCards && (
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-zinc-800 text-sm">
           <thead
@@ -1395,11 +1437,10 @@ export function PowerListenView<TData>({
                         if (!renderer) return null;
                         return (
                           <div className="mt-1">
-                            {renderer({
-                              value: header.column.getFilterValue(),
-                              onChange: (v) => header.column.setFilterValue(v),
-                              column: header.column,
-                            })}
+                            <FilterCell
+                              renderer={renderer}
+                              column={header.column}
+                            />
                           </div>
                         );
                       })()}
@@ -1575,15 +1616,16 @@ export function PowerListenView<TData>({
             })}
           </tbody>
         </table>
-        {showFooter && (
-          <FooterRow
-            count={table.getRowModel().rows.filter((r) => !r.getIsGrouped()).length}
-            sorting={sorting}
-            allColumns={table.getAllLeafColumns()}
-            itemLabel={itemLabel}
-          />
-        )}
       </div>
+      )}
+      {showFooter && !showMobileCards && (
+        <FooterRow
+          count={table.getRowModel().flatRows.filter((r) => !r.getIsGrouped()).length}
+          sorting={sorting}
+          allColumns={table.getAllLeafColumns()}
+          itemLabel={itemLabel}
+        />
+      )}
       {massEditStatus && (
         <div className="pointer-events-none fixed bottom-[calc(1.5rem+var(--bottom-nav-h)+env(safe-area-inset-bottom))] right-6 z-50 rounded-md border border-emerald-500/40 bg-zinc-900 px-4 py-2 text-sm text-emerald-200 shadow-2xl lg:bottom-6">
           {massEditStatus}
@@ -1824,6 +1866,36 @@ function MassEditCell({
         ↵
       </button>
     </div>
+  );
+}
+
+/**
+ * Isolates a column filter renderer in its own fiber. Page-provided renderers
+ * call hooks (e.g. useState in the combobox filter); invoking them directly in
+ * the table render would make those hooks part of PowerListenView's own hook
+ * list, which then changes count when the table is conditionally NOT rendered
+ * (mobile card mode) → "Rendered fewer hooks than expected" on resize across lg.
+ * As a child component the hooks belong here and unmount cleanly with the table.
+ */
+function FilterCell<TData>({
+  renderer,
+  column,
+}: {
+  renderer: (props: {
+    value: unknown;
+    onChange: (v: unknown) => void;
+    column: Column<TData, unknown>;
+  }) => ReactNode;
+  column: Column<TData, unknown>;
+}) {
+  return (
+    <>
+      {renderer({
+        value: column.getFilterValue(),
+        onChange: (v) => column.setFilterValue(v),
+        column,
+      })}
+    </>
   );
 }
 

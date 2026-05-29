@@ -42,6 +42,7 @@ import {
 } from '../lib/format';
 import { KpiCards, type KpiItem } from '../components/KpiCards';
 import { TicketDetailPanel } from '../components/TicketDetailPanel';
+import { TicketCard } from '../components/TicketCard';
 import { InitialAvatar } from '../components/InitialAvatar';
 import { iconForKategorie } from '../lib/kategorieIcon';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
@@ -651,6 +652,9 @@ export function TicketsListePage() {
           onDelete: (rows) => setBulkDeleteConfirm(rows),
         }}
         onRowClick={(row) => openTicket(row.id)}
+        renderMobileCard={(t) => (
+          <TicketCard ticket={t} showStatus onOpen={() => openTicket(t.id)} />
+        )}
         bulkActions={(selected) => (
           <button
             type="button"
