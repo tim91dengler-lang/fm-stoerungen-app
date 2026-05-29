@@ -113,7 +113,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex animate-fade"
+      className="fixed inset-0 z-50 flex animate-fade"
       role="dialog"
       aria-modal="true"
       aria-label="Ticket-Detail"

@@ -1585,7 +1585,7 @@ export function PowerListenView<TData>({
         )}
       </div>
       {massEditStatus && (
-        <div className="pointer-events-none fixed bottom-6 right-6 z-50 rounded-md border border-emerald-500/40 bg-zinc-900 px-4 py-2 text-sm text-emerald-200 shadow-2xl">
+        <div className="pointer-events-none fixed bottom-[calc(1.5rem+var(--bottom-nav-h)+env(safe-area-inset-bottom))] right-6 z-50 rounded-md border border-emerald-500/40 bg-zinc-900 px-4 py-2 text-sm text-emerald-200 shadow-2xl lg:bottom-6">
           {massEditStatus}
         </div>
       )}

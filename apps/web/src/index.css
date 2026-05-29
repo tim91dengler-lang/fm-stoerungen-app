@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Height of the mobile bottom tab bar; consumed by the bar and by the
+       content padding so they never drift apart. */
+    --bottom-nav-h: 3.5rem;
+  }
   html {
     -webkit-tap-highlight-color: transparent;
   }
@@ -29,5 +34,15 @@
   }
   *::-webkit-scrollbar-thumb:hover {
     @apply bg-zinc-600;
+  }
+}
+
+@layer utilities {
+  /* Respect device safe areas (notch / home indicator) in standalone PWA. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
   }
 }
