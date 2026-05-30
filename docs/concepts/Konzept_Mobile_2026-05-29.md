@@ -1,11 +1,12 @@
 # Konzept: Mobile-Tauglichkeit (Stufe 1)
 
-> **Status:** Freigegeben (Tim, 2026-05-29). **M1 umgesetzt** (mobile Navigation). M2–M5 offen.
-> **Datum:** 2026-05-29
+> **Status:** Freigegeben (Tim, 2026-05-29). **M1 + M2 + M4 umgesetzt.** M3 verworfen. M5 offen.
+> **Datum:** 2026-05-29 (Stand-Update 2026-05-30)
 > **Autor:** Claude (Senior-Dev-Modus)
 > **Bezug:** `docs/plan.md` §5.9 (PWA), Mobile-Anforderungen; CLAUDE.md §4 (Listen-Konvention)
 >
-> **Freigabe-Entscheidungen:** Bottom-Tab-Leiste ja · PWA auf `vite-plugin-pwa`/Workbox (M5) ja · Kanban am Handy via „Status ändern"-Schnellmenü statt Touch-Drag (M3) · Reihenfolge M1→M5 bestätigt.
+> **Freigabe-Entscheidungen:** Bottom-Tab-Leiste ja · PWA auf `vite-plugin-pwa`/Workbox (M5) ja · Reihenfolge bestätigt.
+> **M3 verworfen (Tim, 2026-05-30):** Kanban-Touch entfällt — der Status-Wechsel läuft am Handy ohnehin über das Ticket-Detail („alles im Ticket bearbeiten"), das ist der bessere Flow. Kein Touch-Drag / Schnellmenü auf dem Kanban-Board nötig.
 
 ---
 
@@ -82,15 +83,15 @@ Partner-Insert) — der volle Demo-Seed läuft nicht durch (Rollback). Kleines, 
 Reihenfolge bewusst so: erst durchnavigierbar machen (entsperrt alles), dann die kaputten
 Interaktionen, dann Feinschliff, dann PWA.
 
-| # | Paket | Inhalt | Aufwand |
+| # | Paket | Inhalt | Status |
 |:--:|---|---|:--:|
-| **M1** | **Mobile Navigation** | Hamburger-Button im Header (< lg). Slide-in-Drawer, der `navGroups` aus `AppLayout` **wiederverwendet** (keine Doppelpflege). „Neues Ticket"-Button + „Abmelden" im Drawer. Optional zusätzlich eine Bottom-Tab-Leiste für die 3–4 Kern-Aktionen (Dashboard, Pool, Meine Tickets, +Neu). | 🟡 ~1 Tag |
-| **M2** | **Mobile Listen-Karten** | Ticket-Pool: unterhalb `lg` automatisch Karten- statt Tabellen-Darstellung (Titel, Nr., Priorität, Status, Objekt — tap öffnet Detail). Gesamtsuche bleibt; Power-Tabellen-Features (Drag-Reorder, Multi-Sort, Spalten-Ablage) sind Desktop-only. Als wiederverwendbares Muster für künftige Listen. | 🟡 ~1 Tag |
-| **M3** | **Kanban touch-fähig** | Natives `draggable` durch dnd-kit mit `PointerSensor` + `TouchSensor` (Activation-Constraint gegen versehentliches Ziehen beim Scrollen) ersetzen — oder, falls Drag am Handy unergonomisch bleibt, ein „Status ändern"-Schnellmenü pro Karte als Touch-Alternative. | 🟡 ~0,5–1 Tag |
-| **M4** | **Mobile-Feinschliff** | Touch-Targets ≥ 44px (Audit der Listen-/Toolbar-Controls), „System aktiv"-Badge & Abmelden am Handy erreichbar, Tap-Flächen in Listen vergrößern, viewport-fit/Safe-Area (Notch) prüfen. | 🟢 ~0,5 Tag |
-| **M5** | **PWA scharf schalten** | Service-Worker-Deaktivierung (Stand 23.05.) zurücknehmen. **Architektur-Entscheidung** (siehe §5): manueller SW härten **vs.** auf `vite-plugin-pwa`/Workbox umstellen (von tech-spec vorgesehen). Installierbarkeit + Offline-Read-Fallback auf echtem Gerät verifizieren, Lighthouse-PWA-Check. | 🟡 ~0,5–1 Tag |
+| **M1** | **Mobile Navigation** | Hamburger-Button im Header (< lg). Slide-in-Drawer, der `navGroups` aus `AppLayout` **wiederverwendet** (keine Doppelpflege). „Neues Ticket"-Button + „Abmelden" im Drawer. Plus Bottom-Tab-Leiste für die Kern-Aktionen (Dashboard, Pool, Meine Tickets, Mehr). | ✅ **fertig** (#92) |
+| **M2** | **Mobile Listen-Karten** | Ticket-Pool: unterhalb `lg` automatisch Karten- statt Tabellen-Darstellung (geteilte `TicketCard` mit Kanban). Gesamtsuche bleibt; Power-Tabellen-Features Desktop-only. Opt-in pro Liste via `renderMobileCard`. | ✅ **fertig** (#93) |
+| ~~M3~~ | ~~Kanban touch-fähig~~ | **Verworfen (2026-05-30):** Status-Wechsel läuft am Handy über das Ticket-Detail; kein Kanban-Touch nötig. | ❌ entfällt |
+| **M4** | **Mobile-Feinschliff** | Touch-Targets ≥ 44px: globale Mobile-Regel für Formfelder (`input/select/textarea`), Icon-Buttons (Glocke, Detail-X/Foto/Senden/Löschen, Erfassen-Buttons, Kanban-Link) pro Komponente; Header-Safe-Area oben (Notch). Desktop unverändert (`lg:`-Overrides). | ✅ **fertig** |
+| **M5** | **PWA scharf schalten** | Service-Worker-Deaktivierung (Stand 23.05.) zurücknehmen. **Architektur-Entscheidung** (siehe §5): manueller SW härten **vs.** auf `vite-plugin-pwa`/Workbox umstellen (von tech-spec vorgesehen). Installierbarkeit + Offline-Read-Fallback auf echtem Gerät verifizieren, Lighthouse-PWA-Check. | ⏳ offen |
 
-**Gesamt: ~2,5–3,5 Tage** bis „mobil wirklich rund". Jedes Paket ein eigener PR mit Staging-Acceptance durch Tim.
+Jedes Paket ein eigener PR mit Staging-Acceptance durch Tim. **Es fehlt nur noch M5 (PWA).**
 
 ---
 

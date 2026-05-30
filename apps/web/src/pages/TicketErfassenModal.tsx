@@ -268,7 +268,7 @@ export function TicketErfassenModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1 text-zinc-500 hover:bg-zinc-800"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-1 text-zinc-500 hover:bg-zinc-800 lg:min-h-0 lg:min-w-0"
             aria-label="Schließen"
           >
             ×
@@ -690,14 +690,14 @@ export function TicketErfassenModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 lg:min-h-0"
             >
               Abbrechen
             </button>
             <button
               type="submit"
               disabled={isSubmitting || create.isPending}
-              className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 shadow-sm hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 shadow-sm hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500 lg:min-h-0"
             >
               {isSubmitting || create.isPending ? 'Wird angelegt …' : 'Anlegen'}
             </button>
