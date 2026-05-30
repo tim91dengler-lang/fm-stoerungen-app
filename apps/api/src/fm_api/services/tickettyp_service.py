@@ -25,6 +25,65 @@ class TickettypFeldNotFoundError(Exception):
     pass
 
 
+# System-Tickettypen (Slice 1) — ursprünglich nur von Migration 0006 pro
+# damals existierendem Mandanten geseedet. Als idempotenter Provisioning-
+# Helper hier, damit auch neu (per seed_dev) angelegte Mandanten sie bekommen.
+# Werte identisch zu 0006.
+SYSTEM_TICKETTYPEN: list[dict[str, Any]] = [
+    {
+        "key": "reparatur",
+        "label": "Reparatur",
+        "beschreibung": "Standard-Reparatur-Ticket",
+        "icon": "wrench",
+        "farbe": "emerald",
+        "pflichtfelder": ["titel"],
+        "default_reminder_tage": 0,
+        "reihenfolge": 0,
+    },
+    {
+        "key": "wartung",
+        "label": "Wartung",
+        "beschreibung": "Geplante Wartung mit Fälligkeit",
+        "icon": "calendar",
+        "farbe": "blue",
+        "pflichtfelder": ["titel", "faelligkeit_am"],
+        "default_reminder_tage": 7,
+        "reihenfolge": 1,
+    },
+    {
+        "key": "baubegehung",
+        "label": "Baubegehung",
+        "beschreibung": "Termingebundene Begehung",
+        "icon": "binoculars",
+        "farbe": "amber",
+        "pflichtfelder": ["titel", "faelligkeit_am"],
+        "default_reminder_tage": 3,
+        "reihenfolge": 2,
+    },
+]
+
+
+async def ensure_system_tickettypen(db: AsyncSession, mandant_id: UUID) -> None:
+    """Lege die System-Tickettypen (Reparatur/Wartung/Baubegehung) idempotent an.
+
+    Ursprünglich nur von Migration 0006 für damals existierende Mandanten
+    geseedet — neu angelegte Mandanten bekamen sie nicht. Wird daher beim
+    Provisioning (seed_dev) und im Mockup-Seed aufgerufen. Felder (felder/
+    TickettypFeld) werden bewusst nicht angelegt — wie in 0006; sie sind für
+    Slice-1-Tickets nicht nötig.
+    """
+    existing_keys = set(
+        (await db.execute(select(Tickettyp.key).where(Tickettyp.mandant_id == mandant_id)))
+        .scalars()
+        .all()
+    )
+    for cfg in SYSTEM_TICKETTYPEN:
+        if cfg["key"] in existing_keys:
+            continue
+        db.add(Tickettyp(mandant_id=mandant_id, ist_system=True, **cfg))
+    await db.flush()
+
+
 # Default-Konfiguration der 19 System-Felder für neue User-Vorlagen.
 # Tim 2026-05-26 (Track-2-Spec §4.1): alle sichtbar, nur Titel +
 # Beschreibung sind Pflicht — der Admin entscheidet im Designer den Rest

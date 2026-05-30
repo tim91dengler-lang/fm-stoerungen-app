@@ -38,7 +38,6 @@ from fm_api.models import (
     Mandant,
     Objekt,
     ObjektStockwerk,
-    PartnerTyp,
     Projekt,
     ProjektObjektLink,
     Role,
@@ -48,6 +47,8 @@ from fm_api.models import (
     User,
 )
 from fm_api.models.ticket import Ticket
+from fm_api.services.auswahlliste_service import ensure_system_auswahllisten
+from fm_api.services.tickettyp_service import ensure_system_tickettypen
 
 DEFAULT_TENANT_SLUG = os.environ.get("DEV_TENANT_SLUG", "fm-staging-default")
 
@@ -95,6 +96,16 @@ async def main() -> int:
             print(f"[mockup-seed] Tenant {DEFAULT_TENANT_SLUG} not found. Run seed_dev first.")
             return 1
         m_id: UUID = tenant.id
+
+        # ---- System-Auswahllisten sicherstellen (idempotent) ---------------
+        # Garantiert, dass alle System-Listen — inkl. partner_typ — existieren,
+        # bevor wir Werte zu UUIDs auflösen. Macht den Seed self-contained,
+        # unabhängig davon, ob seed_dev die partner_typ-Liste schon angelegt hat
+        # (für Mandanten, die nach Migration 0013 entstanden, fehlte sie sonst).
+        await ensure_system_auswahllisten(db, m_id)
+        # System-Tickettypen (Reparatur/Wartung/Baubegehung) ebenso sicherstellen
+        # — von Migration 0006 nur für damalige Mandanten geseedet.
+        await ensure_system_tickettypen(db, m_id)
 
         # ---- Rollen + Techniker-User ---------------------------------------
         roles_by_name = {
@@ -152,15 +163,18 @@ async def main() -> int:
             adressen.append(adr)
 
         # ---- Partner -------------------------------------------------------
+        # typen ist seit Migration 0016 ein UUID-Array auf Werte der Liste
+        # `partner_typ` (nicht mehr das PartnerTyp-Enum). Wert-Keys hier
+        # angeben, Auflösung zu UUIDs beim Insert.
         partner_data = [
-            ("Bürohaus Marktplatz GmbH", [PartnerTyp.EIGENTUEMER], "info@buerohaus.de"),
-            ("Boutique Stein", [PartnerTyp.MIETER], "info@boutique-stein.de"),
-            ("Café Sonnenschein", [PartnerTyp.MIETER], "leitung@cafe-sonnenschein.de"),
-            ("Elektro Schmidt GmbH", [PartnerTyp.NACHUNTERNEHMER], "service@elektro-schmidt.de"),
-            ("Sanitär Klein KG", [PartnerTyp.NACHUNTERNEHMER], "buero@sanitaer-klein.de"),
+            ("Bürohaus Marktplatz GmbH", ["eigentuemer"], "info@buerohaus.de"),
+            ("Boutique Stein", ["mieter"], "info@boutique-stein.de"),
+            ("Café Sonnenschein", ["mieter"], "leitung@cafe-sonnenschein.de"),
+            ("Elektro Schmidt GmbH", ["nachunternehmer"], "service@elektro-schmidt.de"),
+            ("Sanitär Klein KG", ["nachunternehmer"], "buero@sanitaer-klein.de"),
         ]
         partner_by_name: dict[str, GeschaeftsPartner] = {}
-        for name, typen, email in partner_data:
+        for name, typ_keys, email in partner_data:
             p = (
                 await db.execute(
                     select(GeschaeftsPartner).where(
@@ -169,7 +183,12 @@ async def main() -> int:
                 )
             ).scalar_one_or_none()
             if p is None:
-                p = GeschaeftsPartner(mandant_id=m_id, name=name, email=email, typen=typen)
+                typen_ids = [
+                    await _get_auswahlwert_id(db, m_id, "partner_typ", tk) for tk in typ_keys
+                ]
+                p = GeschaeftsPartner(
+                    mandant_id=m_id, name=name, email=email, typen=typen_ids
+                )
                 db.add(p)
                 await db.flush()
                 print(f"[mockup-seed] partner {name}")
