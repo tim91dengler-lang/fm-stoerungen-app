@@ -60,8 +60,14 @@ export interface ListenPolishOptions {
   actionVisibility?: 'always' | 'hover' | 'kebab';
   /** B1.3: Gruppen-Header bleibt beim Scrollen oben sichtbar. */
   stickyGroupHeaders?: boolean;
-  /** Polish-3: Spalten-Header-Zeile bleibt beim Scrollen oben sichtbar. */
+  /** Polish-3: Spalten-Header-Zeile bleibt beim Scrollen oben sichtbar.
+   *  Macht die Tabelle zu einem höhenbegrenzten Inner-Scroll-Container
+   *  (siehe `stickyMaxHeight`) — sonst greift `position: sticky` im
+   *  overflow-Wrapper nicht, weil der nie selbst scrollt (die Seite scrollt). */
   stickyHeader?: boolean;
+  /** Max-Höhe des Tabellen-Scroll-Containers, wenn `stickyHeader` an ist.
+   *  CSS-Längen-/calc-String. Default `calc(100vh - 12rem)` (Seitenkopf + Toolbar). */
+  stickyMaxHeight?: string;
   /** B1.4: Gruppen-Inhalt sichtbar abgesetzt (Einrückung + Schattierung + dickerer Trenner). */
   groupSeparators?: boolean;
   /** B1.6: Density-Toggle (compact / comfortable / spacious). Persistiert pro viewKey in LocalStorage. */
@@ -502,6 +508,10 @@ export function PowerListenView<TData>({
   const polishActionVisibility = polish?.actionVisibility ?? 'always';
   const polishStickyGroupHeaders = polish?.stickyGroupHeaders ?? false;
   const polishStickyHeader = polish?.stickyHeader ?? false;
+  // L2 (Tim-Feldtest listen-polish-4): bei stickyHeader wird die Tabelle ein
+  // höhenbegrenzter Inner-Scroll-Container, sonst greift position:sticky im
+  // overflow-Wrapper nicht (Wrapper scrollt nie selbst, die Seite scrollt).
+  const stickyMaxHeight = polish?.stickyMaxHeight ?? 'calc(100vh - 12rem)';
   const polishGroupSeparators = polish?.groupSeparators ?? false;
   const polishDensityToggle = polish?.densityToggle ?? false;
   const polishConsolidatedMenu = polish?.consolidatedSettingsMenu ?? false;
@@ -722,6 +732,19 @@ export function PowerListenView<TData>({
     return order;
   }, [columnOrder, enableRowSelection, hasActions]);
 
+  // L1 (Tim-Feldtest listen-polish-4): __select__ + __actions__ zusätzlich nach
+  // links PINNEN. TanStack rendert gepinnte Spalten in einer eigenen linken
+  // Gruppe, die von der Grouping-Umsortierung (groupedColumnMode-Default
+  // 'reorder') UNBERÜHRT bleibt. Das columnOrder-Prepend oben allein reicht
+  // nicht: TanStacks Grouping-Reorder läuft danach und zöge sonst beim 2-Ebenen-
+  // Gruppieren die Gruppen-Spalten vor Checkbox/Aktionen.
+  const columnPinning = useMemo(() => {
+    const left: string[] = [];
+    if (enableRowSelection) left.push('__select__');
+    if (hasActions) left.push('__actions__');
+    return { left, right: [] as string[] };
+  }, [enableRowSelection, hasActions]);
+
   const table = useReactTable<TData>({
     data,
     columns: allColumns,
@@ -732,6 +755,7 @@ export function PowerListenView<TData>({
       columnFilters: columnFilters ?? stableEmptyColumnFilters,
       columnOrder: effectiveColumnOrder,
       rowSelection: rowSelection ?? stableEmptyRowSelection,
+      columnPinning,
       ...(groupingEnabled && grouping ? { grouping } : {}),
     },
     enableMultiSort: true,
@@ -1366,8 +1390,15 @@ export function PowerListenView<TData>({
         </div>
       )}
 
+      {/* L2: bei stickyHeader wird der Wrapper ein höhenbegrenzter Inner-Scroll-
+          Container, damit der sticky <thead> an dessen Oberrand klebt statt mit
+          der Seite wegzuscrollen. overflow-auto = beide Achsen (horizontaler
+          Spalten-Scroll bleibt). Ohne stickyHeader: unverändert overflow-x-auto. */}
       {!showMobileCards && (
-      <div className="overflow-x-auto">
+      <div
+        className={polishStickyHeader ? 'overflow-auto' : 'overflow-x-auto'}
+        style={polishStickyHeader ? { maxHeight: stickyMaxHeight } : undefined}
+      >
         <table className="min-w-full divide-y divide-zinc-800 text-sm">
           <thead
             ref={theadRef}
