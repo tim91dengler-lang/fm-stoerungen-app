@@ -596,7 +596,7 @@ export function TicketsListePage() {
         </div>
         <Link
           to="/kanban"
-          className="flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
+          className="flex min-h-11 items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 lg:min-h-0"
           title="Kanban-Ansicht"
         >
           <LayoutGrid className="h-3.5 w-3.5" /> Kanban

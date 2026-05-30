@@ -83,7 +83,7 @@ export function NotificationsDropdown() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-md p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        className="relative flex min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 lg:min-h-0 lg:min-w-0"
         title="Benachrichtigungen"
         aria-label="Benachrichtigungen"
       >

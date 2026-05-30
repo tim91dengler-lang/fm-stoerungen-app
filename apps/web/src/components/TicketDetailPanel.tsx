@@ -138,7 +138,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:min-h-0 lg:min-w-0"
             aria-label="Panel schließen"
           >
             <X className="h-4 w-4" />
@@ -328,7 +328,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                     if (confirm('Ticket wirklich löschen?')) remove.mutate();
                   }}
                   disabled={remove.isPending}
-                  className="flex w-full items-center justify-center gap-2 rounded-md border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-50 lg:min-h-0"
                 >
                   <Trash2 className="h-4 w-4" /> Ticket löschen
                 </button>
@@ -526,7 +526,7 @@ function Accordion({
       open={defaultOpen}
       className="group rounded-md border border-zinc-800 bg-zinc-900"
     >
-      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200">
+      <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 lg:min-h-0">
         <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
         {title}
       </summary>

@@ -46,3 +46,15 @@
     padding-top: env(safe-area-inset-top);
   }
 }
+
+/* M4: comfortable ≥44px touch targets for form controls below lg (1024px).
+   Form fields are compact (py-1.5/py-2 ≈ 34-40px) which is fine with a mouse
+   but too small for touch. Buttons are handled per-component (sizes vary too
+   much for a blanket rule). */
+@media (max-width: 1023.98px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    min-height: 2.75rem;
+  }
+}

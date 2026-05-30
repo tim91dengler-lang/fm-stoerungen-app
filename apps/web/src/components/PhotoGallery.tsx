@@ -48,7 +48,7 @@ export function PhotoGallery({ ticketId }: Props) {
       open
       className="group rounded-md border border-zinc-800 bg-zinc-900"
     >
-      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200">
+      <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 lg:min-h-0">
         <Camera className="h-3.5 w-3.5" />
         Fotos vor Ort
         {photos.length > 0 && (
@@ -62,7 +62,7 @@ export function PhotoGallery({ ticketId }: Props) {
             e.preventDefault();
             fileInputRef.current?.click();
           }}
-          className="ml-auto flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold normal-case text-emerald-300 hover:bg-emerald-500/25"
+          className="ml-auto flex min-h-11 items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold normal-case text-emerald-300 hover:bg-emerald-500/25 lg:min-h-0"
         >
           <Upload className="h-3 w-3" /> + Foto hinzufügen
         </button>
