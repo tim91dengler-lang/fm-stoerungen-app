@@ -186,9 +186,7 @@ async def main() -> int:
                 typen_ids = [
                     await _get_auswahlwert_id(db, m_id, "partner_typ", tk) for tk in typ_keys
                 ]
-                p = GeschaeftsPartner(
-                    mandant_id=m_id, name=name, email=email, typen=typen_ids
-                )
+                p = GeschaeftsPartner(mandant_id=m_id, name=name, email=email, typen=typen_ids)
                 db.add(p)
                 await db.flush()
                 print(f"[mockup-seed] partner {name}")
