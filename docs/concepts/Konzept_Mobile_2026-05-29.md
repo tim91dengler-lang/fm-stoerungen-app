@@ -1,6 +1,6 @@
 # Konzept: Mobile-Tauglichkeit (Stufe 1)
 
-> **Status:** Freigegeben (Tim, 2026-05-29). **M1 + M2 + M4 umgesetzt.** M3 verworfen. M5 offen.
+> **Status:** Freigegeben (Tim, 2026-05-29). **M1 + M2 + M4 + M5 umgesetzt — Mobile-Roadmap komplett.** M3 verworfen.
 > **Datum:** 2026-05-29 (Stand-Update 2026-05-30)
 > **Autor:** Claude (Senior-Dev-Modus)
 > **Bezug:** `docs/plan.md` §5.9 (PWA), Mobile-Anforderungen; CLAUDE.md §4 (Listen-Konvention)
@@ -89,9 +89,15 @@ Interaktionen, dann Feinschliff, dann PWA.
 | **M2** | **Mobile Listen-Karten** | Ticket-Pool: unterhalb `lg` automatisch Karten- statt Tabellen-Darstellung (geteilte `TicketCard` mit Kanban). Gesamtsuche bleibt; Power-Tabellen-Features Desktop-only. Opt-in pro Liste via `renderMobileCard`. | ✅ **fertig** (#93) |
 | ~~M3~~ | ~~Kanban touch-fähig~~ | **Verworfen (2026-05-30):** Status-Wechsel läuft am Handy über das Ticket-Detail; kein Kanban-Touch nötig. | ❌ entfällt |
 | **M4** | **Mobile-Feinschliff** | Touch-Targets ≥ 44px: globale Mobile-Regel für Formfelder (`input/select/textarea`), Icon-Buttons (Glocke, Detail-X/Foto/Senden/Löschen, Erfassen-Buttons, Kanban-Link) pro Komponente; Header-Safe-Area oben (Notch). Desktop unverändert (`lg:`-Overrides). | ✅ **fertig** |
-| **M5** | **PWA scharf schalten** | Service-Worker-Deaktivierung (Stand 23.05.) zurücknehmen. **Architektur-Entscheidung** (siehe §5): manueller SW härten **vs.** auf `vite-plugin-pwa`/Workbox umstellen (von tech-spec vorgesehen). Installierbarkeit + Offline-Read-Fallback auf echtem Gerät verifizieren, Lighthouse-PWA-Check. | ⏳ offen |
+| **M5** | **PWA scharf schalten** | Umgestellt auf `vite-plugin-pwa` (Workbox), `registerType:'autoUpdate'` → frische Assets nach jedem Deploy (löst „alte-UI-gecacht" strukturell), SW im Dev aus. App-Shell-Precache → Start offline. OfflineBanner. nginx: `sw.js` no-cache. **Bewusst: kein Caching von API-Daten** (DSGVO). | ✅ **fertig** |
 
-Jedes Paket ein eigener PR mit Staging-Acceptance durch Tim. **Es fehlt nur noch M5 (PWA).**
+Jedes Paket ein eigener PR mit Staging-Acceptance durch Tim. **Mobile-Roadmap komplett (M1, M2, M4, M5).**
+
+### Offene Folge-Entscheidungen (separat, nicht Teil der Mobile-Roadmap)
+
+- **Offline-Read von Ticketdaten** (Stufe-1-Idee aus §5.9): aktuell NICHT umgesetzt — würde Ticketdaten persistent auf dem Gerät cachen (DSGVO-Trade-off, v. a. geteilte Geräte). Bewusst Tim-Entscheidung vorbehalten.
+- **Security-Härtung nginx/CSP:** Content-Security-Policy fehlt noch (braucht Tuning für Google-Fonts + Inline-Scripts). Passt zur geplanten Pen-Test-Vorbereitung (tech-spec Schicht 11). Sourcemaps in Prod sind mit M5 deaktiviert, Security-Header auf Dokument/SW/Manifest wieder gesetzt.
+- **Google-Fonts offline:** kommen vom CDN, fallen offline auf System-Font zurück (optional: Fonts precachen).
 
 ---
 

@@ -12,6 +12,7 @@ import {
 import { NotificationsDropdown } from './NotificationsDropdown';
 import { MobileDrawer } from './MobileDrawer';
 import { BottomTabBar } from './BottomTabBar';
+import { OfflineBanner } from './OfflineBanner';
 
 function initialsFor(fullName?: string): string {
   if (!fullName) return '?';
@@ -107,6 +108,7 @@ export function AppLayout() {
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
+        <OfflineBanner />
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950/80 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md lg:px-8 lg:pt-3">
           <div className="flex min-w-0 items-center gap-2">
             <button
