@@ -365,6 +365,24 @@ SYSTEM_AUSWAHLLISTEN_SEED: dict[str, dict[str, Any]] = {
             ("abgeschlossen", "Abgeschlossen", 3, "emerald", True),
         ],
     },
+    # Partner-Modul: ursprünglich nur von Migration 0013 für damals
+    # existierende Mandanten geseedet. Hier in den kanonischen System-Seed
+    # gezogen, damit auch neu (per seed_dev) angelegte Mandanten die Liste
+    # bekommen — sonst fehlt `partner_typ` und Partner-Anlage/Seed bricht.
+    # Werte + Reihenfolge identisch zu 0013 (_WERTE_PARTNER_TYP).
+    "partner_typ": {
+        "label": "Partner-Typ",
+        "beschreibung": "Funktionale Rolle eines Geschäftspartners",
+        "ist_system": False,
+        "werte": [
+            ("mieter", "Mieter", 10, "blue", False),
+            ("eigentuemer", "Eigentümer", 20, "violet", False),
+            ("auftraggeber", "Auftraggeber", 30, "amber", False),
+            ("dienstleister", "Dienstleister", 40, "emerald", False),
+            ("nachunternehmer", "Nachunternehmer", 50, "cyan", False),
+            ("privatperson", "Privatperson", 60, "slate", False),
+        ],
+    },
 }
 
 
