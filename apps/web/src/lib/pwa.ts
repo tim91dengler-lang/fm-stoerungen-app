@@ -1,9 +1,10 @@
 /**
- * Service-Worker-Registrierung und Install-Prompt-Hilfen.
+ * Install-Prompt-Hilfen für die PWA.
  *
- * Der SW liegt unter /sw.js und wird nur in production registriert. Der
- * beforeinstallprompt-Event wird global gespeichert, damit die App ihn
- * später bei Bedarf zeigen kann (z. B. über den Mobile-Demo-Banner).
+ * Die Service-Worker-Registrierung selbst übernimmt vite-plugin-pwa (Workbox)
+ * über `virtual:pwa-register` in `main.tsx`. Hier wird nur der
+ * beforeinstallprompt-Event global gespeichert, damit die App ihn später bei
+ * Bedarf zeigen kann (z. B. über den Mobile-Demo-Banner).
  */
 
 export interface BeforeInstallPromptEvent extends Event {
@@ -13,29 +14,6 @@ export interface BeforeInstallPromptEvent extends Event {
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 const listeners = new Set<(available: boolean) => void>();
-
-export function registerServiceWorker(): void {
-  if (typeof window === 'undefined') return;
-  if (!('serviceWorker' in navigator)) return;
-  // Service Worker während Hot-Iteration deaktiviert (Tim 2026-05-23) —
-  // hat in der Phase mehr Probleme verursacht als gelöst (gecachte alte UI).
-  // Stattdessen: alle bisherigen Registrierungen löschen + Caches leeren,
-  // damit Tester sofort die aktuelle App-Version sehen.
-  window.addEventListener('load', () => {
-    void (async () => {
-      try {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (const reg of regs) await reg.unregister();
-        if ('caches' in window) {
-          const keys = await caches.keys();
-          for (const k of keys) await caches.delete(k);
-        }
-      } catch {
-        // ignore — best-effort cleanup
-      }
-    })();
-  });
-}
 
 export function setupInstallPrompt(): void {
   if (typeof window === 'undefined') return;

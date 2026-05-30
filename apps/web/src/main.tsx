@@ -5,10 +5,14 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBanner } from './components/ErrorBanner';
-import { registerServiceWorker, setupInstallPrompt } from './lib/pwa';
+import { registerSW } from 'virtual:pwa-register';
+import { setupInstallPrompt } from './lib/pwa';
 import './index.css';
 
-registerServiceWorker();
+// Workbox service worker (vite-plugin-pwa). autoUpdate: a new deploy's SW takes
+// over and refreshes the content-hashed precache — no stale UI. Disabled in dev
+// (devOptions.enabled = false).
+registerSW({ immediate: true });
 setupInstallPrompt();
 
 const queryClient = new QueryClient({
