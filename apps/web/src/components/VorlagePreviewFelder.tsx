@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
-import { GripVertical, Star, X } from 'lucide-react';
+import { GripVertical, Lock, Star, X } from 'lucide-react';
 import type { TickettypFeldRead, TickettypRead } from '../api/types';
 import { farbeClass } from './TickettypFarbe';
 import { iconFor } from './TickettypIcon';
@@ -37,6 +37,11 @@ import { iconFor } from './TickettypIcon';
  */
 
 type FeldRenderer = (feld: TickettypFeldRead) => React.ReactNode;
+
+// Kernfelder bleiben in jeder Vorlage fix (Konzept "Das Ticket", Tim 2026-05-31,
+// Entscheidung A): nicht abwählbar, immer Pflicht. Synchron zu KERNFELD_KEYS im
+// Backend (tickettyp_service.py).
+const KERNFELD_KEYS = new Set<string>(['titel']);
 
 const INPUT_CLASS =
   'mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 disabled:opacity-60';
@@ -322,17 +327,27 @@ function CardBody({ feld, draggable, isDragging, editable, onUpdateFeld }: BodyP
       <div className="flex items-center gap-1 pl-5">
         <LabelArea feld={feld} editable={editable} onUpdateFeld={onUpdateFeld} />
         <div className="ml-auto flex items-center gap-0.5">
-          {editable && onUpdateFeld && (
-            <>
-              <PflichtToggleButton
-                pflicht={feld.pflicht}
-                onClick={() => onUpdateFeld(feld.feld_key, { pflicht: !feld.pflicht })}
-              />
-              <VerbergenButton
-                onClick={() => onUpdateFeld(feld.feld_key, { sichtbar: false })}
-              />
-            </>
-          )}
+          {editable &&
+            onUpdateFeld &&
+            (KERNFELD_KEYS.has(feld.feld_key) ? (
+              <span
+                title="Kernfeld — immer sichtbar und Pflicht"
+                aria-label="Kernfeld — immer sichtbar und Pflicht"
+                className="rounded p-1 text-zinc-600"
+              >
+                <Lock className="h-3.5 w-3.5" />
+              </span>
+            ) : (
+              <>
+                <PflichtToggleButton
+                  pflicht={feld.pflicht}
+                  onClick={() => onUpdateFeld(feld.feld_key, { pflicht: !feld.pflicht })}
+                />
+                <VerbergenButton
+                  onClick={() => onUpdateFeld(feld.feld_key, { sichtbar: false })}
+                />
+              </>
+            ))}
         </div>
       </div>
 

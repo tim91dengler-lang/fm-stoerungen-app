@@ -25,6 +25,13 @@ class TickettypFeldNotFoundError(Exception):
     pass
 
 
+# Kernfelder, die in jeder Vorlage fix bleiben (Konzept "Das Ticket",
+# Tim 2026-05-31, Entscheidung A): Titel ist nicht abwählbar und immer
+# Pflicht. Status ist kein Designer-Feld und damit ohnehin immer vorhanden.
+# Synchron halten zu KERNFELD_KEYS im Frontend (VorlagePreviewFelder.tsx).
+KERNFELD_KEYS: frozenset[str] = frozenset({"titel"})
+
+
 # System-Tickettypen (Slice 1) — ursprünglich nur von Migration 0006 pro
 # damals existierendem Mandanten geseedet. Als idempotenter Provisioning-
 # Helper hier, damit auch neu (per seed_dev) angelegte Mandanten sie bekommen.
@@ -292,5 +299,9 @@ async def update_tickettyp_feld(
         if value is None:
             continue
         setattr(feld, key, value)
+    if feld.feld_key in KERNFELD_KEYS:
+        # Kernfeld: nie versteckt oder optional — unabhängig von der Payload.
+        feld.sichtbar = True
+        feld.pflicht = True
     await db.flush()
     return feld
