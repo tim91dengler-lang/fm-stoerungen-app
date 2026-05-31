@@ -19,18 +19,21 @@ import {
   X,
 } from 'lucide-react';
 import {
-  anlageApi,
   auswahllistenApi,
-  fehlercodeApi,
-  objektApi,
   objektstrukturApi,
-  partnerApi,
-  projektApi,
   statusWorkflowApi,
   ticketApi,
   tickettypApi,
   userApi,
 } from '../api/endpoints';
+import { EntitySearchSelect } from './EntitySearchSelect';
+import {
+  makeAnlageSearch,
+  makeFehlercodeSearch,
+  makeProjektSearch,
+  searchObjekte,
+  searchPartner,
+} from '../lib/entitySearch';
 import type {
   StatusWertMini,
   TicketPrioritaetSlug,
@@ -155,36 +158,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     enabled: !!ticketId,
   });
 
-  const objekteQuery = useQuery({
-    queryKey: ['objekte-for-ticket'],
-    queryFn: () => objektApi.list({ limit: 500 }),
-    staleTime: 60_000,
-    enabled: !!ticketId,
-  });
-  const partnerAlleQuery = useQuery({
-    queryKey: ['partner-for-ticket'],
-    queryFn: () => partnerApi.list({ limit: 500 }),
-    staleTime: 60_000,
-    enabled: !!ticketId,
-  });
-  const anlagenQuery = useQuery({
-    queryKey: ['anlagen-for-ticket'],
-    queryFn: () => anlageApi.list({ aktiv_only: true }),
-    staleTime: 60_000,
-    enabled: !!ticketId,
-  });
-  const fehlercodesQuery = useQuery({
-    queryKey: ['fehlercodes-for-ticket'],
-    queryFn: () => fehlercodeApi.list({ aktiv_only: true }),
-    staleTime: 60_000,
-    enabled: !!ticketId,
-  });
-  const projekteQuery = useQuery({
-    queryKey: ['projekte-active'],
-    queryFn: () => projektApi.list({ status: ['geplant', 'aktiv'] }),
-    staleTime: 60_000,
-    enabled: !!ticketId,
-  });
   const hausTreeQuery = useQuery({
     queryKey: ['haus-tree', t0?.objekt?.id],
     queryFn: () => objektstrukturApi.listHaus(t0!.objekt!.id),
@@ -471,20 +444,17 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                     <Accordion title="Kontakt & Beteiligte" defaultOpen>
                       <div className="grid grid-cols-2 gap-3">
                         {felder.sichtbar('partner') && (
-                          <FeldSelect
+                          <FeldSearchSelect
                             label="Auftraggeber / Mieter"
                             icon={<Users2 className="h-3.5 w-3.5" />}
                             pflicht={felder.pflicht('partner')}
                             value={t.partner?.id ?? ''}
-                            onChange={(v) => update.mutate({ partner_id: v || null })}
-                          >
-                            <option value="">— (keiner) —</option>
-                            {partnerAlleQuery.data?.items.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </FeldSelect>
+                            initialLabel={t.partner?.name ?? null}
+                            onChange={(id) => update.mutate({ partner_id: id })}
+                            fetcher={searchPartner}
+                            queryKey="partner-detail"
+                            placeholder="Geschäftspartner suchen …"
+                          />
                         )}
                         {felder.sichtbar('melder') && (
                           <TextField
@@ -509,26 +479,23 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                         {ortSichtbar && (
                           <div className="grid grid-cols-2 gap-3">
                             {felder.sichtbar('objekt') && (
-                              <FeldSelect
+                              <FeldSearchSelect
                                 label="Objekt"
                                 pflicht={felder.pflicht('objekt')}
                                 value={t.objekt?.id ?? ''}
-                                onChange={(v) =>
+                                initialLabel={t.objekt?.name ?? null}
+                                onChange={(id) =>
                                   update.mutate({
-                                    objekt_id: v || null,
+                                    objekt_id: id,
                                     haus_id: null,
                                     stockwerk_id: null,
                                     einheit_id: null,
                                   })
                                 }
-                              >
-                                <option value="">— (keins) —</option>
-                                {objekteQuery.data?.items.map((o) => (
-                                  <option key={o.id} value={o.id}>
-                                    {o.name}
-                                  </option>
-                                ))}
-                              </FeldSelect>
+                                fetcher={searchObjekte}
+                                queryKey="objekt-detail"
+                                placeholder="Objekt suchen …"
+                              />
                             )}
                             {felder.sichtbar('haus') && (
                               <FeldSelect
@@ -587,20 +554,17 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                           </div>
                         )}
                         {felder.sichtbar('anlage') && (
-                          <FeldSelect
+                          <FeldSearchSelect
                             label="Anlage"
                             icon={<Activity className="h-3.5 w-3.5" />}
                             pflicht={felder.pflicht('anlage')}
                             value={t.anlage?.id ?? ''}
-                            onChange={(v) => update.mutate({ anlage_id: v || null })}
-                          >
-                            <option value="">— (keine) —</option>
-                            {anlagenQuery.data?.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.bezeichnung}
-                              </option>
-                            ))}
-                          </FeldSelect>
+                            initialLabel={t.anlage?.bezeichnung ?? null}
+                            onChange={(id) => update.mutate({ anlage_id: id })}
+                            fetcher={makeAnlageSearch(t.objekt?.id)}
+                            queryKey={`anlage-detail-${t.objekt?.id ?? 'all'}`}
+                            placeholder="Anlage suchen …"
+                          />
                         )}
                         {felder.sichtbar('pin') && t.stockwerk?.has_grundriss && (
                           <div>
@@ -687,35 +651,33 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                           </FeldSelect>
                         )}
                         {felder.sichtbar('projekt') && (
-                          <FeldSelect
+                          <FeldSearchSelect
                             label="Projekt"
                             icon={<FolderKanban className="h-3.5 w-3.5" />}
                             value={t.projekt?.id ?? ''}
-                            onChange={(v) => update.mutate({ projekt_id: v || null })}
-                          >
-                            <option value="">— (keins) —</option>
-                            {projekteQuery.data?.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </FeldSelect>
+                            initialLabel={t.projekt?.name ?? null}
+                            onChange={(id) => update.mutate({ projekt_id: id })}
+                            fetcher={makeProjektSearch(['geplant', 'aktiv'])}
+                            queryKey="projekt-detail"
+                            placeholder="Projekt suchen …"
+                          />
                         )}
                         {felder.sichtbar('fehlercode') && (
-                          <FeldSelect
+                          <FeldSearchSelect
                             label="Fehlercode"
                             icon={<AlertOctagon className="h-3.5 w-3.5 text-amber-400" />}
                             pflicht={felder.pflicht('fehlercode')}
                             value={t.fehlercode?.id ?? ''}
-                            onChange={(v) => update.mutate({ fehlercode_id: v || null })}
-                          >
-                            <option value="">— (keiner) —</option>
-                            {fehlercodesQuery.data?.map((fc) => (
-                              <option key={fc.id} value={fc.id}>
-                                {fc.code} — {fc.titel}
-                              </option>
-                            ))}
-                          </FeldSelect>
+                            initialLabel={
+                              t.fehlercode
+                                ? `${t.fehlercode.code} — ${t.fehlercode.titel}`
+                                : null
+                            }
+                            onChange={(id) => update.mutate({ fehlercode_id: id })}
+                            fetcher={makeFehlercodeSearch(t.anlage?.id)}
+                            queryKey={`fehlercode-detail-${t.anlage?.id ?? 'all'}`}
+                            placeholder="Fehlercode suchen …"
+                          />
                         )}
                       </div>
                     </Accordion>
@@ -1019,6 +981,49 @@ function FeldSelect({
       >
         {children}
       </select>
+    </div>
+  );
+}
+
+/** Wie FeldSelect, aber mit serverseitiger Such-Auswahl (Bewegungsdaten). */
+function FeldSearchSelect({
+  label,
+  value,
+  initialLabel,
+  onChange,
+  fetcher,
+  queryKey,
+  placeholder,
+  pflicht = false,
+  icon,
+}: {
+  label: string;
+  value: string;
+  initialLabel: string | null;
+  onChange: (id: string | null) => void;
+  fetcher: (search: string) => Promise<import('./EntitySearchSelect').SearchOption[]>;
+  queryKey: string;
+  placeholder?: string;
+  pflicht?: boolean;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="flex items-center gap-1 text-xs text-zinc-400">
+        {icon}
+        {label}
+        {pflicht && <span className="text-red-400">*</span>}
+      </label>
+      <div className="mt-1">
+        <EntitySearchSelect
+          value={value || null}
+          initialLabel={initialLabel}
+          onChange={(id) => onChange(id)}
+          fetcher={fetcher}
+          queryKey={queryKey}
+          placeholder={placeholder}
+        />
+      </div>
     </div>
   );
 }
