@@ -5,6 +5,7 @@ class StatusWertMini(BaseModel):
     key: str
     label: str
     farbe: str | None = None
+    erfordert_grund: bool = False
 
 
 class StatusWorkflowRead(BaseModel):
@@ -15,4 +16,5 @@ class StatusWorkflowRead(BaseModel):
 
 
 class StatusWorkflowUpdate(BaseModel):
-    uebergaenge: dict[str, list[str]]
+    uebergaenge: dict[str, list[str]] | None = None
+    erfordert_grund: dict[str, bool] | None = None

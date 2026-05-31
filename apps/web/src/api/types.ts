@@ -974,6 +974,7 @@ export interface StatusWertMini {
   key: string;
   label: string;
   farbe: string | null;
+  erfordert_grund: boolean;
 }
 
 export interface StatusWorkflowRead {
@@ -983,5 +984,6 @@ export interface StatusWorkflowRead {
 }
 
 export interface StatusWorkflowUpdate {
-  uebergaenge: Record<string, string[]>;
+  uebergaenge?: Record<string, string[]>;
+  erfordert_grund?: Record<string, boolean>;
 }

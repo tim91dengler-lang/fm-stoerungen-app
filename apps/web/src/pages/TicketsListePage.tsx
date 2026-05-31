@@ -208,7 +208,16 @@ function buildColumns(
       id: 'status',
       accessorFn: (r) => r.status.key,
       header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex flex-wrap items-center gap-1">
+          <StatusBadge status={row.original.status} />
+          {row.original.wartet_grund && (
+            <span className="inline-flex items-center rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+              {row.original.wartet_grund.label}
+            </span>
+          )}
+        </div>
+      ),
       filterFn: 'arrIncludesSome',
       meta: {
         massEdit: { type: 'auswahl' as const, options: massEditOptions.status },

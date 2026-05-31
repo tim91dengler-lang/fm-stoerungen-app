@@ -30,6 +30,12 @@ DEFAULT_UEBERGAENGE: dict[str, list[str]] = {
     "erledigt": [],
 }
 
+META_KEY_GRUND = "erfordert_grund"
+
+# "wartet auf"-Hook (Konzept §6.2, Tim): verlangt ein Status einen Sub-Grund?
+# Default: nur "wartet". Frei konfigurierbar (meta.erfordert_grund je Status).
+DEFAULT_ERFORDERT_GRUND: dict[str, bool] = {"wartet": True}
+
 
 async def get_status_werte(db: AsyncSession, mandant_id: UUID) -> list[AuswahllistenWert]:
     stmt = (
@@ -90,3 +96,29 @@ async def set_uebergaenge(
         w.meta = new_meta
     await db.flush()
     return await get_uebergaenge(db, mandant_id)
+
+
+async def get_erfordert_grund(db: AsyncSession, mandant_id: UUID) -> dict[str, bool]:
+    """Ob ein Status einen Sub-Grund verlangt ("wartet auf"-Hook). Fallback:
+    nur "wartet" = True."""
+    werte = await get_status_werte(db, mandant_id)
+    result: dict[str, bool] = {}
+    for w in werte:
+        roh = (w.meta or {}).get(META_KEY_GRUND)
+        result[w.key] = roh if isinstance(roh, bool) else DEFAULT_ERFORDERT_GRUND.get(w.key, False)
+    return result
+
+
+async def set_erfordert_grund(
+    db: AsyncSession, mandant_id: UUID, flags: dict[str, bool]
+) -> dict[str, bool]:
+    """Schreibt den Hook-Flag je Status (partielles Update, nur enthaltene Keys)."""
+    werte = await get_status_werte(db, mandant_id)
+    for w in werte:
+        if w.key not in flags:
+            continue
+        new_meta = dict(w.meta or {})
+        new_meta[META_KEY_GRUND] = bool(flags[w.key])
+        w.meta = new_meta
+    await db.flush()
+    return await get_erfordert_grund(db, mandant_id)

@@ -68,3 +68,25 @@ async def test_status_workflow_custom_matrix_blocks_transition(client, admin_use
         f"/api/v1/tickets/{tid}", headers=headers, json={"status": "bearbeitung"}
     )
     assert blocked.status_code == 409
+
+
+@pytest.mark.integration
+async def test_status_workflow_erfordert_grund_flag(client, admin_user) -> None:
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+
+    res = await client.get("/api/v1/status-workflow", headers=headers)
+    by_key = {s["key"]: s for s in res.json()["status"]}
+    # Default: nur "wartet" verlangt einen Sub-Grund.
+    assert by_key["wartet"]["erfordert_grund"] is True
+    assert by_key["neu"]["erfordert_grund"] is False
+
+    put = await client.put(
+        "/api/v1/status-workflow",
+        headers=headers,
+        json={"erfordert_grund": {"pruefung": True}},
+    )
+    assert put.status_code == 200, put.text
+    by_key2 = {s["key"]: s for s in put.json()["status"]}
+    assert by_key2["pruefung"]["erfordert_grund"] is True
+    assert by_key2["wartet"]["erfordert_grund"] is True  # unverändert (Default-Fallback)
