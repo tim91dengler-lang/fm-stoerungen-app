@@ -42,6 +42,7 @@ import { PrioBadge, StatusBadge } from './StatusBadge';
 import { ChatPanel } from './ChatPanel';
 import { PhotoGallery } from './PhotoGallery';
 import { TicketDokumente } from './TicketDokumente';
+import { GrundrissPin } from './GrundrissPin';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { PRIO_SLUGS, formatRelativeDateTime, labelForPrioSlug } from '../lib/format';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
@@ -670,6 +671,16 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                       )}
                     </div>
                   </div>
+                </Accordion>
+              )}
+
+              {/* Lage im Grundriss */}
+              {felder.sichtbar('pin') && t.stockwerk?.has_grundriss && (
+                <Accordion title="Lage im Grundriss" defaultOpen>
+                  <GrundrissPin
+                    stockwerkId={t.stockwerk.id}
+                    pin={t.pin_x != null && t.pin_y != null ? { x: t.pin_x, y: t.pin_y } : null}
+                  />
                 </Accordion>
               )}
 

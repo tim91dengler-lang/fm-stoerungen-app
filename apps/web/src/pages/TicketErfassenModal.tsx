@@ -20,6 +20,7 @@ import {
 import { farbeClassHover } from '../components/TickettypFarbe';
 import { iconFor } from '../components/TickettypIcon';
 import { vorlageFelder } from '../lib/vorlageFelder';
+import { GrundrissPin } from '../components/GrundrissPin';
 
 // Schema lax — Pflichtfelder werden pro Vorlage validiert (siehe submit())
 const schema = z.object({
@@ -41,6 +42,8 @@ const schema = z.object({
   zugewiesen_an_id: z.string().uuid().optional().nullable(),
   faelligkeit_am: z.string().optional().nullable(),
   wiederholung: z.string().optional().nullable(),
+  pin_x: z.number().optional().nullable(),
+  pin_y: z.number().optional().nullable(),
 });
 
 type Form = z.infer<typeof schema>;
@@ -132,6 +135,8 @@ export function TicketErfassenModal({
       zugewiesen_an_id: null,
       faelligkeit_am: null,
       wiederholung: null,
+      pin_x: null,
+      pin_y: null,
     },
   });
 
@@ -140,6 +145,8 @@ export function TicketErfassenModal({
   const selectedHausId = watch('haus_id');
   const selectedStockwerkId = watch('stockwerk_id');
   const selectedFehlercodeId = watch('fehlercode_id');
+  const pinX = watch('pin_x');
+  const pinY = watch('pin_y');
 
   const selectedTyp = useMemo(
     () => tickettypen.find((t) => t.id === selectedTypId) ?? null,
@@ -180,6 +187,12 @@ export function TicketErfassenModal({
     if (fc.beschreibung) setValue('beschreibung', fc.beschreibung);
   }, [selectedFehlercodeId, fehlercodes, setValue]);
 
+  // Stockwerk-Wechsel: Pin zurücksetzen (anderer Grundriss).
+  useEffect(() => {
+    setValue('pin_x', null);
+    setValue('pin_y', null);
+  }, [selectedStockwerkId, setValue]);
+
   const create = useMutation({
     mutationFn: (data: Form) =>
       ticketApi.create({
@@ -201,6 +214,8 @@ export function TicketErfassenModal({
         zugewiesen_an_id: data.zugewiesen_an_id || null,
         faelligkeit_am: data.faelligkeit_am || null,
         wiederholung: data.wiederholung || null,
+        pin_x: data.pin_x ?? null,
+        pin_y: data.pin_y ?? null,
       }),
     onSuccess: () => onCreated(),
     onError: () => setError('root', { message: 'Anlegen fehlgeschlagen.' }),
@@ -534,6 +549,19 @@ export function TicketErfassenModal({
                   </div>
                 )}
               </div>
+              {feldSichtbar('pin') && selectedStockwerkId && stockwerk?.has_grundriss && (
+                <div className="mt-3">
+                  <div className="mb-1 text-xs text-zinc-400">Lage im Grundriss (optional)</div>
+                  <GrundrissPin
+                    stockwerkId={selectedStockwerkId}
+                    pin={pinX != null && pinY != null ? { x: pinX, y: pinY } : null}
+                    onSetPin={(x, y) => {
+                      setValue('pin_x', x);
+                      setValue('pin_y', y);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 
