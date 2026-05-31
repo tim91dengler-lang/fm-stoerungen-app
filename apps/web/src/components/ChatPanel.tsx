@@ -55,10 +55,32 @@ export function ChatPanel({ ticketId }: Props) {
       qc.invalidateQueries({ queryKey: ['ticket-messages', ticketId] }),
   });
 
+  const markRead = useMutation({
+    mutationFn: () => chatApi.markRead(ticketId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ticket-messages', ticketId] }),
+  });
+
   // Auto-scroll an's Ende, wenn neue Nachrichten ankommen
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messagesQuery.data?.length]);
+
+  // Read-Receipt: ungelesene fremde Nachrichten als gelesen markieren.
+  useEffect(() => {
+    const msgs = messagesQuery.data;
+    if (!msgs || !user) return;
+    const hasUnread = msgs.some(
+      (m) => m.autor?.id !== user.id && !m.gelesen_von.includes(user.id),
+    );
+    if (hasUnread && !markRead.isPending) markRead.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messagesQuery.data, user]);
+
+  const userById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of usersQuery.data?.items ?? []) m.set(u.id, u.full_name);
+    return m;
+  }, [usersQuery.data]);
 
   const mentionCandidates = useMemo(() => {
     const all = usersQuery.data?.items ?? [];
@@ -167,6 +189,10 @@ export function ChatPanel({ ticketId }: Props) {
               key={m.id}
               message={m}
               isOwn={m.autor?.id === user?.id}
+              readerNames={m.gelesen_von
+                .filter((id) => id !== m.autor?.id)
+                .map((id) => userById.get(id))
+                .filter((n): n is string => !!n)}
               onDelete={() => {
                 if (confirm('Nachricht löschen?')) remove.mutate(m.id);
               }}
@@ -225,10 +251,12 @@ export function ChatPanel({ ticketId }: Props) {
 function MessageRow({
   message,
   isOwn,
+  readerNames,
   onDelete,
 }: {
   message: TicketMessageRead;
   isOwn: boolean;
+  readerNames: string[];
   onDelete: () => void;
 }) {
   return (
@@ -258,6 +286,25 @@ function MessageRow({
         <p className="whitespace-pre-wrap text-sm text-zinc-200">
           {renderWithMentions(message.text)}
         </p>
+        {readerNames.length > 0 && (
+          <div
+            className="mt-1 flex items-center gap-1"
+            title={`Gelesen von: ${readerNames.join(', ')}`}
+          >
+            <span className="text-[9px] uppercase tracking-wider text-zinc-500">gelesen</span>
+            {readerNames.slice(0, 5).map((name, i) => (
+              <span
+                key={i}
+                className="flex h-4 w-4 items-center justify-center rounded-full bg-zinc-700 text-[8px] font-semibold text-zinc-300"
+              >
+                {initials(name)}
+              </span>
+            ))}
+            {readerNames.length > 5 && (
+              <span className="text-[9px] text-zinc-500">+{readerNames.length - 5}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

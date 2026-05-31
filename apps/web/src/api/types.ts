@@ -582,6 +582,7 @@ export interface TicketMessageRead {
   ticket_id: UUID;
   text: string;
   mentions: UUID[];
+  gelesen_von: UUID[];
   autor: UserRef | null;
   created_at: string;
   updated_at: string;

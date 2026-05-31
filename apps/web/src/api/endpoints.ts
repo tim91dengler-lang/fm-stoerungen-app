@@ -281,6 +281,8 @@ export const chatApi = {
     api
       .delete<void>(`/tickets/${ticketId}/messages/${messageId}`)
       .then(() => undefined),
+  markRead: (ticketId: string) =>
+    api.post<void>(`/tickets/${ticketId}/messages/mark-read`).then(() => undefined),
 };
 
 export const ansichtenApi = {
