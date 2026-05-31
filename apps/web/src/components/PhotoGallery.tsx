@@ -14,6 +14,7 @@ export function PhotoGallery({ ticketId }: Props) {
   const qc = useQueryClient();
   const [lightboxId, setLightboxId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const photosQuery = useQuery({
     queryKey: ['ticket-photos', ticketId],
@@ -66,12 +67,32 @@ export function PhotoGallery({ ticketId }: Props) {
         >
           <Upload className="h-3 w-3" /> + Foto hinzufügen
         </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            cameraInputRef.current?.click();
+          }}
+          className="flex min-h-11 items-center gap-1 rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold normal-case text-zinc-200 hover:bg-zinc-700 lg:hidden lg:min-h-0"
+          title="Mit Kamera aufnehmen"
+        >
+          <Camera className="h-3 w-3" /> Kamera
+        </button>
       </summary>
       <input
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic"
         multiple
+        className="hidden"
+        onChange={(e) => onFilesSelected(e.target.files)}
+      />
+      {/* Mobile: öffnet direkt die Kamera (capture); Desktop ignoriert capture. */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={(e) => onFilesSelected(e.target.files)}
       />
