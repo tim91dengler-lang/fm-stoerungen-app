@@ -43,6 +43,10 @@ import { ChatPanel } from './ChatPanel';
 import { PhotoGallery } from './PhotoGallery';
 import { TicketDokumente } from './TicketDokumente';
 import { GrundrissPin } from './GrundrissPin';
+import {
+  PartnerKontaktPicker,
+  type PartnerKontaktAuswahl,
+} from './PartnerKontaktPicker';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { aktiveWerte } from '../lib/aktiveWerte';
 import { PRIO_SLUGS, formatRelativeDateTime, labelForPrioSlug } from '../lib/format';
@@ -126,14 +130,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
   const auswahllistenQuery = useQuery({
     queryKey: ['auswahllisten'],
     queryFn: () => auswahllistenApi.list(),
-    staleTime: 60_000,
-    enabled: !!ticketId,
-  });
-
-  // Nur Nachunternehmer für die Wartet-Sub-Bar.
-  const partnerNachunternehmerQuery = useQuery({
-    queryKey: ['partner-nachunternehmer'],
-    queryFn: () => partnerApi.list({ typ: ['nachunternehmer'], limit: 500 }),
     staleTime: 60_000,
     enabled: !!ticketId,
   });
@@ -410,7 +406,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 <WartetSubBar
                   ticket={t}
                   wartetGruende={aktiveWerte(wartetGruendeListe?.werte, t.wartet_grund?.key)}
-                  nachunternehmer={partnerNachunternehmerQuery.data?.items ?? []}
                   onSave={(payload) => update.mutate(payload)}
                 />
               )}
@@ -792,14 +787,24 @@ function tickettypClass(farbe: string | null): string {
 interface WartetSubBarProps {
   ticket: TicketRead;
   wartetGruende: { id: string; key: string; label: string; farbe: string | null }[];
-  nachunternehmer: { id: string; name: string }[];
   onSave: (payload: TicketUpdate) => void;
 }
 
-function WartetSubBar({ ticket, wartetGruende, nachunternehmer, onSave }: WartetSubBarProps) {
+function WartetSubBar({ ticket, wartetGruende, onSave }: WartetSubBarProps) {
   const grund = ticket.wartet_grund;
   const showKontakt = grund?.key === 'mieter' || grund?.key === 'extern';
   const showNachunternehmer = grund?.key === 'material' || grund?.key === 'extern';
+  const showKontaktBlock = showKontakt || showNachunternehmer;
+
+  // Partner gewählt → Kontaktfelder aus dem Partner-Stamm vorbefüllen + ID setzen.
+  function waehlePartner(p: PartnerKontaktAuswahl) {
+    onSave({
+      wartet_nachunternehmer_id: p.id,
+      wartet_kontakt_name: p.ansprechpartner || p.name || null,
+      wartet_kontakt_telefon: p.telefon || p.mobil || null,
+      wartet_kontakt_email: p.email || null,
+    });
+  }
 
   return (
     <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
@@ -822,28 +827,34 @@ function WartetSubBar({ ticket, wartetGruende, nachunternehmer, onSave }: Wartet
             ))}
           </select>
         </div>
-        {showNachunternehmer && (
-          <div>
-            <label className="block text-[10px] text-zinc-400">Nachunternehmer</label>
-            <select
-              value={ticket.wartet_nachunternehmer?.id ?? ''}
-              onChange={(e) => onSave({ wartet_nachunternehmer_id: e.target.value || null })}
-              className="mt-0.5 w-full rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
-            >
-              <option value="">— (keiner) —</option>
-              {nachunternehmer.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+        {showKontaktBlock && (
+          <div className="sm:col-span-2">
+            <label className="block text-[10px] text-zinc-400">
+              Kontakt / Nachunternehmer (Geschäftspartner)
+            </label>
+            <PartnerKontaktPicker
+              value={
+                ticket.wartet_nachunternehmer
+                  ? {
+                      id: ticket.wartet_nachunternehmer.id,
+                      name: ticket.wartet_nachunternehmer.name,
+                    }
+                  : null
+              }
+              onSelect={waehlePartner}
+              onClear={() => onSave({ wartet_nachunternehmer_id: null })}
+            />
+            <p className="mt-1 text-[10px] text-zinc-500">
+              Auswahl füllt Name/Telefon/E-Mail automatisch — unten anpassbar.
+            </p>
           </div>
         )}
-        {showKontakt && (
+        {showKontaktBlock && (
           <>
             <div className="sm:col-span-2">
               <label className="block text-[10px] text-zinc-400">Kontakt-Name</label>
               <input
+                key={`wkname-${ticket.wartet_kontakt_name ?? ''}`}
                 type="text"
                 defaultValue={ticket.wartet_kontakt_name ?? ''}
                 onBlur={(e) =>
@@ -857,6 +868,7 @@ function WartetSubBar({ ticket, wartetGruende, nachunternehmer, onSave }: Wartet
               <label className="block text-[10px] text-zinc-400">Telefon</label>
               <div className="mt-0.5 flex gap-1">
                 <input
+                  key={`wktel-${ticket.wartet_kontakt_telefon ?? ''}`}
                   type="text"
                   defaultValue={ticket.wartet_kontakt_telefon ?? ''}
                   onBlur={(e) =>
@@ -880,6 +892,7 @@ function WartetSubBar({ ticket, wartetGruende, nachunternehmer, onSave }: Wartet
               <label className="block text-[10px] text-zinc-400">E-Mail</label>
               <div className="mt-0.5 flex gap-1">
                 <input
+                  key={`wkmail-${ticket.wartet_kontakt_email ?? ''}`}
                   type="email"
                   defaultValue={ticket.wartet_kontakt_email ?? ''}
                   onBlur={(e) =>
