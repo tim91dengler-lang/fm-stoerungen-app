@@ -354,7 +354,7 @@ class TicketRead(TimestampedRead):
                         else b.partner.mobil
                     ),
                 )
-                for b in t.beteiligte
+                for b in getattr(t, "beteiligte", [])
             ],
             tickettyp=TickettypRef(
                 id=t.tickettyp.id,

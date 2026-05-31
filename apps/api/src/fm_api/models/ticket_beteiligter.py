@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -13,7 +11,6 @@ from fm_api.models.mixins import TimestampMixin, UuidPkMixin
 if TYPE_CHECKING:
     from fm_api.models.auswahlliste import AuswahllistenWert
     from fm_api.models.partner import GeschaeftsPartner, PartnerKontakt
-    from fm_api.models.ticket import Ticket
 
 
 class TicketBeteiligter(UuidPkMixin, TimestampMixin, Base):
@@ -60,7 +57,9 @@ class TicketBeteiligter(UuidPkMixin, TimestampMixin, Base):
     )
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
-    ticket: Mapped[Ticket] = relationship(back_populates="beteiligte", lazy="raise")
-    partner: Mapped[GeschaeftsPartner] = relationship(lazy="raise")
-    partner_kontakt: Mapped[PartnerKontakt | None] = relationship(lazy="raise")
-    rolle_wert: Mapped[AuswahllistenWert | None] = relationship(lazy="raise")
+    # Kein ``ticket``-Relationship — vermeidet den Modul-Import-Zyklus
+    # (ticket ↔ ticket_beteiligter). Die Zuordnung läuft über ticket_id; der
+    # Service lädt Beteiligte explizit und hängt sie ans Ticket.
+    partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
+    partner_kontakt: Mapped["PartnerKontakt | None"] = relationship(lazy="raise")
+    rolle_wert: Mapped["AuswahllistenWert | None"] = relationship(lazy="raise")

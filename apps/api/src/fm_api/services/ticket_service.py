@@ -72,10 +72,43 @@ _TICKET_LOAD_OPTIONS = (
     selectinload(Ticket.wartet_nachunternehmer),
     selectinload(Ticket.anlage),
     selectinload(Ticket.fehlercode),
-    selectinload(Ticket.beteiligte).selectinload(TicketBeteiligter.partner),
-    selectinload(Ticket.beteiligte).selectinload(TicketBeteiligter.partner_kontakt),
-    selectinload(Ticket.beteiligte).selectinload(TicketBeteiligter.rolle_wert),
 )
+
+# Beteiligte werden separat geladen (keine Ticket-Relationship → kein Import-Zyklus).
+_BETEILIGTE_LOAD_OPTIONS = (
+    selectinload(TicketBeteiligter.partner),
+    selectinload(TicketBeteiligter.partner_kontakt),
+    selectinload(TicketBeteiligter.rolle_wert),
+)
+
+
+async def _attach_beteiligte(db: AsyncSession, tickets: list[Ticket]) -> None:
+    """Lädt die Beteiligten der Tickets (selectin) und hängt sie transient an
+    ``ticket.beteiligte`` (sortiert nach reihenfolge). Ersatz für die bewusst
+    weggelassene Mapped-Relationship (Import-Zyklus-Vermeidung)."""
+    ids = [t.id for t in tickets]
+    by_ticket: dict[UUID, list[TicketBeteiligter]] = {tid: [] for tid in ids}
+    if ids:
+        rows = (
+            (
+                await db.execute(
+                    select(TicketBeteiligter)
+                    .where(TicketBeteiligter.ticket_id.in_(ids))
+                    .options(*_BETEILIGTE_LOAD_OPTIONS)
+                    .order_by(TicketBeteiligter.reihenfolge)
+                    # populate_existing: bereits geladene Identity-Map-Instanzen frisch
+                    # befüllen (nach Update geänderte rolle_id → rolle_wert neu laden).
+                    .execution_options(populate_existing=True)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for r in rows:
+            by_ticket[r.ticket_id].append(r)
+    for t in tickets:
+        # setattr: transientes Attribut, vom ORM-Mapper nicht erfasst.
+        setattr(t, "beteiligte", by_ticket.get(t.id, []))  # noqa: B010
 
 
 async def _validate_assignee(db: AsyncSession, user_id: UUID, mandant_id: UUID) -> None:
@@ -146,13 +179,23 @@ async def _apply_beteiligte(
     """Voll-Replace der Beteiligten-Liste (Reconcile by id).
 
     ``id`` gesetzt + zu diesem Ticket gehörend → Zeile aktualisieren; sonst neu
-    anlegen. Bestehende Zeilen, die nicht mehr in ``items`` vorkommen, werden via
-    delete-orphan-Cascade entfernt. Partner + Ansprechpartner + Rolle werden
-    mandantengebunden validiert.
+    anlegen. Bestehende Zeilen, die nicht mehr in ``items`` vorkommen, werden
+    entfernt. Partner + Ansprechpartner + Rolle werden mandantengebunden validiert.
     """
-    # Bei is_new ist ``ticket.beteiligte`` (lazy='raise') noch nicht geladen — daher
-    # NICHT die Collection mutieren, sondern via db.add/db.delete auf der FK arbeiten.
-    existing = {} if is_new else {b.id: b for b in ticket.beteiligte}
+    # Bestehende Zeilen direkt laden (keine Ticket-Relationship); via db.add/db.delete
+    # auf der FK arbeiten.
+    existing: dict[UUID, TicketBeteiligter] = {}
+    if not is_new:
+        rows = (
+            (
+                await db.execute(
+                    select(TicketBeteiligter).where(TicketBeteiligter.ticket_id == ticket.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        existing = {r.id: r for r in rows}
     seen_ids: set[UUID] = set()
 
     for idx, item in enumerate(items):
@@ -265,8 +308,9 @@ async def list_tickets(
         .limit(limit)
         .offset(offset)
     )
-    items = (await db.execute(items_stmt)).scalars().unique().all()
-    return list(items), total
+    items = list((await db.execute(items_stmt)).scalars().unique().all())
+    await _attach_beteiligte(db, items)
+    return items, total
 
 
 async def get_ticket(db: AsyncSession, ticket_id: UUID, mandant_id: UUID) -> Ticket:
@@ -282,6 +326,7 @@ async def get_ticket(db: AsyncSession, ticket_id: UUID, mandant_id: UUID) -> Tic
     ticket = (await db.execute(stmt)).scalar_one_or_none()
     if ticket is None:
         raise TicketNotFoundError(f"ticket {ticket_id} not found")
+    await _attach_beteiligte(db, [ticket])
     return ticket
 
 
