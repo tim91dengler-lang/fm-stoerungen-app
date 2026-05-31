@@ -197,6 +197,11 @@ export function TicketErfassenModal({
         stockwerk_id: data.stockwerk_id || null,
         einheit_id: data.einheit_id || null,
         partner_id: data.partner_id || null,
+        // Gewählter Partner wird als Beteiligter (Rolle Melder, Hauptkontakt)
+        // angelegt — konsistent mit der Beteiligten-Liste im Detail.
+        beteiligte: data.partner_id
+          ? [{ partner_id: data.partner_id, rolle: 'melder', ist_hauptkontakt: true }]
+          : [],
         projekt_id: data.projekt_id || null,
         anlage_id: data.anlage_id || null,
         fehlercode_id: data.fehlercode_id || null,
