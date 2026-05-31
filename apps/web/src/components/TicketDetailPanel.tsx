@@ -305,7 +305,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     >
       {/* Zentriertes Modal (konsistent zum Anlegen-Dialog) */}
       <div
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 px-5 py-3">
@@ -335,14 +335,16 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
           {!t && (
             <div className="px-5 py-6 text-sm text-zinc-500">
               {ticketQuery.isLoading ? 'Lade Ticket …' : 'Ticket nicht gefunden.'}
             </div>
           )}
           {t && (
-            <div className="space-y-4 px-5 py-4">
+            <>
+            {/* LINKE SPALTE — Fakten & Bearbeitung */}
+            <div className="space-y-4 px-5 py-4 lg:w-3/5 lg:overflow-y-auto">
               {/* Tickettyp-Pill */}
               {t.tickettyp && (
                 <div className="flex items-center gap-2">
@@ -699,12 +701,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 </select>
               </Accordion>
 
-              {felder.sichtbar('foto') && <PhotoGallery ticketId={t.id} />}
-
-              {felder.sichtbar('dokumente') && <TicketDokumente ticketId={t.id} />}
-
-              <ChatPanel ticketId={t.id} />
-
               {/* Verlauf */}
               <Accordion title="Verlauf">
                 <dl className="space-y-1 text-xs text-zinc-400">
@@ -739,6 +735,13 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 </button>
               </div>
             </div>
+            {/* RECHTE SPALTE — Kommunikation & Belege */}
+            <div className="space-y-4 border-t border-zinc-800 px-5 py-4 lg:w-2/5 lg:overflow-y-auto lg:border-l lg:border-t-0">
+              <ChatPanel ticketId={t.id} />
+              {felder.sichtbar('foto') && <PhotoGallery ticketId={t.id} />}
+              {felder.sichtbar('dokumente') && <TicketDokumente ticketId={t.id} />}
+            </div>
+            </>
           )}
         </div>
 
