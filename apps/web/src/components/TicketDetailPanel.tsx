@@ -41,6 +41,7 @@ import type {
 import { PrioBadge, StatusBadge } from './StatusBadge';
 import { ChatPanel } from './ChatPanel';
 import { PhotoGallery } from './PhotoGallery';
+import { TicketDokumente } from './TicketDokumente';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { PRIO_SLUGS, formatRelativeDateTime, labelForPrioSlug } from '../lib/format';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
@@ -706,7 +707,9 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 </select>
               </Accordion>
 
-              <PhotoGallery ticketId={t.id} />
+              {felder.sichtbar('foto') && <PhotoGallery ticketId={t.id} />}
+
+              {felder.sichtbar('dokumente') && <TicketDokumente ticketId={t.id} />}
 
               <ChatPanel ticketId={t.id} />
 
