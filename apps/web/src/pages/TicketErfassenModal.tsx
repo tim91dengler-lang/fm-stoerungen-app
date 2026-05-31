@@ -6,13 +6,9 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Activity, AlertOctagon } from 'lucide-react';
 import clsx from 'clsx';
 import {
-  anlageApi,
   auswahllistenApi,
   fehlercodeApi,
-  objektApi,
   objektstrukturApi,
-  partnerApi,
-  projektApi,
   ticketApi,
   tickettypApi,
   userApi,
@@ -22,6 +18,15 @@ import { farbeClassHover } from '../components/TickettypFarbe';
 import { iconFor } from '../components/TickettypIcon';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { GrundrissPin } from '../components/GrundrissPin';
+import { EntitySearchSelect } from '../components/EntitySearchSelect';
+import {
+  loadProjektLabel,
+  makeAnlageSearch,
+  makeFehlercodeSearch,
+  makeProjektSearch,
+  searchObjekte,
+  searchPartner,
+} from '../lib/entitySearch';
 
 // Schema lax — Pflichtfelder werden pro Vorlage validiert (siehe submit())
 const schema = z.object({
@@ -72,32 +77,6 @@ export function TicketErfassenModal({
     queryFn: () => userApi.list({ limit: 200 }),
     staleTime: 60_000,
   });
-  const { data: objekte } = useQuery({
-    queryKey: ['objekte-for-ticket'],
-    queryFn: () => objektApi.list({ limit: 500 }),
-    staleTime: 60_000,
-  });
-  const { data: partnerListe } = useQuery({
-    queryKey: ['partner-for-ticket'],
-    queryFn: () => partnerApi.list({ limit: 500 }),
-    staleTime: 60_000,
-  });
-  const { data: projekte } = useQuery({
-    queryKey: ['projekte-active'],
-    // F2: status-slugs aus Auswahlliste `projektstatus` — Seed: geplant, aktiv, pausiert, abgeschlossen
-    queryFn: () => projektApi.list({ status: ['geplant', 'aktiv'] }),
-    staleTime: 60_000,
-  });
-  const { data: anlagen } = useQuery({
-    queryKey: ['anlagen-for-ticket'],
-    queryFn: () => anlageApi.list({ aktiv_only: true }),
-    staleTime: 60_000,
-  });
-  const { data: fehlercodes } = useQuery({
-    queryKey: ['fehlercodes-for-ticket'],
-    queryFn: () => fehlercodeApi.list({ aktiv_only: true }),
-    staleTime: 60_000,
-  });
   const { data: auswahllisten } = useQuery({
     queryKey: ['auswahllisten'],
     queryFn: () => auswahllistenApi.list(),
@@ -146,6 +125,9 @@ export function TicketErfassenModal({
   const selectedHausId = watch('haus_id');
   const selectedStockwerkId = watch('stockwerk_id');
   const selectedFehlercodeId = watch('fehlercode_id');
+  const selectedAnlageId = watch('anlage_id');
+  const selectedPartnerId = watch('partner_id');
+  const selectedProjektId = watch('projekt_id');
   const pins = watch('pins');
 
   const selectedTyp = useMemo(
@@ -179,13 +161,21 @@ export function TicketErfassenModal({
     [haus, selectedStockwerkId],
   );
 
-  // Fehlercode-Pre-Fill: nur Beschreibung übernehmen (Entscheidung Tim 2026-05-22)
+  // Fehlercode-Pre-Fill: nur Beschreibung übernehmen (Entscheidung Tim 2026-05-22).
+  // Fehlercode wird einzeln nachgeladen (kein Vorab-Load mehr seit Such-Picker).
   useEffect(() => {
     if (!selectedFehlercodeId) return;
-    const fc = fehlercodes?.find((f) => f.id === selectedFehlercodeId);
-    if (!fc) return;
-    if (fc.beschreibung) setValue('beschreibung', fc.beschreibung);
-  }, [selectedFehlercodeId, fehlercodes, setValue]);
+    let cancelled = false;
+    fehlercodeApi
+      .get(selectedFehlercodeId)
+      .then((fc) => {
+        if (!cancelled && fc.beschreibung) setValue('beschreibung', fc.beschreibung);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFehlercodeId, setValue]);
 
   // Stockwerk-Wechsel: Pins zurücksetzen (anderer Grundriss).
   useEffect(() => {
@@ -307,20 +297,18 @@ export function TicketErfassenModal({
                 <AlertOctagon className="-mt-0.5 mr-1 inline h-3.5 w-3.5 text-amber-400" />
                 Fehlercode {feldPflicht('fehlercode') && <span className="text-red-400">*</span>}
               </label>
-              <select
-                id="fehlercode_id"
-                {...register('fehlercode_id', {
-                  setValueAs: (v) => (v === '' ? null : v),
-                })}
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-              >
-                <option value="">— (kein Fehlercode) —</option>
-                {fehlercodes?.map((fc) => (
-                  <option key={fc.id} value={fc.id}>
-                    {fc.code} — {fc.titel}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <EntitySearchSelect
+                  id="fehlercode_id"
+                  value={selectedFehlercodeId ?? null}
+                  onChange={(id) =>
+                    setValue('fehlercode_id', id, { shouldDirty: true })
+                  }
+                  fetcher={makeFehlercodeSearch(selectedAnlageId)}
+                  queryKey={`fehlercode-${selectedAnlageId ?? 'all'}`}
+                  placeholder="Fehlercode suchen …"
+                />
+              </div>
               <p className="mt-1 text-[10px] text-zinc-500">
                 Bei Auswahl wird die Beschreibung übernommen.
               </p>
@@ -455,25 +443,21 @@ export function TicketErfassenModal({
                     <label htmlFor="objekt_id" className="block text-xs text-zinc-400">
                       Objekt {feldPflicht('objekt') && <span className="text-red-400">*</span>}
                     </label>
-                    <select
-                      id="objekt_id"
-                      {...register('objekt_id', {
-                        setValueAs: (v) => (v === '' ? null : v),
-                        onChange: () => {
+                    <div className="mt-1">
+                      <EntitySearchSelect
+                        id="objekt_id"
+                        value={selectedObjektId ?? null}
+                        onChange={(id) => {
+                          setValue('objekt_id', id, { shouldDirty: true });
                           setValue('haus_id', null);
                           setValue('stockwerk_id', null);
                           setValue('einheit_id', null);
-                        },
-                      })}
-                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                    >
-                      <option value="">— (keins) —</option>
-                      {objekte?.items.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name}
-                        </option>
-                      ))}
-                    </select>
+                        }}
+                        fetcher={searchObjekte}
+                        queryKey="objekt"
+                        placeholder="Objekt suchen …"
+                      />
+                    </div>
                   </div>
                 )}
                 {feldSichtbar('haus') && (
@@ -569,18 +553,16 @@ export function TicketErfassenModal({
                   <Activity className="-mt-0.5 mr-1 inline h-3.5 w-3.5 text-emerald-400" />
                   Anlage {feldPflicht('anlage') && <span className="text-red-400">*</span>}
                 </label>
-                <select
-                  id="anlage_id"
-                  {...register('anlage_id', { setValueAs: (v) => (v === '' ? null : v) })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                >
-                  <option value="">— (keine) —</option>
-                  {anlagen?.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.bezeichnung}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-1">
+                  <EntitySearchSelect
+                    id="anlage_id"
+                    value={selectedAnlageId ?? null}
+                    onChange={(id) => setValue('anlage_id', id, { shouldDirty: true })}
+                    fetcher={makeAnlageSearch(selectedObjektId)}
+                    queryKey={`anlage-${selectedObjektId ?? 'all'}`}
+                    placeholder="Anlage suchen …"
+                  />
+                </div>
               </div>
             )}
             {feldSichtbar('partner') && (
@@ -588,18 +570,16 @@ export function TicketErfassenModal({
                 <label htmlFor="partner_id" className="block text-sm font-medium text-zinc-300">
                   Partner {feldPflicht('partner') && <span className="text-red-400">*</span>}
                 </label>
-                <select
-                  id="partner_id"
-                  {...register('partner_id', { setValueAs: (v) => (v === '' ? null : v) })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                >
-                  <option value="">— (keiner) —</option>
-                  {partnerListe?.items.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-1">
+                  <EntitySearchSelect
+                    id="partner_id"
+                    value={selectedPartnerId ?? null}
+                    onChange={(id) => setValue('partner_id', id, { shouldDirty: true })}
+                    fetcher={searchPartner}
+                    queryKey="partner"
+                    placeholder="Geschäftspartner suchen …"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -610,18 +590,17 @@ export function TicketErfassenModal({
                 <label htmlFor="projekt_id" className="block text-sm font-medium text-zinc-300">
                   Projekt
                 </label>
-                <select
-                  id="projekt_id"
-                  {...register('projekt_id', { setValueAs: (v) => (v === '' ? null : v) })}
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                >
-                  <option value="">— (keins) —</option>
-                  {projekte?.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-1">
+                  <EntitySearchSelect
+                    id="projekt_id"
+                    value={selectedProjektId ?? null}
+                    onChange={(id) => setValue('projekt_id', id, { shouldDirty: true })}
+                    fetcher={makeProjektSearch(['geplant', 'aktiv'])}
+                    loadLabel={loadProjektLabel}
+                    queryKey="projekt"
+                    placeholder="Projekt suchen …"
+                  />
+                </div>
               </div>
             )}
             <div>
