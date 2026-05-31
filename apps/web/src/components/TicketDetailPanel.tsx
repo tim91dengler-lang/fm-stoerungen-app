@@ -38,7 +38,7 @@ import type {
   TicketStatusSlug,
   TicketUpdate,
 } from '../api/types';
-import { PrioBadge, StatusBadge } from './StatusBadge';
+import { PrioBadge } from './StatusBadge';
 import { ChatPanel } from './ChatPanel';
 import { PhotoGallery } from './PhotoGallery';
 import { TicketDokumente } from './TicketDokumente';
@@ -300,21 +300,17 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade"
+      className="fixed inset-0 z-50 flex animate-fade items-center justify-center bg-zinc-950/70 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Ticket-Detail"
+      onClick={onClose}
     >
-      {/* Backdrop */}
-      <button
-        type="button"
-        aria-label="Schließen"
-        onClick={onClose}
-        className="flex-1 bg-zinc-950/60 backdrop-blur-sm"
-      />
-
-      {/* Panel */}
-      <aside className="flex h-full w-full max-w-xl flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl lg:max-w-2xl">
+      {/* Zentriertes Modal (konsistent zum Anlegen-Dialog) */}
+      <div
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 px-5 py-3">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-mono text-zinc-500">#{t?.nummer ?? '…'}</span>
@@ -418,53 +414,39 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 />
               )}
 
-              {/* Status — Workflow-Buttons (nur erlaubte Übergänge) */}
-              <div>
-                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                  Status
-                </label>
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={t.status} />
-                  {statusTargets.map((target) => (
-                    <button
-                      key={target.key}
-                      type="button"
-                      onClick={() => update.mutate({ status: target.key as TicketStatusSlug })}
-                      className="inline-flex min-h-8 items-center rounded-md border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:border-emerald-500/60 hover:bg-emerald-500/10 hover:text-emerald-200"
-                    >
-                      → {target.label}
-                    </button>
-                  ))}
-                  {statusTargets.length === 0 && (
-                    <span className="text-xs text-zinc-500">keine weiteren Übergänge</span>
-                  )}
-                </div>
+              {/* Status / Priorität / Kategorie */}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <SelectField
+                  label="Status"
+                  value={t.status.key}
+                  onChange={(v) => {
+                    if (v !== t.status.key) update.mutate({ status: v as TicketStatusSlug });
+                  }}
+                  options={[
+                    { value: t.status.key, label: t.status.label },
+                    ...statusTargets.map((s) => ({ value: s.key, label: s.label })),
+                  ]}
+                />
+                {felder.sichtbar('prio') && (
+                  <SelectField
+                    label="Priorität"
+                    value={t.prioritaet.key}
+                    onChange={(v) => update.mutate({ prioritaet: v as TicketPrioritaetSlug })}
+                    options={PRIO_SLUGS.map((p) => ({ value: p, label: labelForPrioSlug(p) }))}
+                  />
+                )}
+                {felder.sichtbar('kategorie') && (
+                  <SelectField
+                    label="Kategorie"
+                    value={t.kategorie?.key ?? ''}
+                    onChange={(v) => update.mutate({ kategorie: v || null })}
+                    options={[
+                      { value: '', label: '— (keine) —' },
+                      ...(kategorienListe?.werte.map((w) => ({ value: w.key, label: w.label })) ?? []),
+                    ]}
+                  />
+                )}
               </div>
-
-              {/* Priorität / Kategorie */}
-              {(felder.sichtbar('prio') || felder.sichtbar('kategorie')) && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {felder.sichtbar('prio') && (
-                    <SelectField
-                      label="Priorität"
-                      value={t.prioritaet.key}
-                      onChange={(v) => update.mutate({ prioritaet: v as TicketPrioritaetSlug })}
-                      options={PRIO_SLUGS.map((p) => ({ value: p, label: labelForPrioSlug(p) }))}
-                    />
-                  )}
-                  {felder.sichtbar('kategorie') && (
-                    <SelectField
-                      label="Kategorie"
-                      value={t.kategorie?.key ?? ''}
-                      onChange={(v) => update.mutate({ kategorie: v || null })}
-                      options={[
-                        { value: '', label: '— (keine) —' },
-                        ...(kategorienListe?.werte.map((w) => ({ value: w.key, label: w.label })) ?? []),
-                      ]}
-                    />
-                  )}
-                </div>
-              )}
 
               {/* Stammdaten (editierbar, vorlagengesteuert) */}
               {stammdatenSichtbar && (
@@ -767,7 +749,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
             Speichern fehlgeschlagen.
           </div>
         )}
-      </aside>
+      </div>
 
       <ConfirmDialog
         open={!!pendingSwitch}
