@@ -34,6 +34,7 @@ from fm_api.models.projekt import (
 )
 from fm_api.models.role import Role
 from fm_api.models.ticket import Ticket, TicketPrioritaetSlug, TicketStatusSlug
+from fm_api.models.ticket_beteiligter import TicketBeteiligter
 from fm_api.models.ticket_message import TicketMessage
 from fm_api.models.ticket_photo import TicketPhoto
 from fm_api.models.tickettyp import Tickettyp, TickettypFeld
@@ -75,6 +76,7 @@ __all__ = [
     "StockwerkMieter",
     "SystemAudit",
     "Ticket",
+    "TicketBeteiligter",
     "TicketMessage",
     "TicketPhoto",
     "TicketPrioritaetSlug",

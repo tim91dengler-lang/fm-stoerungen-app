@@ -47,6 +47,16 @@ class PartnerRef(BaseModel):
     typen: list[str] = []
 
 
+class KontaktRef(BaseModel):
+    """Ansprechpartner (Person) eines Geschäftspartners."""
+
+    id: UUID
+    name: str
+    email: str | None = None
+    telefon: str | None = None
+    mobil: str | None = None
+
+
 class TickettypRef(BaseModel):
     id: UUID
     key: str
@@ -79,12 +89,54 @@ def _normalize_slug(v: str | None) -> str | None:
     return v.strip().lower()
 
 
+def _kontakt_name(k: "object") -> str:
+    """Anzeigename eines Ansprechpartners aus Vorname/Nachname (Fallback)."""
+    parts = [getattr(k, "vorname", None), getattr(k, "nachname", None)]
+    name = " ".join(p for p in parts if p).strip()
+    return name or "Ansprechpartner"
+
+
 class TicketPin(BaseModel):
     """Eine Grundriss-Markierung (Prozentkoordinaten 0..100)."""
 
     x: float = Field(ge=0, le=100)
     y: float = Field(ge=0, le=100)
     label: str | None = Field(default=None, max_length=80)
+
+
+class TicketBeteiligterRead(BaseModel):
+    """Ein Beteiligter am Ticket inkl. aufgelöster Kontaktdaten (read-only)."""
+
+    id: UUID
+    partner: PartnerRef
+    kontakt: KontaktRef | None = None
+    rolle: AuswahlWertRef | None = None
+    ist_hauptkontakt: bool = False
+    reihenfolge: int = 0
+    # Aufgelöst: Ansprechpartner bevorzugt, sonst Partner-Stammdaten.
+    email: str | None = None
+    telefon: str | None = None
+    mobil: str | None = None
+
+
+class TicketBeteiligterWrite(BaseModel):
+    """Schreib-Form eines Beteiligten (Voll-Replace-Liste in Create/Update).
+
+    ``id`` gesetzt → bestehende Zeile aktualisieren; ``id`` leer → neu anlegen.
+    Nicht mehr enthaltene bestehende Zeilen werden beim Update entfernt.
+    """
+
+    id: UUID | None = None
+    partner_id: UUID
+    partner_kontakt_id: UUID | None = None
+    rolle: str | None = Field(default=None, max_length=64)
+    ist_hauptkontakt: bool = False
+    reihenfolge: int = 0
+
+    @field_validator("rolle", mode="before")
+    @classmethod
+    def _lower(cls, v: str | None) -> str | None:
+        return _normalize_slug(v)
 
 
 class TicketCreate(BaseModel):
@@ -101,6 +153,7 @@ class TicketCreate(BaseModel):
     einheit_id: UUID | None = None
     pins: list[TicketPin] = Field(default_factory=list)
     partner_id: UUID | None = None
+    beteiligte: list[TicketBeteiligterWrite] = Field(default_factory=list)
     zugewiesen_an_id: UUID | None = None
     tickettyp_id: UUID | None = None
     projekt_id: UUID | None = None
@@ -129,6 +182,7 @@ class TicketUpdate(BaseModel):
     einheit_id: UUID | None = None
     pins: list[TicketPin] | None = None
     partner_id: UUID | None = None
+    beteiligte: list[TicketBeteiligterWrite] | None = None
     zugewiesen_an_id: UUID | None = None
     tickettyp_id: UUID | None = None
     projekt_id: UUID | None = None
@@ -164,6 +218,7 @@ class TicketRead(TimestampedRead):
     einheit: EinheitRef | None = None
     pins: list[TicketPin] = Field(default_factory=list)
     partner: PartnerRef | None = None
+    beteiligte: list[TicketBeteiligterRead] = Field(default_factory=list)
     tickettyp: TickettypRef | None = None
     projekt: ProjektRefMini | None = None
     anlage: AnlageRef | None = None
@@ -252,6 +307,55 @@ class TicketRead(TimestampedRead):
             )
             if t.partner
             else None,
+            beteiligte=[
+                TicketBeteiligterRead(
+                    id=b.id,
+                    partner=PartnerRef(
+                        id=b.partner.id,
+                        name=b.partner.name,
+                        typen=[str(ty) for ty in b.partner.typen],
+                    ),
+                    kontakt=(
+                        KontaktRef(
+                            id=b.partner_kontakt.id,
+                            name=_kontakt_name(b.partner_kontakt),
+                            email=b.partner_kontakt.email,
+                            telefon=b.partner_kontakt.telefon,
+                            mobil=b.partner_kontakt.mobil,
+                        )
+                        if b.partner_kontakt is not None
+                        else None
+                    ),
+                    rolle=(
+                        AuswahlWertRef(
+                            id=b.rolle_wert.id,
+                            key=b.rolle_wert.key,
+                            label=b.rolle_wert.label,
+                            farbe=b.rolle_wert.farbe,
+                        )
+                        if b.rolle_wert is not None
+                        else None
+                    ),
+                    ist_hauptkontakt=b.ist_hauptkontakt,
+                    reihenfolge=b.reihenfolge,
+                    email=(
+                        b.partner_kontakt.email
+                        if b.partner_kontakt is not None and b.partner_kontakt.email
+                        else b.partner.email
+                    ),
+                    telefon=(
+                        b.partner_kontakt.telefon
+                        if b.partner_kontakt is not None and b.partner_kontakt.telefon
+                        else b.partner.telefon
+                    ),
+                    mobil=(
+                        b.partner_kontakt.mobil
+                        if b.partner_kontakt is not None and b.partner_kontakt.mobil
+                        else b.partner.mobil
+                    ),
+                )
+                for b in getattr(t, "beteiligte", [])
+            ],
             tickettyp=TickettypRef(
                 id=t.tickettyp.id,
                 key=t.tickettyp.key,

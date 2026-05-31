@@ -328,6 +328,19 @@ SYSTEM_AUSWAHLLISTEN_SEED: dict[str, dict[str, Any]] = {
             ("extern", "Wartet auf Externen", 3, "red", True),
         ],
     },
+    "beteiligten_rolle": {
+        "label": "Beteiligten-Rolle",
+        "beschreibung": "Rolle eines Beteiligten am Ticket (Melder, Auftraggeber …)",
+        "ist_system": False,
+        "werte": [
+            ("melder", "Melder", 0, "blue", False),
+            ("auftraggeber", "Auftraggeber", 1, "amber", False),
+            ("mieter", "Mieter vor Ort", 2, "cyan", False),
+            ("nachunternehmer", "Nachunternehmer", 3, "emerald", False),
+            ("hausverwaltung", "Hausverwaltung", 4, "violet", False),
+            ("eigentuemer", "Eigentümer", 5, "slate", False),
+        ],
+    },
     "eingangskanal": {
         "label": "Eingangskanal",
         "beschreibung": "Quelle der Ticket-Erfassung",

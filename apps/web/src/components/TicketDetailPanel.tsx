@@ -27,12 +27,12 @@ import {
   userApi,
 } from '../api/endpoints';
 import { EntitySearchSelect } from './EntitySearchSelect';
+import { BeteiligteBlock } from './BeteiligteBlock';
 import {
   makeAnlageSearch,
   makeFehlercodeSearch,
   makeProjektSearch,
   searchObjekte,
-  searchPartner,
 } from '../lib/entitySearch';
 import type {
   StatusWertMini,
@@ -178,6 +178,9 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
   const kategorienListe = auswahllistenQuery.data?.find((l) => l.key === 'ticket_kategorie');
   const quellenListe = auswahllistenQuery.data?.find((l) => l.key === 'eingangskanal');
   const wartetGruendeListe = auswahllistenQuery.data?.find((l) => l.key === 'wartet_grund');
+  const beteiligtenRolleListe = auswahllistenQuery.data?.find(
+    (l) => l.key === 'beteiligten_rolle',
+  );
 
   const hausTree = hausTreeQuery.data;
   const selectedHaus = useMemo(
@@ -442,20 +445,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 {(felder.sichtbar('melder') || felder.sichtbar('partner')) && (
                   <div className="order-2 lg:order-none">
                     <Accordion title="Kontakt & Beteiligte" defaultOpen>
-                      <div className="grid grid-cols-2 gap-3">
-                        {felder.sichtbar('partner') && (
-                          <FeldSearchSelect
-                            label="Auftraggeber / Mieter"
-                            icon={<Users2 className="h-3.5 w-3.5" />}
-                            pflicht={felder.pflicht('partner')}
-                            value={t.partner?.id ?? ''}
-                            initialLabel={t.partner?.name ?? null}
-                            onChange={(id) => update.mutate({ partner_id: id })}
-                            fetcher={searchPartner}
-                            queryKey="partner-detail"
-                            placeholder="Geschäftspartner suchen …"
-                          />
-                        )}
+                      <div className="space-y-3">
                         {felder.sichtbar('melder') && (
                           <TextField
                             key={`melder-${t.id}`}
@@ -463,6 +453,20 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             defaultValue={t.melder ?? ''}
                             onCommit={(v) => update.mutate({ melder: v || null })}
                           />
+                        )}
+                        {felder.sichtbar('partner') && (
+                          <div>
+                            <div className="mb-1 flex items-center gap-1 text-xs text-zinc-400">
+                              <Users2 className="h-3.5 w-3.5" /> Beteiligte
+                            </div>
+                            <BeteiligteBlock
+                              beteiligte={t.beteiligte}
+                              rolleOptions={aktiveWerte(beteiligtenRolleListe?.werte).map(
+                                (w) => ({ key: w.key, label: w.label }),
+                              )}
+                              onChange={(beteiligte) => update.mutate({ beteiligte })}
+                            />
+                          </div>
                         )}
                       </div>
                     </Accordion>

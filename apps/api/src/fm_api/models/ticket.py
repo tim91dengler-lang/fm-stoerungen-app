@@ -212,3 +212,7 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     anlage: Mapped["Anlage | None"] = relationship(lazy="raise")
     fehlercode: Mapped["Fehlercode | None"] = relationship(lazy="raise")
+    # Beteiligte werden bewusst NICHT als Mapped-Relationship geführt, um einen
+    # Modul-Import-Zyklus (ticket ↔ ticket_beteiligter) zu vermeiden. Der Service
+    # lädt sie explizit (selectin) und hängt die Liste via setattr transient an
+    # ``ticket.beteiligte`` (kein Klassen-Attribut → vom ORM-Mapper ignoriert).

@@ -141,6 +141,7 @@ export interface TicketRead {
   einheit: EinheitRef | null;
   pins: TicketPin[];
   partner: PartnerRef | null;
+  beteiligte: TicketBeteiligterRead[];
   tickettyp: TickettypRef | null;
   projekt: ProjektRefMini | null;
   anlage: AnlageRef | null;
@@ -160,6 +161,36 @@ export interface TicketRead {
   geschlossen_am: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface KontaktRef {
+  id: UUID;
+  name: string;
+  email: string | null;
+  telefon: string | null;
+  mobil: string | null;
+}
+
+export interface TicketBeteiligterRead {
+  id: UUID;
+  partner: PartnerRef;
+  kontakt: KontaktRef | null;
+  rolle: AuswahlWertRef | null;
+  ist_hauptkontakt: boolean;
+  reihenfolge: number;
+  // Aufgelöst: Ansprechpartner bevorzugt, sonst Partner-Stamm.
+  email: string | null;
+  telefon: string | null;
+  mobil: string | null;
+}
+
+export interface TicketBeteiligterWrite {
+  id?: UUID | null;
+  partner_id: UUID;
+  partner_kontakt_id?: UUID | null;
+  rolle?: string | null;
+  ist_hauptkontakt?: boolean;
+  reihenfolge?: number;
 }
 
 export interface PaginatedResponse<T> {
@@ -183,6 +214,7 @@ export interface TicketCreate {
   einheit_id?: UUID | null;
   pins?: TicketPin[];
   partner_id?: UUID | null;
+  beteiligte?: TicketBeteiligterWrite[];
   zugewiesen_an_id?: UUID | null;
   tickettyp_id?: UUID | null;
   projekt_id?: UUID | null;
@@ -206,6 +238,7 @@ export interface TicketUpdate {
   einheit_id?: UUID | null;
   pins?: TicketPin[] | null;
   partner_id?: UUID | null;
+  beteiligte?: TicketBeteiligterWrite[] | null;
   zugewiesen_an_id?: UUID | null;
   tickettyp_id?: UUID | null;
   projekt_id?: UUID | null;
