@@ -8,6 +8,7 @@ import type {
   AnlageRead,
   AnlageUpdate,
   AuswahllisteCreate,
+  AuswahllisteUpdate,
   AuswahllisteRead,
   AuswahllistenWertCreate,
   AuswahllistenWertRead,
@@ -113,6 +114,8 @@ export const auswahllistenApi = {
   get: (id: string) => api.get<AuswahllisteRead>(`/auswahllisten/${id}`).then((r) => r.data),
   create: (payload: AuswahllisteCreate) =>
     api.post<AuswahllisteRead>('/auswahllisten', payload).then((r) => r.data),
+  update: (id: string, payload: AuswahllisteUpdate) =>
+    api.patch<AuswahllisteRead>(`/auswahllisten/${id}`, payload).then((r) => r.data),
   remove: (id: string) =>
     api.delete<void>(`/auswahllisten/${id}`).then(() => undefined),
   addWert: (listeId: string, payload: AuswahllistenWertCreate) =>

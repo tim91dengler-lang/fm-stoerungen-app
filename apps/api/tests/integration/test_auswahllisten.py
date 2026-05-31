@@ -51,7 +51,8 @@ async def test_cannot_create_duplicate_liste(client, admin_user) -> None:
 
 
 @pytest.mark.integration
-async def test_cannot_modify_system_liste(client, admin_user) -> None:
+async def test_can_rename_system_liste(client, admin_user) -> None:
+    """System-Listen dürfen umbenannt werden (Key bleibt fix). Konzept §5.A."""
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
     listen = (await client.get("/api/v1/auswahllisten", headers=headers)).json()
@@ -61,7 +62,60 @@ async def test_cannot_modify_system_liste(client, admin_user) -> None:
         headers=headers,
         json={"label": "Neu-benannt"},
     )
+    assert res.status_code == 200, res.text
+    assert res.json()["label"] == "Neu-benannt"
+    assert res.json()["key"] == "ticket_status"
+
+
+@pytest.mark.integration
+async def test_cannot_delete_system_liste(client, admin_user) -> None:
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    listen = (await client.get("/api/v1/auswahllisten", headers=headers)).json()
+    status_liste = next(le for le in listen if le["key"] == "ticket_status")
+    res = await client.delete(f"/api/v1/auswahllisten/{status_liste['id']}", headers=headers)
     assert res.status_code == 403
+
+
+@pytest.mark.integration
+async def test_can_update_system_wert(client, admin_user) -> None:
+    """System-Werte dürfen gepflegt werden (Label/Farbe/Aktiv/meta). Konzept §5.A."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    listen = (await client.get("/api/v1/auswahllisten", headers=headers)).json()
+    status_liste = next(le for le in listen if le["key"] == "ticket_status")
+    system_wert = status_liste["werte"][0]
+    res = await client.patch(
+        f"/api/v1/auswahllisten/werte/{system_wert['id']}",
+        headers=headers,
+        json={"label": "Brandneu", "farbe": "rose", "ist_aktiv": False},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["label"] == "Brandneu"
+    assert body["farbe"] == "rose"
+    assert body["ist_aktiv"] is False
+    assert body["key"] == system_wert["key"]
+
+
+@pytest.mark.integration
+async def test_can_add_own_wert_to_system_liste(client, admin_user) -> None:
+    """Eigene Werte dürfen zu einer System-Liste hinzugefügt werden (ist_system=False)."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    listen = (await client.get("/api/v1/auswahllisten", headers=headers)).json()
+    status_liste = next(le for le in listen if le["key"] == "ticket_status")
+    res = await client.post(
+        f"/api/v1/auswahllisten/{status_liste['id']}/werte",
+        headers=headers,
+        json={"key": "eskaliert", "label": "Eskaliert", "reihenfolge": 9, "farbe": "red"},
+    )
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["ist_system"] is False
+    # ...und dieser eigene Wert in einer System-Liste ist auch wieder löschbar.
+    del_res = await client.delete(f"/api/v1/auswahllisten/werte/{body['id']}", headers=headers)
+    assert del_res.status_code == 204
 
 
 @pytest.mark.integration

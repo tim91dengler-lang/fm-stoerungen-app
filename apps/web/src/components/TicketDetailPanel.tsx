@@ -44,6 +44,7 @@ import { PhotoGallery } from './PhotoGallery';
 import { TicketDokumente } from './TicketDokumente';
 import { GrundrissPin } from './GrundrissPin';
 import { vorlageFelder } from '../lib/vorlageFelder';
+import { aktiveWerte } from '../lib/aktiveWerte';
 import { PRIO_SLUGS, formatRelativeDateTime, labelForPrioSlug } from '../lib/format';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
@@ -408,7 +409,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
               {statusErfordertGrund && (
                 <WartetSubBar
                   ticket={t}
-                  wartetGruende={wartetGruendeListe?.werte ?? []}
+                  wartetGruende={aktiveWerte(wartetGruendeListe?.werte, t.wartet_grund?.key)}
                   nachunternehmer={partnerNachunternehmerQuery.data?.items ?? []}
                   onSave={(payload) => update.mutate(payload)}
                 />
@@ -442,7 +443,10 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                     onChange={(v) => update.mutate({ kategorie: v || null })}
                     options={[
                       { value: '', label: '— (keine) —' },
-                      ...(kategorienListe?.werte.map((w) => ({ value: w.key, label: w.label })) ?? []),
+                      ...aktiveWerte(kategorienListe?.werte, t.kategorie?.key).map((w) => ({
+                        value: w.key,
+                        label: w.label,
+                      })),
                     ]}
                   />
                 )}
@@ -578,7 +582,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                           onChange={(v) => update.mutate({ quelle: v || null })}
                         >
                           <option value="">— (keine) —</option>
-                          {quellenListe?.werte.map((w) => (
+                          {aktiveWerte(quellenListe?.werte, t.quelle?.key).map((w) => (
                             <option key={w.id} value={w.key}>
                               {w.label}
                             </option>

@@ -282,6 +282,11 @@ export interface AuswahllisteCreate {
   beschreibung?: string | null;
 }
 
+export interface AuswahllisteUpdate {
+  label?: string;
+  beschreibung?: string | null;
+}
+
 // ---------------------------------------------------------------- Adressen
 
 export interface AdresseRead {
