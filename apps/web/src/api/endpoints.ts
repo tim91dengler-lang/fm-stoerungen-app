@@ -71,6 +71,8 @@ import type {
   UserRead,
   UserUpdate,
   UUID,
+  StatusWorkflowRead,
+  StatusWorkflowUpdate,
 } from './types';
 
 export const authApi = {
@@ -317,6 +319,12 @@ export const tickettypApi = {
     api.post<TickettypRead>(`/tickettypen/${id}/duplicate`).then((r) => r.data),
   remove: (id: UUID) =>
     api.delete<void>(`/tickettypen/${id}`).then(() => undefined),
+};
+
+export const statusWorkflowApi = {
+  get: () => api.get<StatusWorkflowRead>('/status-workflow').then((r) => r.data),
+  update: (payload: StatusWorkflowUpdate) =>
+    api.put<StatusWorkflowRead>('/status-workflow', payload).then((r) => r.data),
 };
 
 export const anlageApi = {

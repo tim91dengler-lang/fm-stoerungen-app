@@ -14,6 +14,7 @@ from fm_api.api.v1 import (
     objektstruktur,
     partner,
     projekte,
+    status_workflow,
     ticket_messages,
     ticket_photos,
     tickets,
@@ -48,3 +49,4 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(dokumente.router, prefix="/dokumente", tags=["dokumente"])
 api_router.include_router(anlagen.router, prefix="/anlagen", tags=["anlagen"])
 api_router.include_router(fehlercodes.router, prefix="/fehlercodes", tags=["fehlercodes"])
+api_router.include_router(status_workflow.router, prefix="/status-workflow", tags=["tickets"])
