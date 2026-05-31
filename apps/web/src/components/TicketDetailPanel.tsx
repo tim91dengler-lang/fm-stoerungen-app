@@ -26,27 +26,23 @@ import {
   objektstrukturApi,
   partnerApi,
   projektApi,
+  statusWorkflowApi,
   ticketApi,
   tickettypApi,
   userApi,
 } from '../api/endpoints';
 import type {
+  StatusWertMini,
   TicketPrioritaetSlug,
   TicketRead,
   TicketStatusSlug,
   TicketUpdate,
 } from '../api/types';
-import { PrioBadge } from './StatusBadge';
+import { PrioBadge, StatusBadge } from './StatusBadge';
 import { ChatPanel } from './ChatPanel';
 import { PhotoGallery } from './PhotoGallery';
 import { vorlageFelder } from '../lib/vorlageFelder';
-import {
-  PRIO_SLUGS,
-  STATUS_SLUGS,
-  formatRelativeDateTime,
-  labelForPrioSlug,
-  labelForStatusSlug,
-} from '../lib/format';
+import { PRIO_SLUGS, formatRelativeDateTime, labelForPrioSlug } from '../lib/format';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 interface Props {
@@ -131,6 +127,13 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
   const tickettypenQuery = useQuery({
     queryKey: ['tickettypen', 'aktiv_only'],
     queryFn: () => tickettypApi.list({ aktiv_only: true }),
+    staleTime: 5 * 60_000,
+    enabled: !!ticketId,
+  });
+  // Konfigurierbare Status-Übergangsmatrix — steuert die Workflow-Buttons.
+  const workflowQuery = useQuery({
+    queryKey: ['status-workflow'],
+    queryFn: () => statusWorkflowApi.get(),
     staleTime: 5 * 60_000,
     enabled: !!ticketId,
   });
@@ -241,6 +244,16 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     for (const c of betroffen) Object.assign(patch, c.patch);
     setPendingSwitch({ tickettypId: newTypId, labels: betroffen.map((c) => c.label), patch });
   }
+
+  const workflow = workflowQuery.data;
+  const statusByKey = new Map<string, StatusWertMini>(
+    (workflow?.status ?? []).map((s) => [s.key, s]),
+  );
+  const statusTargets: StatusWertMini[] = t
+    ? (workflow?.uebergaenge[t.status.key] ?? [])
+        .map((k) => statusByKey.get(k))
+        .filter((s): s is StatusWertMini => !!s)
+    : [];
 
   // Hat die Vorlage irgendein Ort-Feld sichtbar?
   const ortSichtbar =
@@ -367,34 +380,53 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 />
               )}
 
-              {/* Status / Priorität / Kategorie */}
-              <div className="grid gap-3 sm:grid-cols-3">
-                <SelectField
-                  label="Status"
-                  value={t.status.key}
-                  onChange={(v) => update.mutate({ status: v as TicketStatusSlug })}
-                  options={STATUS_SLUGS.map((s) => ({ value: s, label: labelForStatusSlug(s) }))}
-                />
-                {felder.sichtbar('prio') && (
-                  <SelectField
-                    label="Priorität"
-                    value={t.prioritaet.key}
-                    onChange={(v) => update.mutate({ prioritaet: v as TicketPrioritaetSlug })}
-                    options={PRIO_SLUGS.map((p) => ({ value: p, label: labelForPrioSlug(p) }))}
-                  />
-                )}
-                {felder.sichtbar('kategorie') && (
-                  <SelectField
-                    label="Kategorie"
-                    value={t.kategorie?.key ?? ''}
-                    onChange={(v) => update.mutate({ kategorie: v || null })}
-                    options={[
-                      { value: '', label: '— (keine) —' },
-                      ...(kategorienListe?.werte.map((w) => ({ value: w.key, label: w.label })) ?? []),
-                    ]}
-                  />
-                )}
+              {/* Status — Workflow-Buttons (nur erlaubte Übergänge) */}
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  Status
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={t.status} />
+                  {statusTargets.map((target) => (
+                    <button
+                      key={target.key}
+                      type="button"
+                      onClick={() => update.mutate({ status: target.key as TicketStatusSlug })}
+                      className="inline-flex min-h-8 items-center rounded-md border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:border-emerald-500/60 hover:bg-emerald-500/10 hover:text-emerald-200"
+                    >
+                      → {target.label}
+                    </button>
+                  ))}
+                  {statusTargets.length === 0 && (
+                    <span className="text-xs text-zinc-500">keine weiteren Übergänge</span>
+                  )}
+                </div>
               </div>
+
+              {/* Priorität / Kategorie */}
+              {(felder.sichtbar('prio') || felder.sichtbar('kategorie')) && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {felder.sichtbar('prio') && (
+                    <SelectField
+                      label="Priorität"
+                      value={t.prioritaet.key}
+                      onChange={(v) => update.mutate({ prioritaet: v as TicketPrioritaetSlug })}
+                      options={PRIO_SLUGS.map((p) => ({ value: p, label: labelForPrioSlug(p) }))}
+                    />
+                  )}
+                  {felder.sichtbar('kategorie') && (
+                    <SelectField
+                      label="Kategorie"
+                      value={t.kategorie?.key ?? ''}
+                      onChange={(v) => update.mutate({ kategorie: v || null })}
+                      options={[
+                        { value: '', label: '— (keine) —' },
+                        ...(kategorienListe?.werte.map((w) => ({ value: w.key, label: w.label })) ?? []),
+                      ]}
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Stammdaten (editierbar, vorlagengesteuert) */}
               {stammdatenSichtbar && (

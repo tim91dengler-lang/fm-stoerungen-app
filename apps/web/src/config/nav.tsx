@@ -17,6 +17,7 @@ import {
   Ticket,
   Users,
   Users2,
+  Workflow,
 } from 'lucide-react';
 
 // Single source of truth for navigation, shared by the desktop sidebar,
@@ -64,6 +65,7 @@ export const navGroups: NavGroup[] = [
       { to: '/stammdaten/fehlercodes', label: 'Fehlercodes', icon: <AlertOctagon className="h-4 w-4" /> },
       { to: '/stammdaten/vorlagen', label: 'Vorlagen', icon: <Layers className="h-4 w-4" /> },
       { to: '/stammdaten/auswahllisten', label: 'Auswahllisten', icon: <Tags className="h-4 w-4" /> },
+      { to: '/stammdaten/status-workflow', label: 'Status-Workflow', icon: <Workflow className="h-4 w-4" /> },
     ],
   },
   {

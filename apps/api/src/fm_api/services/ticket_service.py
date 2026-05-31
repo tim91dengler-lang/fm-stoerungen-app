@@ -16,6 +16,7 @@ from fm_api.models import (
     User,
 )
 from fm_api.models.ticket import TicketStatusSlug
+from fm_api.services import status_workflow_service
 from fm_api.services.auswahlliste_service import (
     AuswahllistenWertNotFoundError,
     get_wert_by_id,
@@ -50,16 +51,6 @@ class UnknownAuswahlSlugError(Exception):
 LISTE_KEY_STATUS = "ticket_status"
 LISTE_KEY_PRIORITAET = "ticket_prioritaet"
 LISTE_KEY_KATEGORIE = "ticket_kategorie"
-
-# Status-Workflow-Regeln (slug-basiert, ADR 0004).
-# In Slice 2 bewusst permissiv: nur „erledigt → nicht-erledigt" wird blockiert,
-# damit das Wiedereröffnen ein expliziter Re-Open-Flow in Slice 3 wird.
-INVALID_TRANSITIONS: set[tuple[str, str]] = {
-    (TicketStatusSlug.ERLEDIGT.value, TicketStatusSlug.NEU.value),
-    (TicketStatusSlug.ERLEDIGT.value, TicketStatusSlug.PRUEFUNG.value),
-    (TicketStatusSlug.ERLEDIGT.value, TicketStatusSlug.BEARBEITUNG.value),
-    (TicketStatusSlug.ERLEDIGT.value, TicketStatusSlug.WARTET.value),
-}
 
 _TICKET_LOAD_OPTIONS = (
     selectinload(Ticket.eroeffnet_von),
@@ -418,7 +409,9 @@ async def update_ticket(
     if "status" in updates and updates["status"] is not None:
         new_status_slug = updates["status"]
         current_status_slug = ticket.status_wert.key
-        if (current_status_slug, new_status_slug) in INVALID_TRANSITIONS:
+        if not await status_workflow_service.is_transition_allowed(
+            db, mandant_id, current_status_slug, new_status_slug
+        ):
             raise InvalidStatusTransitionError(
                 f"cannot transition from '{current_status_slug}' to '{new_status_slug}'"
             )

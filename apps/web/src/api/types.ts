@@ -967,3 +967,21 @@ export interface FehlercodeWriteBase {
 
 export type FehlercodeCreate = FehlercodeWriteBase;
 export type FehlercodeUpdate = Partial<FehlercodeWriteBase>;
+
+// --- Status-Workflow (konfigurierbare Übergangsmatrix) ---
+
+export interface StatusWertMini {
+  key: string;
+  label: string;
+  farbe: string | null;
+}
+
+export interface StatusWorkflowRead {
+  status: StatusWertMini[];
+  /** Erlaubte Ziel-Status je Quell-Status-key. */
+  uebergaenge: Record<string, string[]>;
+}
+
+export interface StatusWorkflowUpdate {
+  uebergaenge: Record<string, string[]>;
+}

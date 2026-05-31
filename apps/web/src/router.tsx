@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdressenPage } from './pages/AdressenPage';
 import { AnlagenPage } from './pages/AnlagenPage';
 import { AuswahllistenPage } from './pages/AuswahllistenPage';
+import { StatusWorkflowPage } from './pages/StatusWorkflowPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DokumentePage } from './pages/DokumentePage';
 import { FehlercodesPage } from './pages/FehlercodesPage';
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
           { path: '/stammdaten/vorlagen/neu', element: <VorlageDesignerPage /> },
           { path: '/stammdaten/vorlagen/:id/bearbeiten', element: <VorlageDesignerPage /> },
           { path: '/stammdaten/auswahllisten', element: <AuswahllistenPage /> },
+          { path: '/stammdaten/status-workflow', element: <StatusWorkflowPage /> },
           { path: '/users', element: <UsersListePage /> },
         ],
       },
