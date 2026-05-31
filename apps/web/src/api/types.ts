@@ -118,6 +118,12 @@ export interface FehlercodeRef {
   titel: string;
 }
 
+export interface TicketPin {
+  x: number;
+  y: number;
+  label?: string | null;
+}
+
 export interface TicketRead {
   id: UUID;
   mandant_id: UUID;
@@ -133,8 +139,7 @@ export interface TicketRead {
   haus: HausRef | null;
   stockwerk: StockwerkRef | null;
   einheit: EinheitRef | null;
-  pin_x: number | null;
-  pin_y: number | null;
+  pins: TicketPin[];
   partner: PartnerRef | null;
   tickettyp: TickettypRef | null;
   projekt: ProjektRefMini | null;
@@ -176,8 +181,7 @@ export interface TicketCreate {
   haus_id?: UUID | null;
   stockwerk_id?: UUID | null;
   einheit_id?: UUID | null;
-  pin_x?: number | null;
-  pin_y?: number | null;
+  pins?: TicketPin[];
   partner_id?: UUID | null;
   zugewiesen_an_id?: UUID | null;
   tickettyp_id?: UUID | null;
@@ -200,8 +204,7 @@ export interface TicketUpdate {
   haus_id?: UUID | null;
   stockwerk_id?: UUID | null;
   einheit_id?: UUID | null;
-  pin_x?: number | null;
-  pin_y?: number | null;
+  pins?: TicketPin[] | null;
   partner_id?: UUID | null;
   zugewiesen_an_id?: UUID | null;
   tickettyp_id?: UUID | null;

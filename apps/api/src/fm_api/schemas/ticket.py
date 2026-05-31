@@ -1,5 +1,4 @@
 from datetime import date, datetime
-from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -80,6 +79,14 @@ def _normalize_slug(v: str | None) -> str | None:
     return v.strip().lower()
 
 
+class TicketPin(BaseModel):
+    """Eine Grundriss-Markierung (Prozentkoordinaten 0..100)."""
+
+    x: float = Field(ge=0, le=100)
+    y: float = Field(ge=0, le=100)
+    label: str | None = Field(default=None, max_length=80)
+
+
 class TicketCreate(BaseModel):
     titel: str = Field(min_length=1, max_length=200)
     beschreibung: str = ""
@@ -92,8 +99,7 @@ class TicketCreate(BaseModel):
     haus_id: UUID | None = None
     stockwerk_id: UUID | None = None
     einheit_id: UUID | None = None
-    pin_x: Decimal | None = None
-    pin_y: Decimal | None = None
+    pins: list[TicketPin] = Field(default_factory=list)
     partner_id: UUID | None = None
     zugewiesen_an_id: UUID | None = None
     tickettyp_id: UUID | None = None
@@ -121,8 +127,7 @@ class TicketUpdate(BaseModel):
     haus_id: UUID | None = None
     stockwerk_id: UUID | None = None
     einheit_id: UUID | None = None
-    pin_x: Decimal | None = None
-    pin_y: Decimal | None = None
+    pins: list[TicketPin] | None = None
     partner_id: UUID | None = None
     zugewiesen_an_id: UUID | None = None
     tickettyp_id: UUID | None = None
@@ -157,8 +162,7 @@ class TicketRead(TimestampedRead):
     haus: HausRef | None = None
     stockwerk: StockwerkRef | None = None
     einheit: EinheitRef | None = None
-    pin_x: Decimal | None = None
-    pin_y: Decimal | None = None
+    pins: list[TicketPin] = Field(default_factory=list)
     partner: PartnerRef | None = None
     tickettyp: TickettypRef | None = None
     projekt: ProjektRefMini | None = None
@@ -237,8 +241,10 @@ class TicketRead(TimestampedRead):
             einheit=EinheitRef(id=t.einheit.id, bezeichnung=t.einheit.bezeichnung)
             if t.einheit
             else None,
-            pin_x=t.pin_x,
-            pin_y=t.pin_y,
+            pins=[
+                TicketPin(x=float(pp["x"]), y=float(pp["y"]), label=pp.get("label"))
+                for pp in (t.pins or [])
+            ],
             partner=PartnerRef(
                 id=t.partner.id,
                 name=t.partner.name,

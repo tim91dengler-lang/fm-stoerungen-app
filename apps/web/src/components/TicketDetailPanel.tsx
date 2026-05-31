@@ -86,7 +86,7 @@ const FELD_NULL_CONFIG: {
   { feldKey: 'faelligkeit_am', label: 'Fälligkeitsdatum', hasValue: (t) => !!t.faelligkeit_am, patch: { faelligkeit_am: null } },
   { feldKey: 'wiederholung', label: 'Wiederholung', hasValue: (t) => !!t.wiederholung, patch: { wiederholung: null } },
   { feldKey: 'beschreibung', label: 'Beschreibung', hasValue: (t) => !!t.beschreibung, patch: { beschreibung: '' } },
-  { feldKey: 'pin', label: 'Foto-Pin', hasValue: (t) => t.pin_x != null || t.pin_y != null, patch: { pin_x: null, pin_y: null } },
+  { feldKey: 'pin', label: 'Grundriss-Pins', hasValue: (t) => (t.pins ?? []).length > 0, patch: { pins: [] } },
 ];
 
 /** Baut einen mailto-Entwurf mit Ticket-Zusammenfassung (Konzept §9, Stufe 1). */
@@ -609,11 +609,8 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             </div>
                             <GrundrissPin
                               stockwerkId={t.stockwerk.id}
-                              pin={
-                                t.pin_x != null && t.pin_y != null
-                                  ? { x: t.pin_x, y: t.pin_y }
-                                  : null
-                              }
+                              pins={t.pins ?? []}
+                              onChange={(pins) => update.mutate({ pins })}
                             />
                           </div>
                         )}
