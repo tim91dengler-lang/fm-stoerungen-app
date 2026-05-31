@@ -11,6 +11,7 @@ import {
   FolderKanban,
   Mail,
   MapPin,
+  Pencil,
   Phone,
   Trash2,
   User,
@@ -114,6 +115,8 @@ function buildBeteiligteMailto(t: TicketRead): string {
 export function TicketDetailPanel({ ticketId, onClose }: Props) {
   const qc = useQueryClient();
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
 
   const ticketQuery = useQuery({
     queryKey: ['ticket', ticketId],
@@ -201,6 +204,16 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     },
   });
 
+  function startTitleEdit(current: string) {
+    setTitleDraft(current);
+    setTitleEditing(true);
+  }
+  function commitTitle(current: string) {
+    const v = titleDraft.trim();
+    if (v && v !== current) update.mutate({ titel: v });
+    setTitleEditing(false);
+  }
+
   const remove = useMutation({
     mutationFn: () => ticketApi.remove(ticketId!),
     onSuccess: () => {
@@ -214,11 +227,21 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
   useEffect(() => {
     if (!ticketId) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      // Escape in einem Eingabefeld (z. B. Titel-Edit) bricht nur dieses ab,
+      // schließt NICHT das Panel.
+      const el = document.activeElement;
+      if (el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
+      onClose();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [ticketId, onClose]);
+
+  // Titel-Edit beim Ticketwechsel zurücksetzen (kein Übertrag des Entwurfs).
+  useEffect(() => {
+    setTitleEditing(false);
+  }, [ticketId]);
 
   if (!ticketId) return null;
 
@@ -298,9 +321,36 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 </span>
               )}
             </div>
-            <h1 className="mt-0.5 truncate text-lg font-semibold text-zinc-100">
-              {t?.titel ?? '…'}
-            </h1>
+            {titleEditing && t ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                maxLength={200}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => commitTitle(t.titel)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitTitle(t.titel);
+                  } else if (e.key === 'Escape') {
+                    setTitleEditing(false);
+                  }
+                }}
+                className="mt-0.5 w-full rounded border border-emerald-500/50 bg-zinc-900 px-1.5 py-0.5 text-lg font-semibold text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                aria-label="Titel bearbeiten"
+              />
+            ) : (
+              <h1
+                className="group mt-0.5 flex cursor-text items-center gap-1.5 text-lg font-semibold text-zinc-100"
+                onClick={() => t && startTitleEdit(t.titel)}
+                title="Titel bearbeiten"
+              >
+                <span className="truncate">{t?.titel ?? '…'}</span>
+                {t && (
+                  <Pencil className="h-3.5 w-3.5 shrink-0 text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100" />
+                )}
+              </h1>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {t && (
@@ -733,7 +783,9 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                     {felder.sichtbar('dokumente') && <TicketDokumente ticketId={t.id} />}
                   </div>
                 )}
-                <div className="order-6 lg:order-none">
+                {/* Chat: mobil unten (Techniker-Reihenfolge), Desktop oben in der
+                    rechten Spalte (Tim: „Chat ganz oben rechts"). */}
+                <div className="order-6 lg:order-first">
                   <ChatPanel ticketId={t.id} />
                 </div>
               </div>

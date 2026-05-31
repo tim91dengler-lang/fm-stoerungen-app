@@ -84,6 +84,7 @@ const DEFAULT_CONFIG: TicketsViewConfig = {
     'status',
     'zugewiesen_an',
     'eroeffnet_am',
+    'faelligkeit_am',
   ],
   grouping: [],
 };
@@ -340,7 +341,37 @@ function buildColumns(
         </span>
       ),
     },
+    {
+      id: 'faelligkeit_am',
+      accessorKey: 'faelligkeit_am',
+      header: 'Fällig am',
+      sortUndefined: 'last',
+      // Filter „fällig bis <Datum>": zeigt Tickets mit Fälligkeit ≤ gewähltem Datum.
+      filterFn: (row, _id, value) => {
+        if (!value) return true;
+        const d = row.original.faelligkeit_am;
+        return d ? d <= (value as string) : false;
+      },
+      cell: ({ row }) => {
+        const d = row.original.faelligkeit_am;
+        if (!d) return <span className="text-zinc-600">—</span>;
+        const heute = new Date().toISOString().slice(0, 10);
+        const erledigt = row.original.status.key === 'erledigt';
+        const ueberfaellig = d < heute && !erledigt;
+        return (
+          <span className={ueberfaellig ? 'font-medium text-red-400' : 'text-zinc-300'}>
+            {formatDateDE(d)}
+          </span>
+        );
+      },
+    },
   ];
+}
+
+/** Datum „YYYY-MM-DD" → „DD.MM.YYYY" (Fälligkeit ist datumsgenau). */
+function formatDateDE(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return d && m && y ? `${d}.${m}.${y}` : iso;
 }
 
 // #86: liest den (Multi-Select-)Wert eines Spalten-Filters als Slug-Liste aus.
@@ -355,6 +386,25 @@ function columnFilterSlugs<T extends string>(
   return Array.isArray(value) && value.length > 0 ? (value as T[]) : undefined;
 }
 
+/** Datums-Filter „fällig bis": einfacher Date-Picker, Wert = ISO-Datum. */
+function DateFilter({
+  value,
+  onChange,
+}: {
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  return (
+    <input
+      type="date"
+      value={typeof value === 'string' ? value : ''}
+      onChange={(e) => onChange(e.target.value || undefined)}
+      className="w-full rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-xs text-zinc-200 focus:border-emerald-500/60 focus:outline-none"
+      title="Fällig bis (≤ Datum)"
+    />
+  );
+}
+
 const filterRenderers = {
   titel: TextFilter,
   status: (props: { value: unknown; onChange: (v: unknown) => void }) => (
@@ -367,6 +417,7 @@ const filterRenderers = {
   objekt: TextFilter,
   partner: TextFilter,
   zugewiesen_an: TextFilter,
+  faelligkeit_am: DateFilter,
 };
 
 export function TicketsListePage() {
