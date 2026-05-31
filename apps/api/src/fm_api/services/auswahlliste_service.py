@@ -156,11 +156,10 @@ async def update_liste(
     liste_id: UUID,
     updates: dict[str, Any],
 ) -> Auswahlliste:
+    # System-Listen dürfen umbenannt/beschrieben werden (Konzept Auswahllisten-
+    # Überarbeitung §5.A, Tim 2026-05-31). Geschützt bleiben nur Key und Löschen
+    # (siehe delete_liste) — der Key ist über diesen Pfad ohnehin nicht änderbar.
     liste = await get_liste_by_id(db, mandant_id, liste_id)
-    if liste.ist_system:
-        raise SystemEntryProtectedError(
-            f"auswahlliste '{liste.key}' is system-managed and cannot be modified"
-        )
     if "label" in updates and updates["label"] is not None:
         liste.label = updates["label"]
     if "beschreibung" in updates:
@@ -236,10 +235,9 @@ async def update_wert(
     wert = (await db.execute(stmt)).scalar_one_or_none()
     if wert is None:
         raise AuswahllistenWertNotFoundError(f"wert {wert_id} not found")
-    if wert.ist_system:
-        raise SystemEntryProtectedError(
-            f"wert '{wert.key}' is system-managed and cannot be modified"
-        )
+    # System-Werte dürfen gepflegt werden (Label/Farbe/Reihenfolge/Aktiv/meta) —
+    # Konzept Auswahllisten-Überarbeitung §5.A. Der technische Key ist über diesen
+    # Pfad nicht änderbar; gegen Löschen bleiben System-Werte geschützt (delete_wert).
     if "label" in updates and updates["label"] is not None:
         wert.label = updates["label"]
     if "reihenfolge" in updates and updates["reihenfolge"] is not None:

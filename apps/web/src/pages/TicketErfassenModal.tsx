@@ -17,6 +17,7 @@ import {
   tickettypApi,
   userApi,
 } from '../api/endpoints';
+import { aktiveWerte } from '../lib/aktiveWerte';
 import { farbeClassHover } from '../components/TickettypFarbe';
 import { iconFor } from '../components/TickettypIcon';
 import { vorlageFelder } from '../lib/vorlageFelder';
@@ -397,7 +398,7 @@ export function TicketErfassenModal({
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                 >
                   <option value="">— (keine) —</option>
-                  {kategorienListe?.werte.map((w) => (
+                  {aktiveWerte(kategorienListe?.werte).map((w) => (
                     <option key={w.id} value={w.key}>
                       {w.label}
                     </option>
@@ -419,7 +420,7 @@ export function TicketErfassenModal({
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                 >
                   <option value="">— (keine) —</option>
-                  {quellenListe?.werte.map((w) => (
+                  {aktiveWerte(quellenListe?.werte).map((w) => (
                     <option key={w.id} value={w.key}>
                       {w.label}
                     </option>
