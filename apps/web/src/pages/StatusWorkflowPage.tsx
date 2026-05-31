@@ -18,11 +18,15 @@ export function StatusWorkflowPage() {
   });
 
   const [matrix, setMatrix] = useState<Record<string, string[]>>({});
+  const [erfordertGrund, setErfordertGrund] = useState<Record<string, boolean>>({});
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     if (query.data) {
       setMatrix(query.data.uebergaenge);
+      setErfordertGrund(
+        Object.fromEntries(query.data.status.map((s) => [s.key, s.erfordert_grund])),
+      );
       setDirty(false);
     }
   }, [query.data]);
@@ -30,10 +34,12 @@ export function StatusWorkflowPage() {
   const status: StatusWertMini[] = query.data?.status ?? [];
 
   const save = useMutation({
-    mutationFn: () => statusWorkflowApi.update({ uebergaenge: matrix }),
+    mutationFn: () =>
+      statusWorkflowApi.update({ uebergaenge: matrix, erfordert_grund: erfordertGrund }),
     onSuccess: (data) => {
       qc.setQueryData(['status-workflow'], data);
       setMatrix(data.uebergaenge);
+      setErfordertGrund(Object.fromEntries(data.status.map((s) => [s.key, s.erfordert_grund])));
       setDirty(false);
     },
   });
@@ -45,6 +51,11 @@ export function StatusWorkflowPage() {
       else cur.add(nach);
       return { ...prev, [von]: [...cur] };
     });
+    setDirty(true);
+  }
+
+  function toggleGrund(key: string) {
+    setErfordertGrund((prev) => ({ ...prev, [key]: !prev[key] }));
     setDirty(true);
   }
 
@@ -128,7 +139,33 @@ export function StatusWorkflowPage() {
         </div>
       )}
 
-      <p className="mt-3 text-[11px] text-zinc-500">
+      {status.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-1 text-sm font-semibold text-zinc-200">„Wartet auf“-Hook</h2>
+          <p className="mb-2 text-[11px] text-zinc-500">
+            Status, die einen Sub-Grund verlangen. Beim Setzen erscheint im Ticket die
+            Wartet-auf-Erfassung (Grund, Nachunternehmer, Kontakt).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {status.map((s) => (
+              <label
+                key={s.key}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/40 px-3 py-1.5 text-sm text-zinc-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={!!erfordertGrund[s.key]}
+                  onChange={() => toggleGrund(s.key)}
+                  className="h-4 w-4 accent-emerald-500"
+                />
+                {s.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 text-[11px] text-zinc-500">
         Tipp: „Erledigt“ hat per Default keine Übergänge — ein Häkchen in der Erledigt-Zeile
         aktiviert ein gezieltes Wiedereröffnen.
       </p>

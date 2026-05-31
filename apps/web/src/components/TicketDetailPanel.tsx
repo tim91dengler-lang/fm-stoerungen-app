@@ -254,6 +254,11 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
         .map((k) => statusByKey.get(k))
         .filter((s): s is StatusWertMini => !!s)
     : [];
+  // "wartet auf"-Hook: Sub-Grund-Erfassung anzeigen, wenn der aktuelle Status
+  // ihn verlangt (konfigurierbar; Fallback auf den klassischen "wartet"-Key).
+  const statusErfordertGrund = t
+    ? (statusByKey.get(t.status.key)?.erfordert_grund ?? t.status.key === 'wartet')
+    : false;
 
   // Hat die Vorlage irgendein Ort-Feld sichtbar?
   const ortSichtbar =
@@ -370,8 +375,8 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 </div>
               )}
 
-              {/* Wartet-Sub-Bar */}
-              {t.status.key === 'wartet' && (
+              {/* Wartet-Sub-Bar — wenn der aktuelle Status den Sub-Grund-Hook hat */}
+              {statusErfordertGrund && (
                 <WartetSubBar
                   ticket={t}
                   wartetGruende={wartetGruendeListe?.werte ?? []}

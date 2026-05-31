@@ -17,8 +17,17 @@ router = APIRouter()
 async def _build_read(db: AsyncSession, mandant_id: UUID) -> StatusWorkflowRead:
     werte = await status_workflow_service.get_status_werte(db, mandant_id)
     uebergaenge = await status_workflow_service.get_uebergaenge(db, mandant_id)
+    grund_flags = await status_workflow_service.get_erfordert_grund(db, mandant_id)
     return StatusWorkflowRead(
-        status=[StatusWertMini(key=w.key, label=w.label, farbe=w.farbe) for w in werte],
+        status=[
+            StatusWertMini(
+                key=w.key,
+                label=w.label,
+                farbe=w.farbe,
+                erfordert_grund=grund_flags.get(w.key, False),
+            )
+            for w in werte
+        ],
         uebergaenge=uebergaenge,
     )
 
@@ -32,5 +41,10 @@ async def get_status_workflow(db: AuditedDbSession, current: CurrentUserDep) -> 
 async def update_status_workflow(
     payload: StatusWorkflowUpdate, db: AuditedDbSession, current: CurrentUserDep
 ) -> StatusWorkflowRead:
-    await status_workflow_service.set_uebergaenge(db, current.mandant_id, payload.uebergaenge)
+    if payload.uebergaenge is not None:
+        await status_workflow_service.set_uebergaenge(db, current.mandant_id, payload.uebergaenge)
+    if payload.erfordert_grund is not None:
+        await status_workflow_service.set_erfordert_grund(
+            db, current.mandant_id, payload.erfordert_grund
+        )
     return await _build_read(db, current.mandant_id)

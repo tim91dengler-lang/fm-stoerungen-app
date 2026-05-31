@@ -61,9 +61,14 @@ export function TicketCard({ ticket, onOpen, dragId, showStatus }: TicketCardPro
       <div className="text-sm font-medium text-zinc-100" title={ticket.titel}>
         <span className="line-clamp-2">{ticket.titel}</span>
       </div>
-      {(showStatus || ticket.tickettyp) && (
+      {(showStatus || ticket.tickettyp || ticket.wartet_grund) && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {showStatus && <StatusBadge status={ticket.status} />}
+          {ticket.wartet_grund && (
+            <span className="inline-block rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-300">
+              {ticket.wartet_grund.label}
+            </span>
+          )}
           {ticket.tickettyp && (
             <span
               className={clsx(
