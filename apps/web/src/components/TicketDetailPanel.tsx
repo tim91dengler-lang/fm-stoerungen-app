@@ -83,6 +83,25 @@ const FELD_NULL_CONFIG: {
   { feldKey: 'pin', label: 'Foto-Pin', hasValue: (t) => t.pin_x != null || t.pin_y != null, patch: { pin_x: null, pin_y: null } },
 ];
 
+/** Baut einen mailto-Entwurf mit Ticket-Zusammenfassung (Konzept §9, Stufe 1). */
+function buildBeteiligteMailto(t: TicketRead): string {
+  const ort = [t.objekt?.name, t.haus?.bezeichnung, t.stockwerk?.bezeichnung, t.einheit?.bezeichnung]
+    .filter(Boolean)
+    .join(' › ');
+  const lines = [
+    `Ticket #${t.nummer}: ${t.titel}`,
+    `Status: ${t.status.label} · Priorität: ${t.prioritaet.label}`,
+    ort ? `Ort: ${ort}` : '',
+    t.partner ? `Partner: ${t.partner.name}` : '',
+    t.faelligkeit_am ? `Fällig: ${t.faelligkeit_am}` : '',
+    '',
+    t.beschreibung || '',
+  ].filter((l) => l !== '');
+  const to = t.wartet_kontakt_email ?? '';
+  const subject = `Ticket #${t.nummer}: ${t.titel}`;
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+}
+
 export function TicketDetailPanel({ ticketId, onClose }: Props) {
   const qc = useQueryClient();
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
@@ -299,14 +318,26 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
             <span className="font-mono text-zinc-500">#{t?.nummer ?? '…'}</span>
             {t && <PrioBadge prioritaet={t.prioritaet} />}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:min-h-0 lg:min-w-0"
-            aria-label="Panel schließen"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {t && (
+              <a
+                href={buildBeteiligteMailto(t)}
+                className="flex min-h-11 items-center gap-1 rounded-md px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-emerald-300 lg:min-h-0"
+                title="E-Mail an Beteiligte (Entwurf öffnen)"
+              >
+                <Mail className="h-4 w-4" />
+                <span className="hidden sm:inline">E-Mail</span>
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 lg:min-h-0 lg:min-w-0"
+              aria-label="Panel schließen"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto">
