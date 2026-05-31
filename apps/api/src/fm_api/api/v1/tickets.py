@@ -84,6 +84,7 @@ async def create_ticket(
             einheit_id=payload.einheit_id,
             pins=[p.model_dump() for p in payload.pins],
             partner_id=payload.partner_id,
+            beteiligte=[b.model_dump() for b in payload.beteiligte],
             zugewiesen_an_id=payload.zugewiesen_an_id,
             tickettyp_id=payload.tickettyp_id,
             projekt_id=payload.projekt_id,
