@@ -19,13 +19,14 @@ import { iconFor } from '../components/TickettypIcon';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { GrundrissPin } from '../components/GrundrissPin';
 import { EntitySearchSelect } from '../components/EntitySearchSelect';
+import { BeteiligteCreateEditor } from '../components/BeteiligteCreateEditor';
+import type { TicketBeteiligterWrite } from '../api/types';
 import {
   loadProjektLabel,
   makeAnlageSearch,
   makeFehlercodeSearch,
   makeProjektSearch,
   searchObjekte,
-  searchPartner,
 } from '../lib/entitySearch';
 
 // Schema lax — Pflichtfelder werden pro Vorlage validiert (siehe submit())
@@ -85,8 +86,10 @@ export function TicketErfassenModal({
 
   const kategorienListe = auswahllisten?.find((l) => l.key === 'ticket_kategorie');
   const quellenListe = auswahllisten?.find((l) => l.key === 'eingangskanal');
+  const beteiligtenRolleListe = auswahllisten?.find((l) => l.key === 'beteiligten_rolle');
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [beteiligte, setBeteiligte] = useState<TicketBeteiligterWrite[]>([]);
 
   const {
     register,
@@ -126,7 +129,6 @@ export function TicketErfassenModal({
   const selectedStockwerkId = watch('stockwerk_id');
   const selectedFehlercodeId = watch('fehlercode_id');
   const selectedAnlageId = watch('anlage_id');
-  const selectedPartnerId = watch('partner_id');
   const selectedProjektId = watch('projekt_id');
   const pins = watch('pins');
 
@@ -196,12 +198,12 @@ export function TicketErfassenModal({
         haus_id: data.haus_id || null,
         stockwerk_id: data.stockwerk_id || null,
         einheit_id: data.einheit_id || null,
-        partner_id: data.partner_id || null,
-        // Gewählter Partner wird als Beteiligter (Rolle Melder, Hauptkontakt)
-        // angelegt — konsistent mit der Beteiligten-Liste im Detail.
-        beteiligte: data.partner_id
-          ? [{ partner_id: data.partner_id, rolle: 'melder', ist_hauptkontakt: true }]
-          : [],
+        // Legacy-Einzelfeld aus Hauptkontakt (sonst erstem Beteiligten) ableiten.
+        partner_id:
+          beteiligte.find((b) => b.ist_hauptkontakt)?.partner_id ??
+          beteiligte[0]?.partner_id ??
+          null,
+        beteiligte,
         projekt_id: data.projekt_id || null,
         anlage_id: data.anlage_id || null,
         fehlercode_id: data.fehlercode_id || null,
@@ -223,7 +225,7 @@ export function TicketErfassenModal({
       ['haus', 'Haus', data.haus_id],
       ['stockwerk', 'Stockwerk', data.stockwerk_id],
       ['einheit', 'Einheit', data.einheit_id],
-      ['partner', 'Partner', data.partner_id],
+      ['partner', 'Partner / Beteiligte', beteiligte.length > 0 ? 'ok' : null],
       ['kategorie', 'Kategorie', data.kategorie],
       ['anlage', 'Anlage', data.anlage_id],
       ['fehlercode', 'Fehlercode', data.fehlercode_id],
@@ -570,24 +572,22 @@ export function TicketErfassenModal({
                 </div>
               </div>
             )}
-            {feldSichtbar('partner') && (
-              <div>
-                <label htmlFor="partner_id" className="block text-sm font-medium text-zinc-300">
-                  Partner {feldPflicht('partner') && <span className="text-red-400">*</span>}
-                </label>
-                <div className="mt-1">
-                  <EntitySearchSelect
-                    id="partner_id"
-                    value={selectedPartnerId ?? null}
-                    onChange={(id) => setValue('partner_id', id, { shouldDirty: true })}
-                    fetcher={searchPartner}
-                    queryKey="partner"
-                    placeholder="Geschäftspartner suchen …"
-                  />
-                </div>
-              </div>
-            )}
           </div>
+
+          {feldSichtbar('partner') && (
+            <div>
+              <div className="mb-1 text-sm font-medium text-zinc-300">
+                Beteiligte {feldPflicht('partner') && <span className="text-red-400">*</span>}
+              </div>
+              <BeteiligteCreateEditor
+                rolleOptions={aktiveWerte(beteiligtenRolleListe?.werte).map((w) => ({
+                  key: w.key,
+                  label: w.label,
+                }))}
+                onChange={setBeteiligte}
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             {feldSichtbar('projekt') && (
