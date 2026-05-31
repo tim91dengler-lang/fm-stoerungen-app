@@ -10,6 +10,11 @@ DokumentTargetLiteral = Literal["ticket", "projekt", "objekt", "partner"]
 
 
 class DokumentLinkRef(BaseModel):
+    # from_attributes nötig, damit DokumentRead.model_validate(orm) die
+    # ORM-DokumentLink-Objekte in der links-Liste serialisieren kann
+    # (Pydantic v2 vererbt from_attributes NICHT an verschachtelte Modelle).
+    model_config = ConfigDict(from_attributes=True)
+
     target_type: DokumentTargetLiteral
     target_id: UUID
 
