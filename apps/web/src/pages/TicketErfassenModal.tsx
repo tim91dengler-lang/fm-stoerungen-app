@@ -17,9 +17,9 @@ import {
   tickettypApi,
   userApi,
 } from '../api/endpoints';
-import type { TickettypFeldRead, TickettypRead } from '../api/types';
 import { farbeClassHover } from '../components/TickettypFarbe';
 import { iconFor } from '../components/TickettypIcon';
+import { vorlageFelder } from '../lib/vorlageFelder';
 
 // Schema lax — Pflichtfelder werden pro Vorlage validiert (siehe submit())
 const schema = z.object({
@@ -50,16 +50,6 @@ interface Props {
   onCreated: () => void;
   /** Pre-fill the projekt-Select when the modal is opened from a Projekt-Detail context. */
   defaultProjektId?: string | null;
-}
-
-/** Liefert die Sichtbar/Pflicht-Map aus den Vorlage-Feldern, indexiert nach feld_key. */
-function buildFelderMap(typ: TickettypRead | null): Map<string, TickettypFeldRead> {
-  const m = new Map<string, TickettypFeldRead>();
-  if (!typ) return m;
-  for (const f of typ.felder) {
-    m.set(f.feld_key, f);
-  }
-  return m;
 }
 
 export function TicketErfassenModal({
@@ -155,17 +145,9 @@ export function TicketErfassenModal({
     () => tickettypen.find((t) => t.id === selectedTypId) ?? null,
     [tickettypen, selectedTypId],
   );
-  const felderMap = useMemo(() => buildFelderMap(selectedTyp), [selectedTyp]);
-
-  function feldSichtbar(key: string): boolean {
-    if (!selectedTyp) return true;
-    const f = felderMap.get(key);
-    return f ? f.sichtbar : true;
-  }
-  function feldPflicht(key: string): boolean {
-    const f = felderMap.get(key);
-    return f ? f.pflicht && f.sichtbar : false;
-  }
+  const felder = useMemo(() => vorlageFelder(selectedTyp), [selectedTyp]);
+  const feldSichtbar = felder.sichtbar;
+  const feldPflicht = felder.pflicht;
 
   useEffect(() => {
     if (!selectedTypId && tickettypen.length > 0) {
