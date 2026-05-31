@@ -1,10 +1,11 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -103,8 +104,13 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
         index=True,
     )
+    # Legacy-Einzel-Pin (vor Migration 0020). Bleibt als Altlast; neue Quelle der
+    # Wahrheit ist ``pins`` (mehrere Grundriss-Markierungen je Ticket).
     pin_x: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     pin_y: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    pins: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     partner_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("geschaeftspartner.id", ondelete="SET NULL"),
