@@ -17,4 +17,5 @@ class TicketMessageRead(TimestampedRead):
     ticket_id: UUID
     text: str
     mentions: list[str]
+    gelesen_von: list[str] = Field(default_factory=list)
     autor: UserRef | None = None

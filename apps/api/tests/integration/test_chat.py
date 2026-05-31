@@ -84,3 +84,25 @@ async def test_chat_requires_auth(client) -> None:
     fake_tid = "00000000-0000-0000-0000-000000000000"
     res = await client.get(f"/api/v1/tickets/{fake_tid}/messages")
     assert res.status_code == 401
+
+
+@pytest.mark.integration
+async def test_mark_read_records_reader(client, admin_user, techniker_user) -> None:
+    admin_headers = auth_header(await _login(client, admin_user))
+    tid = await _create_ticket(client, admin_headers)
+
+    msg = await client.post(
+        f"/api/v1/tickets/{tid}/messages",
+        headers=admin_headers,
+        json={"text": "Bitte lesen"},
+    )
+    assert msg.status_code == 201
+    assert msg.json()["gelesen_von"] == []
+
+    tech_user, _ = techniker_user
+    tech_headers = auth_header(await _login(client, techniker_user))
+    read = await client.post(f"/api/v1/tickets/{tid}/messages/mark-read", headers=tech_headers)
+    assert read.status_code == 204, read.text
+
+    listed = await client.get(f"/api/v1/tickets/{tid}/messages", headers=admin_headers)
+    assert listed.json()[0]["gelesen_von"] == [str(tech_user.id)]

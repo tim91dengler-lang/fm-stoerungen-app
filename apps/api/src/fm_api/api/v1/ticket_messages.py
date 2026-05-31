@@ -56,6 +56,23 @@ async def create_message(
     return TicketMessageRead.model_validate(message)
 
 
+@router.post(
+    "/mark-read",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Alle Nachrichten des Tickets als gelesen markieren",
+)
+async def mark_messages_read(
+    ticket_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> None:
+    try:
+        await chat_service.mark_read(db, ticket_id, current.mandant_id, current.user_id)
+    except TicketNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return None
+
+
 @router.delete(
     "/{message_id}",
     status_code=status.HTTP_204_NO_CONTENT,

@@ -131,3 +131,25 @@ async def soft_delete_message(
         raise PermissionError("only the author can delete this message")
     message.deleted_at = datetime.now(UTC)
     await db.flush()
+
+
+async def mark_read(
+    db: AsyncSession,
+    ticket_id: UUID,
+    mandant_id: UUID,
+    user_id: UUID,
+) -> None:
+    """Markiert alle fremden Nachrichten des Tickets als von ``user_id`` gelesen
+    (Read-Receipts, Konzept §5.6). Eigene Nachrichten werden übersprungen."""
+    await _assert_ticket(db, ticket_id, mandant_id)
+    stmt = select(TicketMessage).where(
+        TicketMessage.ticket_id == ticket_id,
+        TicketMessage.deleted_at.is_(None),
+    )
+    uid = str(user_id)
+    for message in (await db.execute(stmt)).scalars().all():
+        if message.autor_user_id == user_id or uid in message.gelesen_von:
+            continue
+        # Neue Liste zuweisen, damit SQLAlchemy die JSONB-Änderung erkennt.
+        message.gelesen_von = [*message.gelesen_von, uid]
+    await db.flush()

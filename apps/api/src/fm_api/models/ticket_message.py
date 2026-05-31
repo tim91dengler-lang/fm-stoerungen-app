@@ -36,6 +36,13 @@ class TicketMessage(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         default=list,
         server_default="[]",
     )
+    # User-IDs, die diese Nachricht gelesen haben (Read-Receipts, Konzept §5.6).
+    gelesen_von: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default="[]",
+    )
 
     ticket: Mapped["Ticket"] = relationship(lazy="raise")
     autor: Mapped["User | None"] = relationship(lazy="raise")
