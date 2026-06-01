@@ -65,6 +65,8 @@ export interface TicketFormEngineProps {
   leftHeaderSlot?: React.ReactNode; // Status/Workflow/Wartet — oben links
   leftFooterSlot?: React.ReactNode; // Verlauf/Löschen — unten links
   chatSlot?: React.ReactNode; // Chat — oben rechts (Desktop)
+  /** Einspaltig (Erfassen-Modal): alle Blöcke gestapelt, ohne Links/Rechts-Split. */
+  singleColumn?: boolean;
 }
 
 export function TicketFormEngine({
@@ -73,7 +75,20 @@ export function TicketFormEngine({
   leftHeaderSlot,
   leftFooterSlot,
   chatSlot,
+  singleColumn = false,
 }: TicketFormEngineProps) {
+  if (singleColumn) {
+    return (
+      <div className="space-y-3">
+        {leftHeaderSlot}
+        {layout.alle.map((block) => (
+          <BlockSection key={block.block_key} block={block} renderFeld={renderFeld} />
+        ))}
+        {chatSlot}
+        {leftFooterSlot}
+      </div>
+    );
+  }
   return (
     <>
       <div className="contents lg:flex lg:w-3/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:px-5 lg:py-4">
