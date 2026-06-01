@@ -289,10 +289,11 @@ class TicketRead(TimestampedRead):
             ),
             objekt=ObjektRef(id=t.objekt.id, name=t.objekt.name) if t.objekt else None,
             adresse_id=t.adresse_id,
-            # Effektive Adresse: eigene Ticket-Adresse, sonst Objekt-Adresse (Default).
+            # Effektive Adresse: eigene Ticket-Adresse (transient via Service
+            # geladen), sonst Objekt-Adresse (Default).
             adresse=(
-                AdresseRead.model_validate(t.adresse)
-                if t.adresse is not None
+                AdresseRead.model_validate(eigene_adresse)
+                if (eigene_adresse := getattr(t, "_eigene_adresse", None)) is not None
                 else AdresseRead.model_validate(t.objekt.adresse)
                 if t.objekt is not None and t.objekt.adresse is not None
                 else None

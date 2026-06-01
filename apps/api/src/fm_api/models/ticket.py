@@ -13,7 +13,6 @@ from fm_api.db.base import Base
 from fm_api.models.mixins import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 if TYPE_CHECKING:
-    from fm_api.models.adresse import Adresse
     from fm_api.models.anlage import Anlage
     from fm_api.models.auswahlliste import AuswahllistenWert
     from fm_api.models.fehlercode import Fehlercode
@@ -201,7 +200,9 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         foreign_keys=[kategorie_id], lazy="raise"
     )
     objekt: Mapped["Objekt | None"] = relationship(lazy="raise")
-    adresse: Mapped["Adresse | None"] = relationship(foreign_keys=[adresse_id], lazy="raise")
+    # Keine ``adresse``-Relationship (vermeidet Modul-Import-Zyklus
+    # ticket → adresse → mandant → ticket). Die eigene Ticket-Adresse lädt der
+    # Service separat und hängt sie transient an.
     haus: Mapped["Haus | None"] = relationship(lazy="raise")
     stockwerk: Mapped["ObjektStockwerk | None"] = relationship(lazy="raise")
     einheit: Mapped["StockwerkEinheit | None"] = relationship(lazy="raise")

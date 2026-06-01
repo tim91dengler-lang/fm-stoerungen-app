@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from fm_api.models import (
+    Adresse,
     Auswahlliste,
     AuswahllistenWert,
     GeschaeftsPartner,
@@ -61,7 +62,6 @@ _TICKET_LOAD_OPTIONS = (
     selectinload(Ticket.prioritaet_wert),
     selectinload(Ticket.kategorie_wert),
     selectinload(Ticket.objekt).selectinload(Objekt.adresse),
-    selectinload(Ticket.adresse),
     selectinload(Ticket.haus),
     selectinload(Ticket.stockwerk),
     selectinload(Ticket.einheit),
@@ -110,6 +110,23 @@ async def _attach_beteiligte(db: AsyncSession, tickets: list[Ticket]) -> None:
     for t in tickets:
         # setattr: transientes Attribut, vom ORM-Mapper nicht erfasst.
         setattr(t, "beteiligte", by_ticket.get(t.id, []))  # noqa: B010
+
+
+async def _attach_eigene_adresse(db: AsyncSession, tickets: list[Ticket]) -> None:
+    """Lädt die ticket-eigene Adresse (adresse_id) separat und hängt sie transient
+    an ``ticket._eigene_adresse``. Bewusst ohne Mapped-Relationship am Ticket
+    (Import-Zyklus-Vermeidung); die effektive Adresse löst das Schema auf
+    (eigene Adresse, sonst Objekt-Adresse)."""
+    ids = [t.adresse_id for t in tickets if t.adresse_id is not None]
+    by_id: dict[UUID, Adresse] = {}
+    if ids:
+        rows = (await db.execute(select(Adresse).where(Adresse.id.in_(ids)))).scalars().all()
+        by_id = {a.id: a for a in rows}
+    for t in tickets:
+        # setattr: transientes Attribut, vom ORM-Mapper nicht erfasst.
+        setattr(  # noqa: B010
+            t, "_eigene_adresse", by_id.get(t.adresse_id) if t.adresse_id else None
+        )
 
 
 async def _validate_assignee(db: AsyncSession, user_id: UUID, mandant_id: UUID) -> None:
@@ -311,6 +328,7 @@ async def list_tickets(
     )
     items = list((await db.execute(items_stmt)).scalars().unique().all())
     await _attach_beteiligte(db, items)
+    await _attach_eigene_adresse(db, items)
     return items, total
 
 
@@ -328,6 +346,7 @@ async def get_ticket(db: AsyncSession, ticket_id: UUID, mandant_id: UUID) -> Tic
     if ticket is None:
         raise TicketNotFoundError(f"ticket {ticket_id} not found")
     await _attach_beteiligte(db, [ticket])
+    await _attach_eigene_adresse(db, [ticket])
     return ticket
 
 
