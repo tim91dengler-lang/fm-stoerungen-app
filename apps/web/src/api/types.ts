@@ -762,6 +762,43 @@ export interface TickettypFeldRead {
   pflicht: boolean;
   nur_admin_sichtbar: boolean;
   reihenfolge: number;
+  /** Stufe C: Zuordnung zu einem Block (null ⇒ Auffang-Block "weitere"). */
+  block_id: UUID | null;
+}
+
+export type BlockRegion = 'links' | 'rechts';
+
+export interface TickettypBlockRead {
+  id: UUID;
+  block_key: string;
+  label: string;
+  region: BlockRegion;
+  reihenfolge: number;
+  ist_system_block: boolean;
+  collapsible_default_open: boolean;
+}
+
+// ---- Layout-Write (Designer-Save, Stufe C) ----
+export interface BlockLayoutWrite {
+  block_key: string;
+  label: string;
+  region: BlockRegion;
+  reihenfolge: number;
+  collapsible_default_open?: boolean;
+}
+
+export interface FeldLayoutWrite {
+  feld_key: string;
+  block_key: string;
+  reihenfolge: number;
+  sichtbar: boolean;
+  pflicht: boolean;
+  label?: string | null;
+}
+
+export interface LayoutWrite {
+  bloecke: BlockLayoutWrite[];
+  felder: FeldLayoutWrite[];
 }
 
 export interface TickettypFeldUpdate {
@@ -787,7 +824,11 @@ export interface TickettypRead {
   ist_system: boolean;
   /** Track 2 (Migration 0016 / `0016_tickettyp_aktiv`): deaktivierbare Vorlagen. */
   aktiv: boolean;
+  /** Stufe C: genau eine Alles-Vorlage pro Mandant (enthält automatisch alle Felder). */
+  ist_alles_vorlage: boolean;
   felder: TickettypFeldRead[];
+  /** Stufe C: frei konfigurierbare Block-Gruppierungen je Vorlage. */
+  bloecke: TickettypBlockRead[];
   created_at: string;
   updated_at: string;
 }
