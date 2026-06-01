@@ -16,12 +16,6 @@ COPY . .
 ARG VITE_API_BASE=/api/v1
 ENV VITE_API_BASE=$VITE_API_BASE
 
-# Stufe-C-Flag: Default leer (= AUS, Code-Default). Der Staging-Deploy reicht
-# `VITE_VORLAGE_LAYOUT_V2=1` als Build-Arg rein, damit Stufe C dort ohne
-# Flag-Umschaltung live ist. Vite inlined VITE_*-Vars zur Build-Zeit.
-ARG VITE_VORLAGE_LAYOUT_V2=
-ENV VITE_VORLAGE_LAYOUT_V2=$VITE_VORLAGE_LAYOUT_V2
-
 RUN npm run build
 
 # ---------- runtime ----------

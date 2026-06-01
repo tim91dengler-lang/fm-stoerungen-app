@@ -18,7 +18,6 @@ import {
   VorlagePreviewFelder,
 } from '../components/VorlagePreviewFelder';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
-import { isVorlageLayoutV2 } from '../lib/featureFlags';
 import { VorlageLayoutBuilder } from '../components/VorlageLayoutBuilder';
 
 interface DesignerForm {
@@ -599,7 +598,7 @@ export function VorlageDesignerPage() {
         </section>
 
         {/* Pool + Vorschau */}
-        {isVorlageLayoutV2() && !isNew && vorlage ? (
+        {!isNew && vorlage ? (
           <section className="mt-4">
             <VorlageLayoutBuilder
               tickettyp={vorlage}

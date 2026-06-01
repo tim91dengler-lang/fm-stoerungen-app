@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Activity, AlertOctagon } from 'lucide-react';
 import clsx from 'clsx';
 import {
   auswahllistenApi,
@@ -18,26 +17,14 @@ import { aktiveWerte } from '../lib/aktiveWerte';
 import { farbeClassHover } from '../components/TickettypFarbe';
 import { iconFor } from '../components/TickettypIcon';
 import { vorlageFelder } from '../lib/vorlageFelder';
-import { GrundrissPin } from '../components/GrundrissPin';
-import { TicketAdresseField } from '../components/TicketAdresseField';
 import type { AdresseRead } from '../api/types';
-import { EntitySearchSelect } from '../components/EntitySearchSelect';
-import { BeteiligteCreateEditor } from '../components/BeteiligteCreateEditor';
 import type { TicketBeteiligterWrite } from '../api/types';
-import { isVorlageLayoutV2 } from '../lib/featureFlags';
 import { buildVorlageLayout } from '../lib/vorlageLayout';
 import { TicketFormEngine } from '../components/ticket/TicketFormEngine';
 import {
   renderCreateFeld,
   type CreateFieldCtx,
 } from '../components/ticket/createFieldRenderers';
-import {
-  loadProjektLabel,
-  makeAnlageSearch,
-  makeFehlercodeSearch,
-  makeProjektSearch,
-  searchObjekte,
-} from '../lib/entitySearch';
 
 // Schema lax — Pflichtfelder werden pro Vorlage validiert (siehe submit())
 const schema = z.object({
@@ -105,7 +92,6 @@ export function TicketErfassenModal({
   const [selectedAdresse, setSelectedAdresse] = useState<AdresseRead | null>(null);
 
   const {
-    register,
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
@@ -140,16 +126,12 @@ export function TicketErfassenModal({
   const selectedHausId = watch('haus_id');
   const selectedStockwerkId = watch('stockwerk_id');
   const selectedFehlercodeId = watch('fehlercode_id');
-  const selectedAnlageId = watch('anlage_id');
-  const selectedProjektId = watch('projekt_id');
-  const pins = watch('pins');
 
   const selectedTyp = useMemo(
     () => tickettypen.find((t) => t.id === selectedTypId) ?? null,
     [tickettypen, selectedTypId],
   );
   const felder = useMemo(() => vorlageFelder(selectedTyp), [selectedTyp]);
-  const feldSichtbar = felder.sichtbar;
   const feldPflicht = felder.pflicht;
 
   useEffect(() => {
@@ -360,452 +342,12 @@ export function TicketErfassenModal({
             </div>
           </div>
 
-          {isVorlageLayoutV2() ? (
-            // Zweispaltig wie im Detail: linke Region + rechte Region (z. B.
-            // Belege) nebeneinander. Auf kleinen Screens stapelt die Engine via
-            // `contents`/`lg:flex` automatisch. Ohne rechts-Blöcke nimmt links
-            // die volle Breite (Engine-Collapse).
             <div className="lg:flex lg:gap-0">
               <TicketFormEngine
                 layout={layout}
                 renderFeld={(feld) => renderCreateFeld(feld.feld_key, createCtx)}
               />
             </div>
-          ) : (
-            <>
-              {feldSichtbar('fehlercode') && (
-                <div>
-                  <label
-                    htmlFor="fehlercode_id"
-                    className="block text-sm font-medium text-zinc-300"
-                  >
-                    <AlertOctagon className="-mt-0.5 mr-1 inline h-3.5 w-3.5 text-amber-400" />
-                    Fehlercode{' '}
-                    {feldPflicht('fehlercode') && <span className="text-red-400">*</span>}
-                  </label>
-                  <div className="mt-1">
-                    <EntitySearchSelect
-                      id="fehlercode_id"
-                      value={selectedFehlercodeId ?? null}
-                      onChange={(id) =>
-                        setValue('fehlercode_id', id, { shouldDirty: true })
-                      }
-                      fetcher={makeFehlercodeSearch(selectedAnlageId)}
-                      queryKey={`fehlercode-${selectedAnlageId ?? 'all'}`}
-                      placeholder="Fehlercode suchen …"
-                    />
-                  </div>
-                  <p className="mt-1 text-[10px] text-zinc-500">
-                    Bei Auswahl wird die Beschreibung übernommen.
-                  </p>
-                </div>
-              )}
-
-              {feldSichtbar('titel') && (
-                <div>
-                  <label
-                    htmlFor="titel"
-                    className="block text-sm font-medium text-zinc-300"
-                  >
-                    Titel{' '}
-                    {feldPflicht('titel') && <span className="text-red-400">*</span>}
-                  </label>
-                  <input
-                    id="titel"
-                    {...register('titel')}
-                    autoFocus
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                    placeholder={
-                      selectedTyp?.key === 'wartung'
-                        ? 'z. B. Wartung Heizungsanlage Q2'
-                        : 'Kurze Beschreibung des Problems'
-                    }
-                  />
-                  {errors.titel && (
-                    <p className="mt-1 text-xs text-red-400">{errors.titel.message}</p>
-                  )}
-                </div>
-              )}
-
-              {feldSichtbar('beschreibung') && (
-                <div>
-                  <label
-                    htmlFor="beschreibung"
-                    className="block text-sm font-medium text-zinc-300"
-                  >
-                    Beschreibung{' '}
-                    {feldPflicht('beschreibung') && (
-                      <span className="text-red-400">*</span>
-                    )}
-                  </label>
-                  <textarea
-                    id="beschreibung"
-                    rows={3}
-                    {...register('beschreibung')}
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                {feldSichtbar('prio') && (
-                  <div>
-                    <label
-                      htmlFor="prioritaet"
-                      className="block text-sm font-medium text-zinc-300"
-                    >
-                      Priorität
-                    </label>
-                    <select
-                      id="prioritaet"
-                      {...register('prioritaet')}
-                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                    >
-                      <option value="niedrig">Niedrig</option>
-                      <option value="mittel">Mittel</option>
-                      <option value="hoch">Hoch</option>
-                      <option value="kritisch">Kritisch</option>
-                    </select>
-                  </div>
-                )}
-                {feldSichtbar('kategorie') && (
-                  <div>
-                    <label
-                      htmlFor="kategorie"
-                      className="block text-sm font-medium text-zinc-300"
-                    >
-                      Kategorie{' '}
-                      {feldPflicht('kategorie') && (
-                        <span className="text-red-400">*</span>
-                      )}
-                    </label>
-                    <select
-                      id="kategorie"
-                      {...register('kategorie', {
-                        setValueAs: (v) => (v === '' ? null : v),
-                      })}
-                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                    >
-                      <option value="">— (keine) —</option>
-                      {aktiveWerte(kategorienListe?.werte).map((w) => (
-                        <option key={w.id} value={w.key}>
-                          {w.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {feldSichtbar('quelle') && (
-                  <div>
-                    <label
-                      htmlFor="quelle"
-                      className="block text-sm font-medium text-zinc-300"
-                    >
-                      Quelle
-                    </label>
-                    <select
-                      id="quelle"
-                      {...register('quelle', {
-                        setValueAs: (v) => (v === '' ? null : v),
-                      })}
-                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                    >
-                      <option value="">— (keine) —</option>
-                      {aktiveWerte(quellenListe?.werte).map((w) => (
-                        <option key={w.id} value={w.key}>
-                          {w.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Ort: Objekt -> Haus -> Stockwerk -> Einheit */}
-              {(feldSichtbar('objekt') ||
-                feldSichtbar('haus') ||
-                feldSichtbar('stockwerk') ||
-                feldSichtbar('einheit')) && (
-                <div className="rounded-md border border-zinc-800 bg-zinc-950/40 p-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Ort
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {feldSichtbar('objekt') && (
-                      <div>
-                        <label
-                          htmlFor="objekt_id"
-                          className="block text-xs text-zinc-400"
-                        >
-                          Objekt{' '}
-                          {feldPflicht('objekt') && (
-                            <span className="text-red-400">*</span>
-                          )}
-                        </label>
-                        <div className="mt-1">
-                          <EntitySearchSelect
-                            id="objekt_id"
-                            value={selectedObjektId ?? null}
-                            onChange={(id) => {
-                              setValue('objekt_id', id, { shouldDirty: true });
-                              setValue('haus_id', null);
-                              setValue('stockwerk_id', null);
-                              setValue('einheit_id', null);
-                            }}
-                            fetcher={searchObjekte}
-                            queryKey="objekt"
-                            placeholder="Objekt suchen …"
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {feldSichtbar('haus') && (
-                      <div>
-                        <label htmlFor="haus_id" className="block text-xs text-zinc-400">
-                          Haus
-                        </label>
-                        <select
-                          id="haus_id"
-                          disabled={!selectedObjektId}
-                          {...register('haus_id', {
-                            setValueAs: (v) => (v === '' ? null : v),
-                            onChange: () => {
-                              setValue('stockwerk_id', null);
-                              setValue('einheit_id', null);
-                            },
-                          })}
-                          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
-                        >
-                          <option value="">— (keins) —</option>
-                          {hausTree?.map((h) => (
-                            <option key={h.id} value={h.id}>
-                              {h.bezeichnung}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {feldSichtbar('stockwerk') && (
-                      <div>
-                        <label
-                          htmlFor="stockwerk_id"
-                          className="block text-xs text-zinc-400"
-                        >
-                          Stockwerk
-                        </label>
-                        <select
-                          id="stockwerk_id"
-                          disabled={!selectedHausId}
-                          {...register('stockwerk_id', {
-                            setValueAs: (v) => (v === '' ? null : v),
-                            onChange: () => setValue('einheit_id', null),
-                          })}
-                          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
-                        >
-                          <option value="">— (keins) —</option>
-                          {haus?.stockwerke.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.bezeichnung}
-                              {s.ausrichtung ? ` · ${s.ausrichtung}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {feldSichtbar('einheit') && (
-                      <div>
-                        <label
-                          htmlFor="einheit_id"
-                          className="block text-xs text-zinc-400"
-                        >
-                          Einheit
-                        </label>
-                        <select
-                          id="einheit_id"
-                          disabled={!selectedStockwerkId}
-                          {...register('einheit_id', {
-                            setValueAs: (v) => (v === '' ? null : v),
-                          })}
-                          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
-                        >
-                          <option value="">— (keine) —</option>
-                          {stockwerk?.einheiten.map((e) => (
-                            <option key={e.id} value={e.id}>
-                              {e.bezeichnung}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                  {feldSichtbar('pin') &&
-                    selectedStockwerkId &&
-                    stockwerk?.has_grundriss && (
-                      <div className="mt-3">
-                        <div className="mb-1 text-xs text-zinc-400">
-                          Lage im Grundriss (optional, mehrere möglich)
-                        </div>
-                        <GrundrissPin
-                          stockwerkId={selectedStockwerkId}
-                          pins={pins ?? []}
-                          onChange={(p) => setValue('pins', p)}
-                        />
-                      </div>
-                    )}
-                </div>
-              )}
-
-              {feldSichtbar('adresse') && (
-                <TicketAdresseField
-                  adresse={adresseId ? selectedAdresse : (objektDetail?.adresse ?? null)}
-                  isEigen={!!adresseId}
-                  onSet={(id, a) => {
-                    setAdresseId(id);
-                    setSelectedAdresse(a);
-                  }}
-                />
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                {feldSichtbar('anlage') && (
-                  <div>
-                    <label
-                      htmlFor="anlage_id"
-                      className="block text-sm font-medium text-zinc-300"
-                    >
-                      <Activity className="-mt-0.5 mr-1 inline h-3.5 w-3.5 text-emerald-400" />
-                      Anlage{' '}
-                      {feldPflicht('anlage') && <span className="text-red-400">*</span>}
-                    </label>
-                    <div className="mt-1">
-                      <EntitySearchSelect
-                        id="anlage_id"
-                        value={selectedAnlageId ?? null}
-                        onChange={(id) =>
-                          setValue('anlage_id', id, { shouldDirty: true })
-                        }
-                        fetcher={makeAnlageSearch(selectedObjektId)}
-                        queryKey={`anlage-${selectedObjektId ?? 'all'}`}
-                        placeholder="Anlage suchen …"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {feldSichtbar('partner') && (
-                <div>
-                  <div className="mb-1 text-sm font-medium text-zinc-300">
-                    Beteiligte{' '}
-                    {feldPflicht('partner') && <span className="text-red-400">*</span>}
-                  </div>
-                  <BeteiligteCreateEditor
-                    rolleOptions={aktiveWerte(beteiligtenRolleListe?.werte).map((w) => ({
-                      key: w.key,
-                      label: w.label,
-                    }))}
-                    onChange={setBeteiligte}
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                {feldSichtbar('projekt') && (
-                  <div>
-                    <label
-                      htmlFor="projekt_id"
-                      className="block text-sm font-medium text-zinc-300"
-                    >
-                      Projekt
-                    </label>
-                    <div className="mt-1">
-                      <EntitySearchSelect
-                        id="projekt_id"
-                        value={selectedProjektId ?? null}
-                        onChange={(id) =>
-                          setValue('projekt_id', id, { shouldDirty: true })
-                        }
-                        fetcher={makeProjektSearch(['geplant', 'aktiv'])}
-                        loadLabel={loadProjektLabel}
-                        queryKey="projekt"
-                        placeholder="Projekt suchen …"
-                      />
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <label
-                    htmlFor="zugewiesen_an_id"
-                    className="block text-sm font-medium text-zinc-300"
-                  >
-                    Zugewiesen an
-                  </label>
-                  <select
-                    id="zugewiesen_an_id"
-                    {...register('zugewiesen_an_id', {
-                      setValueAs: (v) => (v === '' ? null : v),
-                    })}
-                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                  >
-                    <option value="">— (offen) —</option>
-                    {users?.items.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {feldSichtbar('faelligkeit_am') && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label
-                      htmlFor="faelligkeit_am"
-                      className="block text-sm font-medium text-zinc-300"
-                    >
-                      Fälligkeit{' '}
-                      {feldPflicht('faelligkeit_am') && (
-                        <span className="text-red-400">*</span>
-                      )}
-                    </label>
-                    <input
-                      id="faelligkeit_am"
-                      type="date"
-                      {...register('faelligkeit_am')}
-                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                    />
-                  </div>
-                  {feldSichtbar('wiederholung') && (
-                    <div>
-                      <label
-                        htmlFor="wiederholung"
-                        className="block text-sm font-medium text-zinc-300"
-                      >
-                        Wiederholung
-                      </label>
-                      <select
-                        id="wiederholung"
-                        {...register('wiederholung', {
-                          setValueAs: (v) => (v === '' ? null : v),
-                        })}
-                        className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                      >
-                        <option value="">— (keine) —</option>
-                        <option value="weekly">Wöchentlich</option>
-                        <option value="monthly">Monatlich</option>
-                        <option value="quarterly">Quartalsweise</option>
-                        <option value="yearly">Jährlich</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
 
           {(errors.root || submitError) && (
             <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
