@@ -2,20 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Activity,
-  AlertOctagon,
   AlertTriangle,
   Calendar,
   ChevronRight,
   Clock,
   FolderKanban,
   Mail,
-  MapPin,
   Pencil,
   Phone,
   Trash2,
   User,
-  Users2,
   Wrench,
   X,
 } from 'lucide-react';
@@ -27,33 +23,19 @@ import {
   tickettypApi,
   userApi,
 } from '../api/endpoints';
-import { EntitySearchSelect } from './EntitySearchSelect';
-import { BeteiligteBlock } from './BeteiligteBlock';
-import { TicketAdresseField } from './TicketAdresseField';
 import { formatAdresse, mapsUrl } from '../lib/adresse';
-import {
-  makeAnlageSearch,
-  makeFehlercodeSearch,
-  makeProjektSearch,
-  searchObjekte,
-} from '../lib/entitySearch';
 import type {
   StatusWertMini,
   TicketBeteiligterRead,
-  TicketPrioritaetSlug,
   TicketRead,
   TicketStatusSlug,
   TicketUpdate,
 } from '../api/types';
 import { ChatPanel } from './ChatPanel';
-import { PhotoGallery } from './PhotoGallery';
-import { TicketDokumente } from './TicketDokumente';
-import { GrundrissPin } from './GrundrissPin';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { aktiveWerte } from '../lib/aktiveWerte';
-import { PRIO_SLUGS, formatRelativeDateTime, labelForPrioSlug } from '../lib/format';
+import { formatRelativeDateTime } from '../lib/format';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
-import { isVorlageLayoutV2 } from '../lib/featureFlags';
 import { buildVorlageLayout } from '../lib/vorlageLayout';
 import { TicketFormEngine } from './ticket/TicketFormEngine';
 import { renderDetailFeld } from './ticket/detailFieldRenderers';
@@ -278,15 +260,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
   );
 
   const hausTree = hausTreeQuery.data;
-  const selectedHaus = useMemo(
-    () => hausTree?.find((h) => h.id === t0?.haus?.id) ?? null,
-    [hausTree, t0?.haus?.id],
-  );
-  const selectedStockwerk = useMemo(
-    () => selectedHaus?.stockwerke?.find((s) => s.id === t0?.stockwerk?.id) ?? null,
-    [selectedHaus, t0?.stockwerk?.id],
-  );
-
   const update = useMutation({
     mutationFn: (payload: TicketUpdate) => ticketApi.update(ticketId!, payload),
     onSuccess: (data) => {
@@ -373,13 +346,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
   const statusErfordertGrund = t
     ? (statusByKey.get(t.status.key)?.erfordert_grund ?? t.status.key === 'wartet')
     : false;
-
-  // Hat die Vorlage irgendein Ort-Feld sichtbar?
-  const ortSichtbar =
-    felder.sichtbar('objekt') ||
-    felder.sichtbar('haus') ||
-    felder.sichtbar('stockwerk') ||
-    felder.sichtbar('einheit');
 
   return (
     <div
@@ -478,8 +444,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
               {ticketQuery.isLoading ? 'Lade Ticket …' : 'Ticket nicht gefunden.'}
             </div>
           )}
-          {t &&
-            (isVorlageLayoutV2() ? (
+          {t && (
               <TicketFormEngine
                 layout={buildVorlageLayout(tickettypQuery.data ?? null)}
                 renderFeld={(feld) =>
@@ -605,445 +570,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                   </div>
                 }
               />
-            ) : (
-              <>
-                {/* LINKE SPALTE — Fakten & Bearbeitung */}
-                <div className="contents lg:flex lg:w-3/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:px-5 lg:py-4">
-                  {/* ① PROBLEM & BEARBEITUNG */}
-                  {(felder.sichtbar('beschreibung') ||
-                    felder.sichtbar('faelligkeit_am') ||
-                    felder.sichtbar('wiederholung') ||
-                    statusErfordertGrund) && (
-                    <div className="order-1 lg:order-none">
-                      <Accordion title="Problem & Bearbeitung" defaultOpen>
-                        <div className="space-y-3">
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <SelectField
-                              label="Status"
-                              value={t.status.key}
-                              onChange={(v) => {
-                                if (v !== t.status.key)
-                                  update.mutate({ status: v as TicketStatusSlug });
-                              }}
-                              options={[
-                                { value: t.status.key, label: t.status.label },
-                                ...statusTargets.map((s) => ({
-                                  value: s.key,
-                                  label: s.label,
-                                })),
-                              ]}
-                            />
-                            <div>
-                              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                                Zugewiesen an
-                              </label>
-                              <select
-                                value={t.zugewiesen_an?.id ?? ''}
-                                onChange={(e) =>
-                                  update.mutate({
-                                    zugewiesen_an_id: e.target.value || null,
-                                  })
-                                }
-                                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                              >
-                                <option value="">— (offen) —</option>
-                                {usersQuery.data?.items.map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.full_name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                          {statusErfordertGrund && (
-                            <WartetSubBar
-                              ticket={t}
-                              wartetGruende={aktiveWerte(
-                                wartetGruendeListe?.werte,
-                                t.wartet_grund?.key,
-                              )}
-                              onSave={(payload) => update.mutate(payload)}
-                            />
-                          )}
-                          {felder.sichtbar('beschreibung') && (
-                            <div>
-                              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                                Beschreibung
-                              </label>
-                              <textarea
-                                key={`besch-${t.id}`}
-                                rows={4}
-                                defaultValue={t.beschreibung ?? ''}
-                                onBlur={(e) => {
-                                  if (e.target.value !== (t.beschreibung ?? '')) {
-                                    update.mutate({ beschreibung: e.target.value });
-                                  }
-                                }}
-                                placeholder="Details zur Störung"
-                                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                              />
-                            </div>
-                          )}
-                          {(felder.sichtbar('faelligkeit_am') ||
-                            felder.sichtbar('wiederholung')) && (
-                            <div className="grid grid-cols-2 gap-3">
-                              {felder.sichtbar('faelligkeit_am') && (
-                                <div>
-                                  <label className="block text-xs text-zinc-400">
-                                    Fällig am
-                                    {felder.pflicht('faelligkeit_am') && (
-                                      <span className="text-red-400"> *</span>
-                                    )}
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={t.faelligkeit_am ?? ''}
-                                    onChange={(e) =>
-                                      update.mutate({
-                                        faelligkeit_am: e.target.value || null,
-                                      })
-                                    }
-                                    className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                                  />
-                                </div>
-                              )}
-                              {felder.sichtbar('wiederholung') && (
-                                <FeldSelect
-                                  label="Wiederholung"
-                                  value={t.wiederholung ?? ''}
-                                  onChange={(v) =>
-                                    update.mutate({ wiederholung: v || null })
-                                  }
-                                >
-                                  <option value="">— (keine) —</option>
-                                  <option value="weekly">Wöchentlich</option>
-                                  <option value="monthly">Monatlich</option>
-                                  <option value="quarterly">Quartalsweise</option>
-                                  <option value="yearly">Jährlich</option>
-                                </FeldSelect>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </Accordion>
-                    </div>
-                  )}
-
-                  {/* ② KONTAKT & BETEILIGTE */}
-                  {felder.sichtbar('partner') && (
-                    <div className="order-2 lg:order-none">
-                      <Accordion title="Kontakt & Beteiligte" defaultOpen>
-                        <div className="space-y-3">
-                          <div>
-                            <div className="mb-1 flex items-center gap-1 text-xs text-zinc-400">
-                              <Users2 className="h-3.5 w-3.5" /> Beteiligte
-                            </div>
-                            <BeteiligteBlock
-                              beteiligte={t.beteiligte}
-                              rolleOptions={aktiveWerte(beteiligtenRolleListe?.werte).map(
-                                (w) => ({ key: w.key, label: w.label }),
-                              )}
-                              onChange={(beteiligte) => update.mutate({ beteiligte })}
-                            />
-                          </div>
-                        </div>
-                      </Accordion>
-                    </div>
-                  )}
-
-                  {/* ④ VERORTUNG */}
-                  {(ortSichtbar ||
-                    felder.sichtbar('adresse') ||
-                    felder.sichtbar('anlage') ||
-                    (felder.sichtbar('pin') && t.stockwerk?.has_grundriss)) && (
-                    <div className="order-4 lg:order-none">
-                      <Accordion title="Verortung" defaultOpen>
-                        <div className="space-y-3 text-sm">
-                          {ortSichtbar && (
-                            <div className="grid grid-cols-2 gap-3">
-                              {felder.sichtbar('objekt') && (
-                                <FeldSearchSelect
-                                  label="Objekt"
-                                  pflicht={felder.pflicht('objekt')}
-                                  value={t.objekt?.id ?? ''}
-                                  initialLabel={t.objekt?.name ?? null}
-                                  onChange={(id) =>
-                                    update.mutate({
-                                      objekt_id: id,
-                                      haus_id: null,
-                                      stockwerk_id: null,
-                                      einheit_id: null,
-                                    })
-                                  }
-                                  fetcher={searchObjekte}
-                                  queryKey="objekt-detail"
-                                  placeholder="Objekt suchen …"
-                                />
-                              )}
-                              {felder.sichtbar('haus') && (
-                                <FeldSelect
-                                  label="Haus"
-                                  disabled={!t.objekt}
-                                  value={t.haus?.id ?? ''}
-                                  onChange={(v) =>
-                                    update.mutate({
-                                      haus_id: v || null,
-                                      stockwerk_id: null,
-                                      einheit_id: null,
-                                    })
-                                  }
-                                >
-                                  <option value="">— (keins) —</option>
-                                  {hausTree?.map((h) => (
-                                    <option key={h.id} value={h.id}>
-                                      {h.bezeichnung}
-                                    </option>
-                                  ))}
-                                </FeldSelect>
-                              )}
-                              {felder.sichtbar('stockwerk') && (
-                                <FeldSelect
-                                  label="Stockwerk"
-                                  disabled={!t.haus}
-                                  value={t.stockwerk?.id ?? ''}
-                                  onChange={(v) =>
-                                    update.mutate({
-                                      stockwerk_id: v || null,
-                                      einheit_id: null,
-                                    })
-                                  }
-                                >
-                                  <option value="">— (keins) —</option>
-                                  {selectedHaus?.stockwerke?.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.bezeichnung}
-                                      {s.ausrichtung ? ` · ${s.ausrichtung}` : ''}
-                                    </option>
-                                  ))}
-                                </FeldSelect>
-                              )}
-                              {felder.sichtbar('einheit') && (
-                                <FeldSelect
-                                  label="Einheit"
-                                  disabled={!t.stockwerk}
-                                  value={t.einheit?.id ?? ''}
-                                  onChange={(v) =>
-                                    update.mutate({ einheit_id: v || null })
-                                  }
-                                >
-                                  <option value="">— (keine) —</option>
-                                  {selectedStockwerk?.einheiten?.map((e) => (
-                                    <option key={e.id} value={e.id}>
-                                      {e.bezeichnung}
-                                    </option>
-                                  ))}
-                                </FeldSelect>
-                              )}
-                            </div>
-                          )}
-                          {felder.sichtbar('adresse') && (
-                            <TicketAdresseField
-                              adresse={t.adresse}
-                              isEigen={!!t.adresse_id}
-                              onSet={(adresse_id) => update.mutate({ adresse_id })}
-                            />
-                          )}
-                          {felder.sichtbar('anlage') && (
-                            <FeldSearchSelect
-                              label="Anlage"
-                              icon={<Activity className="h-3.5 w-3.5" />}
-                              pflicht={felder.pflicht('anlage')}
-                              value={t.anlage?.id ?? ''}
-                              initialLabel={t.anlage?.bezeichnung ?? null}
-                              onChange={(id) => update.mutate({ anlage_id: id })}
-                              fetcher={makeAnlageSearch(t.objekt?.id)}
-                              queryKey={`anlage-detail-${t.objekt?.id ?? 'all'}`}
-                              placeholder="Anlage suchen …"
-                            />
-                          )}
-                          {felder.sichtbar('pin') && t.stockwerk?.has_grundriss && (
-                            <div>
-                              <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                                <MapPin className="h-3.5 w-3.5" /> Lage im Grundriss
-                              </div>
-                              <GrundrissPin
-                                stockwerkId={t.stockwerk.id}
-                                pins={t.pins ?? []}
-                                onChange={(pins) => update.mutate({ pins })}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </Accordion>
-                    </div>
-                  )}
-
-                  {/* ⑤ KLASSIFIZIERUNG */}
-                  {(felder.sichtbar('prio') ||
-                    felder.sichtbar('kategorie') ||
-                    felder.sichtbar('quelle') ||
-                    felder.sichtbar('projekt') ||
-                    felder.sichtbar('fehlercode') ||
-                    switchOptions.length > 0) && (
-                    <div className="order-5 lg:order-none">
-                      <Accordion title="Klassifizierung">
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          {switchOptions.length > 0 && (
-                            <div>
-                              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                                Vorlage
-                              </label>
-                              <select
-                                value={t.tickettyp?.id ?? ''}
-                                onChange={(e) => handleVorlageWechsel(e.target.value)}
-                                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                              >
-                                {!t.tickettyp && <option value="">— (keine) —</option>}
-                                {switchOptions.map((o) => (
-                                  <option key={o.id} value={o.id}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                          {felder.sichtbar('prio') && (
-                            <SelectField
-                              label="Priorität"
-                              value={t.prioritaet.key}
-                              onChange={(v) =>
-                                update.mutate({ prioritaet: v as TicketPrioritaetSlug })
-                              }
-                              options={PRIO_SLUGS.map((p) => ({
-                                value: p,
-                                label: labelForPrioSlug(p),
-                              }))}
-                            />
-                          )}
-                          {felder.sichtbar('kategorie') && (
-                            <SelectField
-                              label="Kategorie"
-                              value={t.kategorie?.key ?? ''}
-                              onChange={(v) => update.mutate({ kategorie: v || null })}
-                              options={[
-                                { value: '', label: '— (keine) —' },
-                                ...aktiveWerte(
-                                  kategorienListe?.werte,
-                                  t.kategorie?.key,
-                                ).map((w) => ({
-                                  value: w.key,
-                                  label: w.label,
-                                })),
-                              ]}
-                            />
-                          )}
-                          {felder.sichtbar('quelle') && (
-                            <FeldSelect
-                              label="Quelle"
-                              value={t.quelle?.key ?? ''}
-                              onChange={(v) => update.mutate({ quelle: v || null })}
-                            >
-                              <option value="">— (keine) —</option>
-                              {aktiveWerte(quellenListe?.werte, t.quelle?.key).map(
-                                (w) => (
-                                  <option key={w.id} value={w.key}>
-                                    {w.label}
-                                  </option>
-                                ),
-                              )}
-                            </FeldSelect>
-                          )}
-                          {felder.sichtbar('projekt') && (
-                            <FeldSearchSelect
-                              label="Projekt"
-                              icon={<FolderKanban className="h-3.5 w-3.5" />}
-                              value={t.projekt?.id ?? ''}
-                              initialLabel={t.projekt?.name ?? null}
-                              onChange={(id) => update.mutate({ projekt_id: id })}
-                              fetcher={makeProjektSearch(['geplant', 'aktiv'])}
-                              queryKey="projekt-detail"
-                              placeholder="Projekt suchen …"
-                            />
-                          )}
-                          {felder.sichtbar('fehlercode') && (
-                            <FeldSearchSelect
-                              label="Fehlercode"
-                              icon={
-                                <AlertOctagon className="h-3.5 w-3.5 text-amber-400" />
-                              }
-                              pflicht={felder.pflicht('fehlercode')}
-                              value={t.fehlercode?.id ?? ''}
-                              initialLabel={
-                                t.fehlercode
-                                  ? `${t.fehlercode.code} — ${t.fehlercode.titel}`
-                                  : null
-                              }
-                              onChange={(id) => update.mutate({ fehlercode_id: id })}
-                              fetcher={makeFehlercodeSearch(t.anlage?.id)}
-                              queryKey={`fehlercode-detail-${t.anlage?.id ?? 'all'}`}
-                              placeholder="Fehlercode suchen …"
-                            />
-                          )}
-                        </div>
-                      </Accordion>
-                    </div>
-                  )}
-
-                  {/* ⑦ VERLAUF + Löschen */}
-                  <div className="order-7 lg:order-none">
-                    <Accordion title="Verlauf">
-                      <dl className="space-y-1 text-xs text-zinc-400">
-                        <TimelineEntry
-                          icon={<Calendar className="h-3.5 w-3.5" />}
-                          label="Eröffnet"
-                          value={`${formatRelativeDateTime(t.eroeffnet_am)} · ${t.eroeffnet_von.full_name}`}
-                        />
-                        <TimelineEntry
-                          icon={<User className="h-3.5 w-3.5" />}
-                          label="Zugewiesen"
-                          value={formatRelativeDateTime(t.zugewiesen_am)}
-                        />
-                        <TimelineEntry
-                          icon={<Clock className="h-3.5 w-3.5" />}
-                          label="Erledigt"
-                          value={formatRelativeDateTime(t.erledigt_am)}
-                        />
-                      </dl>
-                    </Accordion>
-
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm('Ticket wirklich löschen?')) remove.mutate();
-                        }}
-                        disabled={remove.isPending}
-                        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-50 lg:min-h-0"
-                      >
-                        <Trash2 className="h-4 w-4" /> Ticket löschen
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* RECHTE SPALTE — Belege & Kommunikation */}
-                <div className="contents lg:flex lg:w-2/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:border-l lg:border-zinc-800 lg:px-5 lg:py-4">
-                  {(felder.sichtbar('foto') || felder.sichtbar('dokumente')) && (
-                    <div className="order-3 space-y-3 lg:order-none">
-                      {felder.sichtbar('foto') && <PhotoGallery ticketId={t.id} />}
-                      {felder.sichtbar('dokumente') && (
-                        <TicketDokumente ticketId={t.id} />
-                      )}
-                    </div>
-                  )}
-                  {/* Chat: mobil unten (Techniker-Reihenfolge), Desktop oben in der
-                    rechten Spalte (Tim: „Chat ganz oben rechts"). */}
-                  <div className="order-6 lg:order-first">
-                    <ChatPanel ticketId={t.id} />
-                  </div>
-                </div>
-              </>
-            ))}
+          )}
         </div>
 
         {/* Status-Banner bei Mutation-Errors */}
@@ -1238,86 +765,6 @@ function SelectField({
           </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-/** Editierbares Select für die Stammdaten-Sektion (Label + optionales Icon + Pflicht-Stern). */
-function FeldSelect({
-  label,
-  value,
-  onChange,
-  children,
-  disabled = false,
-  pflicht = false,
-  icon,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  children: React.ReactNode;
-  disabled?: boolean;
-  pflicht?: boolean;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="flex items-center gap-1 text-xs text-zinc-400">
-        {icon}
-        {label}
-        {pflicht && <span className="text-red-400">*</span>}
-      </label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
-      >
-        {children}
-      </select>
-    </div>
-  );
-}
-
-/** Wie FeldSelect, aber mit serverseitiger Such-Auswahl (Bewegungsdaten). */
-function FeldSearchSelect({
-  label,
-  value,
-  initialLabel,
-  onChange,
-  fetcher,
-  queryKey,
-  placeholder,
-  pflicht = false,
-  icon,
-}: {
-  label: string;
-  value: string;
-  initialLabel: string | null;
-  onChange: (id: string | null) => void;
-  fetcher: (search: string) => Promise<import('./EntitySearchSelect').SearchOption[]>;
-  queryKey: string;
-  placeholder?: string;
-  pflicht?: boolean;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="flex items-center gap-1 text-xs text-zinc-400">
-        {icon}
-        {label}
-        {pflicht && <span className="text-red-400">*</span>}
-      </label>
-      <div className="mt-1">
-        <EntitySearchSelect
-          value={value || null}
-          initialLabel={initialLabel}
-          onChange={(id) => onChange(id)}
-          fetcher={fetcher}
-          queryKey={queryKey}
-          placeholder={placeholder}
-        />
-      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'admin-dev-pass-12';
 const API = process.env.E2E_API ?? 'http://localhost:8000';
 
-test('Flag-AN: Designer-Builder rendert Blöcke + Layout speichern', async ({ page }) => {
+test('Designer-Builder rendert Blöcke + Layout speichern', async ({ page }) => {
   // Vorlage-ID direkt über die API holen (robuster als UI-Navigation).
   const api = await pwRequest.newContext();
   const login = await api.post(`${API}/api/v1/auth/login`, {
@@ -25,7 +25,6 @@ test('Flag-AN: Designer-Builder rendert Blöcke + Layout speichern', async ({ pa
   const vorlage = vorlagen.find((v) => v.key === 'reparatur') ?? vorlagen[0];
   await api.dispose();
 
-  await page.addInitScript(() => localStorage.setItem('ff_vorlage_layout_v2', '1'));
 
   await page.goto('/login');
   await page.getByLabel('E-Mail').fill(ADMIN_EMAIL);
@@ -62,7 +61,7 @@ async function dragHandleTo(
   await page.waitForTimeout(350);
 }
 
-test('Flag-AN: Drag & Drop — Feld sortieren + Block in andere Region', async ({ page }) => {
+test('Drag & Drop — Feld sortieren + Block in andere Region', async ({ page }) => {
   const api = await pwRequest.newContext();
   const login = await api.post(`${API}/api/v1/auth/login`, {
     data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
@@ -76,7 +75,6 @@ test('Flag-AN: Drag & Drop — Feld sortieren + Block in andere Region', async (
   await api.dispose();
 
   await page.setViewportSize({ width: 1440, height: 1100 });
-  await page.addInitScript(() => localStorage.setItem('ff_vorlage_layout_v2', '1'));
   await page.goto('/login');
   await page.getByLabel('E-Mail').fill(ADMIN_EMAIL);
   await page.getByLabel('Passwort').fill(ADMIN_PASSWORD);

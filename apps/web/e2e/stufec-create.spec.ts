@@ -9,8 +9,7 @@ import { expect, test } from '@playwright/test';
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'admin-dev-pass-12';
 
-test('Flag-AN: Erfassen-Modal rendert Blöcke + Ticket anlegen', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('ff_vorlage_layout_v2', '1'));
+test('Erfassen-Modal rendert Blöcke + Ticket anlegen', async ({ page }) => {
 
   await page.goto('/login');
   await page.getByLabel('E-Mail').fill(ADMIN_EMAIL);

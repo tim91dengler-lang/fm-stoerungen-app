@@ -7,12 +7,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBanner } from './components/ErrorBanner';
 import { registerSW } from 'virtual:pwa-register';
 import { setupInstallPrompt } from './lib/pwa';
-import { syncVorlageLayoutV2FromUrl } from './lib/featureFlags';
 import './index.css';
-
-// Feature-Flag per Link umschaltbar machen (`?ff_vorlage_layout_v2=1|0`),
-// damit die Staging-Acceptance ohne DevTools-Konsole klappt. Vor dem Render.
-syncVorlageLayoutV2FromUrl();
 
 // Workbox service worker (vite-plugin-pwa). autoUpdate: a new deploy's SW takes
 // over and refreshes the content-hashed precache — no stale UI. Disabled in dev
