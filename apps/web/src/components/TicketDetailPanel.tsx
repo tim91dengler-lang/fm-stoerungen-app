@@ -84,6 +84,7 @@ const FELD_NULL_CONFIG: {
   { feldKey: 'einheit', label: 'Einheit', hasValue: (t) => !!t.einheit, patch: { einheit_id: null } },
   { feldKey: 'anlage', label: 'Anlage', hasValue: (t) => !!t.anlage, patch: { anlage_id: null } },
   { feldKey: 'partner', label: 'Partner', hasValue: (t) => !!t.partner, patch: { partner_id: null } },
+  { feldKey: 'adresse', label: 'Adresse', hasValue: (t) => !!t.adresse_id, patch: { adresse_id: null } },
   { feldKey: 'kategorie', label: 'Kategorie', hasValue: (t) => !!t.kategorie, patch: { kategorie: null } },
   { feldKey: 'quelle', label: 'Quelle', hasValue: (t) => !!t.quelle, patch: { quelle: null } },
   { feldKey: 'projekt', label: 'Projekt', hasValue: (t) => !!t.projekt, patch: { projekt_id: null } },

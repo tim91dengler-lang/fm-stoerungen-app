@@ -9,6 +9,11 @@ from fm_api.services import ticket_service
 from fm_api.services.adresse_service import AdresseNotFoundError
 from fm_api.services.anlage_service import AnlageNotFoundError
 from fm_api.services.fehlercode_service import FehlercodeNotFoundError
+from fm_api.services.objektstruktur_service import (
+    EinheitNotFoundError,
+    HausNotFoundError,
+    StockwerkNotFoundError,
+)
 from fm_api.services.projekt_service import ProjektNotFoundError
 from fm_api.services.ticket_service import (
     AssigneeNotFoundError,
@@ -105,7 +110,14 @@ async def create_ticket(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except AdresseNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except (AnlageNotFoundError, FehlercodeNotFoundError, ProjektNotFoundError) as exc:
+    except (
+        AnlageNotFoundError,
+        FehlercodeNotFoundError,
+        ProjektNotFoundError,
+        HausNotFoundError,
+        StockwerkNotFoundError,
+        EinheitNotFoundError,
+    ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PartnerNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -160,7 +172,14 @@ async def update_ticket(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except AdresseNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except (AnlageNotFoundError, FehlercodeNotFoundError, ProjektNotFoundError) as exc:
+    except (
+        AnlageNotFoundError,
+        FehlercodeNotFoundError,
+        ProjektNotFoundError,
+        HausNotFoundError,
+        StockwerkNotFoundError,
+        EinheitNotFoundError,
+    ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PartnerNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

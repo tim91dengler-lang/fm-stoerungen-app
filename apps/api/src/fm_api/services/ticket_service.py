@@ -13,9 +13,12 @@ from fm_api.models import (
     AuswahllistenWert,
     Fehlercode,
     GeschaeftsPartner,
+    Haus,
     Objekt,
+    ObjektStockwerk,
     PartnerKontakt,
     Projekt,
+    StockwerkEinheit,
     Ticket,
     TicketBeteiligter,
     User,
@@ -30,6 +33,11 @@ from fm_api.services.auswahlliste_service import (
     get_wert_by_key,
 )
 from fm_api.services.fehlercode_service import FehlercodeNotFoundError
+from fm_api.services.objektstruktur_service import (
+    EinheitNotFoundError,
+    HausNotFoundError,
+    StockwerkNotFoundError,
+)
 from fm_api.services.projekt_service import ProjektNotFoundError
 
 
@@ -218,6 +226,37 @@ async def _validate_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise PartnerNotFoundError(f"partner {partner_id} not found")
+
+
+async def _validate_haus(db: AsyncSession, haus_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen eines fremden Hauses (IDOR)."""
+    stmt = select(Haus.id).where(
+        Haus.id == haus_id, Haus.mandant_id == mandant_id, Haus.deleted_at.is_(None)
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise HausNotFoundError(f"haus {haus_id} not found")
+
+
+async def _validate_stockwerk(db: AsyncSession, stockwerk_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen eines fremden Stockwerks (IDOR)."""
+    stmt = select(ObjektStockwerk.id).where(
+        ObjektStockwerk.id == stockwerk_id,
+        ObjektStockwerk.mandant_id == mandant_id,
+        ObjektStockwerk.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise StockwerkNotFoundError(f"stockwerk {stockwerk_id} not found")
+
+
+async def _validate_einheit(db: AsyncSession, einheit_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen einer fremden Einheit (IDOR)."""
+    stmt = select(StockwerkEinheit.id).where(
+        StockwerkEinheit.id == einheit_id,
+        StockwerkEinheit.mandant_id == mandant_id,
+        StockwerkEinheit.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise EinheitNotFoundError(f"einheit {einheit_id} not found")
 
 
 async def _resolve_slug(
@@ -471,6 +510,12 @@ async def create_ticket(
         await _validate_fehlercode(db, fehlercode_id, mandant_id)
     if projekt_id is not None:
         await _validate_projekt(db, projekt_id, mandant_id)
+    if haus_id is not None:
+        await _validate_haus(db, haus_id, mandant_id)
+    if stockwerk_id is not None:
+        await _validate_stockwerk(db, stockwerk_id, mandant_id)
+    if einheit_id is not None:
+        await _validate_einheit(db, einheit_id, mandant_id)
 
     zugewiesen_am = now if zugewiesen_an_id is not None else None
     erledigt_am = now if status_wert.key == TicketStatusSlug.ERLEDIGT.value else None
@@ -548,9 +593,6 @@ async def update_ticket(
         "wiederholung",
         "faelligkeit_am",
         "pins",
-        "haus_id",
-        "stockwerk_id",
-        "einheit_id",
         "tickettyp_id",
     ):
         if direct in updates:
@@ -561,6 +603,10 @@ async def update_ticket(
         ("anlage_id", _validate_anlage),
         ("fehlercode_id", _validate_fehlercode),
         ("projekt_id", _validate_projekt),
+        ("haus_id", _validate_haus),
+        ("stockwerk_id", _validate_stockwerk),
+        ("einheit_id", _validate_einheit),
+        ("wartet_nachunternehmer_id", _validate_partner),
     ):
         if fk in updates:
             new_val = updates[fk]
@@ -594,9 +640,6 @@ async def update_ticket(
         else:
             w_wert = await _resolve_slug(db, mandant_id, "wartet_grund", updates["wartet_grund"])
             ticket.wartet_grund_id = w_wert.id
-
-    if "wartet_nachunternehmer_id" in updates:
-        ticket.wartet_nachunternehmer_id = updates["wartet_nachunternehmer_id"]
 
     if "objekt_id" in updates:
         new_objekt = updates["objekt_id"]
