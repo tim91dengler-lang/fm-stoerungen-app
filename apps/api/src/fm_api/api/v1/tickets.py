@@ -23,6 +23,7 @@ from fm_api.services.ticket_service import (
     TicketNotFoundError,
     UnknownAuswahlSlugError,
 )
+from fm_api.services.tickettyp_service import TickettypNotFoundError
 
 router = APIRouter()
 
@@ -117,6 +118,7 @@ async def create_ticket(
         HausNotFoundError,
         StockwerkNotFoundError,
         EinheitNotFoundError,
+        TickettypNotFoundError,
     ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PartnerNotFoundError as exc:
@@ -179,6 +181,7 @@ async def update_ticket(
         HausNotFoundError,
         StockwerkNotFoundError,
         EinheitNotFoundError,
+        TickettypNotFoundError,
     ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PartnerNotFoundError as exc:

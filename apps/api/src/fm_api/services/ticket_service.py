@@ -21,6 +21,7 @@ from fm_api.models import (
     StockwerkEinheit,
     Ticket,
     TicketBeteiligter,
+    Tickettyp,
     User,
 )
 from fm_api.models.ticket import TicketStatusSlug
@@ -39,6 +40,7 @@ from fm_api.services.objektstruktur_service import (
     StockwerkNotFoundError,
 )
 from fm_api.services.projekt_service import ProjektNotFoundError
+from fm_api.services.tickettyp_service import TickettypNotFoundError
 
 
 class TicketNotFoundError(Exception):
@@ -257,6 +259,16 @@ async def _validate_einheit(db: AsyncSession, einheit_id: UUID, mandant_id: UUID
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise EinheitNotFoundError(f"einheit {einheit_id} not found")
+
+
+async def _validate_tickettyp(db: AsyncSession, tickettyp_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen einer fremden Vorlage (IDOR)."""
+    stmt = select(Tickettyp.id).where(
+        Tickettyp.id == tickettyp_id,
+        Tickettyp.mandant_id == mandant_id,
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise TickettypNotFoundError(f"tickettyp {tickettyp_id} not found")
 
 
 async def _resolve_slug(
@@ -516,6 +528,8 @@ async def create_ticket(
         await _validate_stockwerk(db, stockwerk_id, mandant_id)
     if einheit_id is not None:
         await _validate_einheit(db, einheit_id, mandant_id)
+    if tickettyp_id is not None:
+        await _validate_tickettyp(db, tickettyp_id, mandant_id)
 
     zugewiesen_am = now if zugewiesen_an_id is not None else None
     erledigt_am = now if status_wert.key == TicketStatusSlug.ERLEDIGT.value else None
@@ -593,7 +607,6 @@ async def update_ticket(
         "wiederholung",
         "faelligkeit_am",
         "pins",
-        "tickettyp_id",
     ):
         if direct in updates:
             setattr(ticket, direct, updates[direct])
@@ -607,6 +620,7 @@ async def update_ticket(
         ("stockwerk_id", _validate_stockwerk),
         ("einheit_id", _validate_einheit),
         ("wartet_nachunternehmer_id", _validate_partner),
+        ("tickettyp_id", _validate_tickettyp),
     ):
         if fk in updates:
             new_val = updates[fk]

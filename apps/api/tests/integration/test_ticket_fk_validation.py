@@ -13,7 +13,15 @@ async def _login_admin(client, admin_user) -> str:
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "field",
-    ["anlage_id", "fehlercode_id", "projekt_id", "haus_id", "stockwerk_id", "einheit_id"],
+    [
+        "anlage_id",
+        "fehlercode_id",
+        "projekt_id",
+        "haus_id",
+        "stockwerk_id",
+        "einheit_id",
+        "tickettyp_id",
+    ],
 )
 async def test_create_unknown_fk_rejected(client, admin_user, field) -> None:
     """IDOR-Schutz: unbekannte/fremde anlage_id/fehlercode_id/projekt_id → 400."""
@@ -30,7 +38,15 @@ async def test_create_unknown_fk_rejected(client, admin_user, field) -> None:
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "field",
-    ["anlage_id", "fehlercode_id", "projekt_id", "haus_id", "stockwerk_id", "einheit_id"],
+    [
+        "anlage_id",
+        "fehlercode_id",
+        "projekt_id",
+        "haus_id",
+        "stockwerk_id",
+        "einheit_id",
+        "tickettyp_id",
+    ],
 )
 async def test_update_unknown_fk_rejected(client, admin_user, field) -> None:
     token = await _login_admin(client, admin_user)
@@ -49,7 +65,15 @@ async def test_update_unknown_fk_rejected(client, admin_user, field) -> None:
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "field",
-    ["anlage_id", "fehlercode_id", "projekt_id", "haus_id", "stockwerk_id", "einheit_id"],
+    [
+        "anlage_id",
+        "fehlercode_id",
+        "projekt_id",
+        "haus_id",
+        "stockwerk_id",
+        "einheit_id",
+        "tickettyp_id",
+    ],
 )
 async def test_update_fk_to_null_allowed(client, admin_user, field) -> None:
     """None bleibt erlaubt (Zuordnung entfernen)."""
