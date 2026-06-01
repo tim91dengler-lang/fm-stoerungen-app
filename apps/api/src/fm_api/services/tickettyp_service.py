@@ -25,6 +25,28 @@ class TickettypFeldNotFoundError(Exception):
     pass
 
 
+class LayoutValidationError(Exception):
+    """Ungültiges Layout (z.B. abhängiges Feld sichtbar, Eltern-Feld ausgeblendet)."""
+
+
+# Geschützte Blöcke: nie löschbar (Stufe C, Tim-Entscheidung 2: System-Blöcke
+# außer kopf/weitere sind frei löschbar). kopf trägt das Kernfeld, weitere ist
+# der Auffang-Block.
+PROTECTED_BLOCK_KEYS: frozenset[str] = frozenset({"kopf", "weitere"})
+
+# Eltern-Sichtbarkeit (H4): ist ein abhängiges Feld sichtbar, müssen alle seine
+# Eltern ebenfalls sichtbar sein — sonst entsteht eine unbedienbare Vorlage
+# (z.B. Grundriss-Pin ohne sichtbares Stockwerk).
+FELD_PARENTS: dict[str, tuple[str, ...]] = {
+    "haus": ("objekt",),
+    "stockwerk": ("objekt", "haus"),
+    "einheit": ("objekt", "haus", "stockwerk"),
+    "anlage": ("objekt",),
+    "fehlercode": ("objekt", "anlage"),
+    "pin": ("objekt", "haus", "stockwerk"),
+}
+
+
 # Kernfelder, die in jeder Vorlage fix bleiben (Konzept "Das Ticket",
 # Tim 2026-05-31, Entscheidung A): Titel ist nicht abwählbar und immer
 # Pflicht. Status ist kein Designer-Feld und damit ohnehin immer vorhanden.
@@ -377,6 +399,10 @@ async def get_tickettyp(db: AsyncSession, mandant_id: UUID, tickettyp_id: UUID) 
             Tickettyp.mandant_id == mandant_id,
         )
         .options(*_LOAD_OPTIONS)
+        # populate_existing: get_tickettyp ist der Post-Mutation-Read (create/update/
+        # save_layout schreiben + lesen in DERSELBEN Session). Ohne Refresh lieferte
+        # selectinload die stale identity-mapped felder/bloecke-Collection zurück.
+        .execution_options(populate_existing=True)
     )
     item = (await db.execute(stmt)).scalar_one_or_none()
     if item is None:
@@ -554,3 +580,104 @@ async def update_tickettyp_feld(
         feld.pflicht = True
     await db.flush()
     return feld
+
+
+# ---- Layout-Save (Stufe C: Blöcke + Feld→Block in einem Rutsch) ----
+
+
+async def save_layout(
+    db: AsyncSession, mandant_id: UUID, tickettyp_id: UUID, layout: dict[str, Any]
+) -> Tickettyp:
+    """Transaktionaler Designer-Save: Blöcke + Feld→Block-Zuordnung einer Vorlage.
+
+    Identifikation über ``block_key``/``feld_key`` — NUR innerhalb dieser Vorlage
+    aufgelöst (IDOR-sicher: kein Cross-Vorlage-/Cross-Mandant-Reparenting möglich,
+    weil keine fremden IDs referenzierbar sind). Erzwungen werden: Kernfeld-Schutz
+    (titel sichtbar+pflicht, Block kopf), Alles-Vorlage-Lock (alle Felder sichtbar)
+    und die Eltern-Sichtbarkeits-Regel (H4).
+    """
+    tt = await get_tickettyp(db, mandant_id, tickettyp_id)
+    is_alles = tt.ist_alles_vorlage
+    bloecke = layout.get("bloecke", [])
+    felder = layout.get("felder", [])
+
+    # ---- Eltern-Sichtbarkeits-Validierung (H4) — vor jedem Schreiben ----
+    known_feld_keys = {f.feld_key for f in tt.felder}
+    sichtbar_map = {f.feld_key: f.sichtbar for f in tt.felder}
+    for fw in felder:
+        if fw["feld_key"] in known_feld_keys:
+            sichtbar_map[fw["feld_key"]] = bool(fw["sichtbar"])
+    if not is_alles:
+        for child, parents in FELD_PARENTS.items():
+            if sichtbar_map.get(child):
+                missing = [p for p in parents if not sichtbar_map.get(p, False)]
+                if missing:
+                    raise LayoutValidationError(
+                        f"Feld '{child}' ist sichtbar, benötigt aber sichtbare Felder: "
+                        f"{', '.join(missing)}."
+                    )
+
+    # ---- Blöcke reconcilen (by block_key, scoped to this tickettyp) ----
+    existing_blocks = {b.block_key: b for b in tt.bloecke}
+    payload_keys = {b["block_key"] for b in bloecke}
+    for bw in bloecke:
+        blk = existing_blocks.get(bw["block_key"])
+        if blk is None:
+            blk = TickettypBlock(
+                tickettyp_id=tt.id,
+                block_key=bw["block_key"],
+                label=bw["label"],
+                region=bw["region"],
+                reihenfolge=bw["reihenfolge"],
+                ist_system_block=False,
+                collapsible_default_open=bw.get("collapsible_default_open", True),
+            )
+            db.add(blk)
+            existing_blocks[bw["block_key"]] = blk
+        else:
+            blk.label = bw["label"]
+            blk.region = bw["region"]
+            blk.reihenfolge = bw["reihenfolge"]
+            blk.collapsible_default_open = bw.get("collapsible_default_open", True)
+    # Nicht mehr enthaltene Blöcke löschen (außer geschützt).
+    for bkey, blk in list(existing_blocks.items()):
+        if bkey not in payload_keys and bkey not in PROTECTED_BLOCK_KEYS:
+            await db.delete(blk)
+            del existing_blocks[bkey]
+    # Geschützte Blöcke immer vorhalten (Fallback-Ziele für Kernfeld + Auffang).
+    for pkey, plabel, preg, prh in (
+        ("kopf", "Kopf", "links", 0),
+        ("weitere", "Weitere Felder", "links", 99),
+    ):
+        if pkey not in existing_blocks:
+            blk = TickettypBlock(
+                tickettyp_id=tt.id,
+                block_key=pkey,
+                label=plabel,
+                region=preg,
+                reihenfolge=prh,
+                ist_system_block=True,
+            )
+            db.add(blk)
+            existing_blocks[pkey] = blk
+    await db.flush()  # ids für neue Blöcke
+
+    # ---- Felder reconcilen ----
+    existing_felder = {f.feld_key: f for f in tt.felder}
+    for fw in felder:
+        feld = existing_felder.get(fw["feld_key"])
+        if feld is None:
+            continue  # unbekannter feld_key → ignorieren (keine neuen System-Felder)
+        target = existing_blocks.get(fw["block_key"]) or existing_blocks["weitere"]
+        feld.block_id = target.id
+        feld.reihenfolge = fw["reihenfolge"]
+        feld.sichtbar = True if is_alles else bool(fw["sichtbar"])
+        feld.pflicht = bool(fw["pflicht"])
+        if fw.get("label"):
+            feld.label = fw["label"]
+        if feld.feld_key in KERNFELD_KEYS:
+            feld.sichtbar = True
+            feld.pflicht = True
+            feld.block_id = existing_blocks["kopf"].id
+    await db.flush()
+    return await get_tickettyp(db, mandant_id, tt.id)

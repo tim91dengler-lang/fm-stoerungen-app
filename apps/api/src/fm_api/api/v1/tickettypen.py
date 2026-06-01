@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from fm_api.core.deps import AuditedDbSession, CurrentUserDep
 from fm_api.schemas.tickettyp import (
+    LayoutWrite,
     TickettypCreate,
     TickettypFeldUpdate,
     TickettypRead,
@@ -11,6 +12,7 @@ from fm_api.schemas.tickettyp import (
 )
 from fm_api.services import tickettyp_service
 from fm_api.services.tickettyp_service import (
+    LayoutValidationError,
     SystemTickettypProtectedError,
     TickettypFeldNotFoundError,
     TickettypKeyConflictError,
@@ -129,4 +131,27 @@ async def update_tickettyp_felder(
             # erweitert sich); wir ignorieren statt 4xx zu werfen.
             continue
     item = await tickettyp_service.get_tickettyp(db, current.mandant_id, tickettyp_id)
+    return TickettypRead.model_validate(item)
+
+
+@router.put("/{tickettyp_id}/layout", response_model=TickettypRead)
+async def save_tickettyp_layout(
+    tickettyp_id: UUID,
+    payload: LayoutWrite,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> TickettypRead:
+    """Stufe-C-Designer-Save: vollständiges Block-/Feld-Layout einer Vorlage
+    transaktional schreiben. Block-/Feld-Keys werden nur innerhalb dieser Vorlage
+    aufgelöst (IDOR-sicher)."""
+    try:
+        item = await tickettyp_service.save_layout(
+            db, current.mandant_id, tickettyp_id, payload.model_dump()
+        )
+    except TickettypNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LayoutValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return TickettypRead.model_validate(item)
