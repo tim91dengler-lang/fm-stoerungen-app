@@ -57,6 +57,7 @@ import type {
   StockwerkCreate,
   StockwerkRead,
   StockwerkUpdate,
+  LayoutWrite,
   TickettypFeldUpdate,
   TickettypRead,
   TickettypCreate,
@@ -85,9 +86,7 @@ export const authApi = {
 export const userApi = {
   me: () => api.get<UserRead>('/users/me').then((r) => r.data),
   list: (params: { search?: string; limit?: number; offset?: number } = {}) =>
-    api
-      .get<PaginatedResponse<UserRead>>('/users', { params })
-      .then((r) => r.data),
+    api.get<PaginatedResponse<UserRead>>('/users', { params }).then((r) => r.data),
   update: (id: string, payload: UserUpdate) =>
     api.patch<UserRead>(`/users/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/users/${id}`).then(() => undefined),
@@ -109,15 +108,17 @@ export const ticketApi = {
 export const auswahllistenApi = {
   list: (search?: string) =>
     api
-      .get<AuswahllisteRead[]>('/auswahllisten', { params: search ? { search } : undefined })
+      .get<
+        AuswahllisteRead[]
+      >('/auswahllisten', { params: search ? { search } : undefined })
       .then((r) => r.data),
-  get: (id: string) => api.get<AuswahllisteRead>(`/auswahllisten/${id}`).then((r) => r.data),
+  get: (id: string) =>
+    api.get<AuswahllisteRead>(`/auswahllisten/${id}`).then((r) => r.data),
   create: (payload: AuswahllisteCreate) =>
     api.post<AuswahllisteRead>('/auswahllisten', payload).then((r) => r.data),
   update: (id: string, payload: AuswahllisteUpdate) =>
     api.patch<AuswahllisteRead>(`/auswahllisten/${id}`, payload).then((r) => r.data),
-  remove: (id: string) =>
-    api.delete<void>(`/auswahllisten/${id}`).then(() => undefined),
+  remove: (id: string) => api.delete<void>(`/auswahllisten/${id}`).then(() => undefined),
   addWert: (listeId: string, payload: AuswahllistenWertCreate) =>
     api
       .post<AuswahllistenWertRead>(`/auswahllisten/${listeId}/werte`, payload)
@@ -141,9 +142,7 @@ export const partnerApi = {
       offset?: number;
     } = {},
   ) =>
-    api
-      .get<PaginatedResponse<PartnerRead>>('/partner', { params })
-      .then((r) => r.data),
+    api.get<PaginatedResponse<PartnerRead>>('/partner', { params }).then((r) => r.data),
   get: (id: string) => api.get<PartnerRead>(`/partner/${id}`).then((r) => r.data),
   create: (payload: PartnerCreate) =>
     api.post<PartnerRead>('/partner', payload).then((r) => r.data),
@@ -151,18 +150,12 @@ export const partnerApi = {
     api.patch<PartnerRead>(`/partner/${id}`, payload).then((r) => r.data),
   remove: (id: string) => api.delete<void>(`/partner/${id}`).then(() => undefined),
   sperren: (id: string) =>
-    api
-      .post<PartnerSperrenResponse>(`/partner/${id}/sperren`)
-      .then((r) => r.data),
+    api.post<PartnerSperrenResponse>(`/partner/${id}/sperren`).then((r) => r.data),
   entsperren: (id: string) =>
-    api
-      .post<PartnerSperrenResponse>(`/partner/${id}/entsperren`)
-      .then((r) => r.data),
+    api.post<PartnerSperrenResponse>(`/partner/${id}/entsperren`).then((r) => r.data),
   // Sub-Resource: Kontakte
   listKontakte: (partnerId: string) =>
-    api
-      .get<PartnerKontaktRead[]>(`/partner/${partnerId}/kontakte`)
-      .then((r) => r.data),
+    api.get<PartnerKontaktRead[]>(`/partner/${partnerId}/kontakte`).then((r) => r.data),
   createKontakt: (partnerId: string, payload: PartnerKontaktCreate) =>
     api
       .post<PartnerKontaktRead>(`/partner/${partnerId}/kontakte`, payload)
@@ -172,14 +165,10 @@ export const partnerApi = {
       .patch<PartnerKontaktRead>(`/partner/kontakte/${kontaktId}`, payload)
       .then((r) => r.data),
   removeKontakt: (kontaktId: string) =>
-    api
-      .delete<void>(`/partner/kontakte/${kontaktId}`)
-      .then(() => undefined),
+    api.delete<void>(`/partner/kontakte/${kontaktId}`).then(() => undefined),
   // Sub-Resource: Adress-Verknüpfungen
   listAdressen: (partnerId: string) =>
-    api
-      .get<PartnerAdresseRead[]>(`/partner/${partnerId}/adressen`)
-      .then((r) => r.data),
+    api.get<PartnerAdresseRead[]>(`/partner/${partnerId}/adressen`).then((r) => r.data),
   createAdresse: (partnerId: string, payload: PartnerAdresseCreate) =>
     api
       .post<PartnerAdresseRead>(`/partner/${partnerId}/adressen`, payload)
@@ -189,18 +178,14 @@ export const partnerApi = {
       .patch<PartnerAdresseRead>(`/partner/adressen/${linkId}`, payload)
       .then((r) => r.data),
   removeAdresse: (linkId: string) =>
-    api
-      .delete<void>(`/partner/adressen/${linkId}`)
-      .then(() => undefined),
+    api.delete<void>(`/partner/adressen/${linkId}`).then(() => undefined),
   // Track 3 — Hierarchie + verlinkte Listen
   getHierarchie: (partnerId: string) =>
     api
       .get<PartnerHierarchieResponse>(`/partner/${partnerId}/hierarchie`)
       .then((r) => r.data),
   listObjekte: (partnerId: string) =>
-    api
-      .get<PartnerObjektLinkRead[]>(`/partner/${partnerId}/objekte`)
-      .then((r) => r.data),
+    api.get<PartnerObjektLinkRead[]>(`/partner/${partnerId}/objekte`).then((r) => r.data),
   listProjekte: (partnerId: string) =>
     api
       .get<PartnerProjektLinkRead[]>(`/partner/${partnerId}/projekte`)
@@ -221,10 +206,7 @@ export const objektApi = {
       limit?: number;
       offset?: number;
     } = {},
-  ) =>
-    api
-      .get<PaginatedResponse<ObjektRead>>('/objekte', { params })
-      .then((r) => r.data),
+  ) => api.get<PaginatedResponse<ObjektRead>>('/objekte', { params }).then((r) => r.data),
   get: (id: string) => api.get<ObjektRead>(`/objekte/${id}`).then((r) => r.data),
   create: (payload: ObjektCreate) =>
     api.post<ObjektRead>('/objekte', payload).then((r) => r.data),
@@ -239,9 +221,7 @@ export const objektApi = {
 
 export const photoApi = {
   list: (ticketId: string) =>
-    api
-      .get<TicketPhotoRead[]>(`/tickets/${ticketId}/photos`)
-      .then((r) => r.data),
+    api.get<TicketPhotoRead[]>(`/tickets/${ticketId}/photos`).then((r) => r.data),
   upload: (ticketId: string, file: File, beschreibung?: string) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -254,15 +234,10 @@ export const photoApi = {
   },
   update: (ticketId: string, photoId: string, payload: TicketPhotoUpdate) =>
     api
-      .patch<TicketPhotoRead>(
-        `/tickets/${ticketId}/photos/${photoId}`,
-        payload,
-      )
+      .patch<TicketPhotoRead>(`/tickets/${ticketId}/photos/${photoId}`, payload)
       .then((r) => r.data),
   remove: (ticketId: string, photoId: string) =>
-    api
-      .delete<void>(`/tickets/${ticketId}/photos/${photoId}`)
-      .then(() => undefined),
+    api.delete<void>(`/tickets/${ticketId}/photos/${photoId}`).then(() => undefined),
   fetchBlob: (ticketId: string, photoId: string) =>
     api
       .get<Blob>(`/tickets/${ticketId}/photos/${photoId}/file`, {
@@ -273,17 +248,13 @@ export const photoApi = {
 
 export const chatApi = {
   list: (ticketId: string) =>
-    api
-      .get<TicketMessageRead[]>(`/tickets/${ticketId}/messages`)
-      .then((r) => r.data),
+    api.get<TicketMessageRead[]>(`/tickets/${ticketId}/messages`).then((r) => r.data),
   create: (ticketId: string, payload: TicketMessageCreate) =>
     api
       .post<TicketMessageRead>(`/tickets/${ticketId}/messages`, payload)
       .then((r) => r.data),
   remove: (ticketId: string, messageId: string) =>
-    api
-      .delete<void>(`/tickets/${ticketId}/messages/${messageId}`)
-      .then(() => undefined),
+    api.delete<void>(`/tickets/${ticketId}/messages/${messageId}`).then(() => undefined),
   markRead: (ticketId: string) =>
     api.post<void>(`/tickets/${ticketId}/messages/mark-read`).then(() => undefined),
 };
@@ -296,34 +267,27 @@ export const ansichtenApi = {
       })
       .then((r) => r.data),
   create: (payload: GespeicherteAnsichtCreate) =>
-    api
-      .post<GespeicherteAnsichtRead>('/ansichten', payload)
-      .then((r) => r.data),
+    api.post<GespeicherteAnsichtRead>('/ansichten', payload).then((r) => r.data),
   update: (id: string, payload: GespeicherteAnsichtUpdate) =>
-    api
-      .patch<GespeicherteAnsichtRead>(`/ansichten/${id}`, payload)
-      .then((r) => r.data),
-  remove: (id: string) =>
-    api.delete<void>(`/ansichten/${id}`).then(() => undefined),
+    api.patch<GespeicherteAnsichtRead>(`/ansichten/${id}`, payload).then((r) => r.data),
+  remove: (id: string) => api.delete<void>(`/ansichten/${id}`).then(() => undefined),
 };
 
 export const tickettypApi = {
   list: (params?: { aktiv_only?: boolean }) =>
     api.get<TickettypRead[]>('/tickettypen', { params }).then((r) => r.data),
-  get: (id: UUID) =>
-    api.get<TickettypRead>(`/tickettypen/${id}`).then((r) => r.data),
+  get: (id: UUID) => api.get<TickettypRead>(`/tickettypen/${id}`).then((r) => r.data),
   create: (payload: TickettypCreate) =>
     api.post<TickettypRead>('/tickettypen', payload).then((r) => r.data),
   update: (id: UUID, payload: TickettypUpdate) =>
     api.patch<TickettypRead>(`/tickettypen/${id}`, payload).then((r) => r.data),
   updateFelder: (id: UUID, payload: TickettypFeldUpdate[]) =>
-    api
-      .patch<TickettypRead>(`/tickettypen/${id}/felder`, payload)
-      .then((r) => r.data),
+    api.patch<TickettypRead>(`/tickettypen/${id}/felder`, payload).then((r) => r.data),
+  saveLayout: (id: UUID, payload: LayoutWrite) =>
+    api.put<TickettypRead>(`/tickettypen/${id}/layout`, payload).then((r) => r.data),
   duplicate: (id: UUID) =>
     api.post<TickettypRead>(`/tickettypen/${id}/duplicate`).then((r) => r.data),
-  remove: (id: UUID) =>
-    api.delete<void>(`/tickettypen/${id}`).then(() => undefined),
+  remove: (id: UUID) => api.delete<void>(`/tickettypen/${id}`).then(() => undefined),
 };
 
 export const statusWorkflowApi = {
@@ -340,16 +304,13 @@ export const anlageApi = {
       aktiv_only?: boolean;
       limit?: number;
     } = {},
-  ) =>
-    api.get<AnlageRead[]>('/anlagen', { params }).then((r) => r.data),
-  get: (id: UUID) =>
-    api.get<AnlageRead>(`/anlagen/${id}`).then((r) => r.data),
+  ) => api.get<AnlageRead[]>('/anlagen', { params }).then((r) => r.data),
+  get: (id: UUID) => api.get<AnlageRead>(`/anlagen/${id}`).then((r) => r.data),
   create: (payload: AnlageCreate) =>
     api.post<AnlageRead>('/anlagen', payload).then((r) => r.data),
   update: (id: UUID, payload: AnlageUpdate) =>
     api.patch<AnlageRead>(`/anlagen/${id}`, payload).then((r) => r.data),
-  remove: (id: UUID) =>
-    api.delete<void>(`/anlagen/${id}`).then(() => undefined),
+  remove: (id: UUID) => api.delete<void>(`/anlagen/${id}`).then(() => undefined),
 };
 
 export const fehlercodeApi = {
@@ -360,35 +321,24 @@ export const fehlercodeApi = {
       aktiv_only?: boolean;
       limit?: number;
     } = {},
-  ) =>
-    api
-      .get<FehlercodeRead[]>('/fehlercodes', { params })
-      .then((r) => r.data),
-  get: (id: UUID) =>
-    api.get<FehlercodeRead>(`/fehlercodes/${id}`).then((r) => r.data),
+  ) => api.get<FehlercodeRead[]>('/fehlercodes', { params }).then((r) => r.data),
+  get: (id: UUID) => api.get<FehlercodeRead>(`/fehlercodes/${id}`).then((r) => r.data),
   create: (payload: FehlercodeCreate) =>
     api.post<FehlercodeRead>('/fehlercodes', payload).then((r) => r.data),
   update: (id: UUID, payload: FehlercodeUpdate) =>
-    api
-      .patch<FehlercodeRead>(`/fehlercodes/${id}`, payload)
-      .then((r) => r.data),
-  remove: (id: UUID) =>
-    api.delete<void>(`/fehlercodes/${id}`).then(() => undefined),
+    api.patch<FehlercodeRead>(`/fehlercodes/${id}`, payload).then((r) => r.data),
+  remove: (id: UUID) => api.delete<void>(`/fehlercodes/${id}`).then(() => undefined),
 };
 
 export const projektApi = {
   list: (params: ProjektListFilters = {}) =>
-    api
-      .get<ProjektRead[]>('/projekte', { params })
-      .then((r) => r.data),
-  get: (id: UUID) =>
-    api.get<ProjektRead>(`/projekte/${id}`).then((r) => r.data),
+    api.get<ProjektRead[]>('/projekte', { params }).then((r) => r.data),
+  get: (id: UUID) => api.get<ProjektRead>(`/projekte/${id}`).then((r) => r.data),
   create: (payload: ProjektCreate) =>
     api.post<ProjektRead>('/projekte', payload).then((r) => r.data),
   update: (id: UUID, payload: ProjektUpdate) =>
     api.patch<ProjektRead>(`/projekte/${id}`, payload).then((r) => r.data),
-  remove: (id: UUID) =>
-    api.delete<void>(`/projekte/${id}`).then(() => undefined),
+  remove: (id: UUID) => api.delete<void>(`/projekte/${id}`).then(() => undefined),
   getTickets: (id: UUID, params: ProjektTicketsParams = {}) =>
     api
       .get<PaginatedResponse<TicketRead>>(`/projekte/${id}/tickets`, { params })
@@ -397,21 +347,15 @@ export const projektApi = {
 
 export const objektstrukturApi = {
   listHaus: (objektId: UUID) =>
-    api
-      .get<HausRead[]>(`/objektstruktur/objekte/${objektId}/haus`)
-      .then((r) => r.data),
+    api.get<HausRead[]>(`/objektstruktur/objekte/${objektId}/haus`).then((r) => r.data),
   createHaus: (objektId: UUID, payload: HausCreate) =>
     api
       .post<HausRead>(`/objektstruktur/objekte/${objektId}/haus`, payload)
       .then((r) => r.data),
   updateHaus: (hausId: UUID, payload: HausUpdate) =>
-    api
-      .patch<HausRead>(`/objektstruktur/haus/${hausId}`, payload)
-      .then((r) => r.data),
+    api.patch<HausRead>(`/objektstruktur/haus/${hausId}`, payload).then((r) => r.data),
   removeHaus: (hausId: UUID) =>
-    api
-      .delete<void>(`/objektstruktur/haus/${hausId}`)
-      .then(() => undefined),
+    api.delete<void>(`/objektstruktur/haus/${hausId}`).then(() => undefined),
   createStockwerk: (hausId: UUID, payload: StockwerkCreate) =>
     api
       .post<StockwerkRead>(`/objektstruktur/haus/${hausId}/stockwerke`, payload)
@@ -421,9 +365,7 @@ export const objektstrukturApi = {
       .patch<StockwerkRead>(`/objektstruktur/stockwerke/${stockwerkId}`, payload)
       .then((r) => r.data),
   removeStockwerk: (stockwerkId: UUID) =>
-    api
-      .delete<void>(`/objektstruktur/stockwerke/${stockwerkId}`)
-      .then(() => undefined),
+    api.delete<void>(`/objektstruktur/stockwerke/${stockwerkId}`).then(() => undefined),
   uploadGrundriss: (stockwerkId: UUID, file: File) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -452,9 +394,7 @@ export const objektstrukturApi = {
       .patch<EinheitRead>(`/objektstruktur/einheiten/${einheitId}`, payload)
       .then((r) => r.data),
   removeEinheit: (einheitId: UUID) =>
-    api
-      .delete<void>(`/objektstruktur/einheiten/${einheitId}`)
-      .then(() => undefined),
+    api.delete<void>(`/objektstruktur/einheiten/${einheitId}`).then(() => undefined),
 };
 
 export const notificationApi = {
@@ -462,18 +402,11 @@ export const notificationApi = {
     api
       .get<NotificationRead[]>('/notifications', { params: { limit } })
       .then((r) => r.data),
-  count: () =>
-    api
-      .get<{ unread: number }>('/notifications/count')
-      .then((r) => r.data),
+  count: () => api.get<{ unread: number }>('/notifications/count').then((r) => r.data),
   markRead: (ids: UUID[]) =>
-    api
-      .post<{ status: string }>('/notifications/mark-read', { ids })
-      .then((r) => r.data),
+    api.post<{ status: string }>('/notifications/mark-read', { ids }).then((r) => r.data),
   markAllRead: () =>
-    api
-      .post<{ status: string }>('/notifications/mark-all-read')
-      .then((r) => r.data),
+    api.post<{ status: string }>('/notifications/mark-all-read').then((r) => r.data),
 };
 
 export const dokumentApi = {
@@ -483,10 +416,7 @@ export const dokumentApi = {
       target_type?: DokumentTarget;
       target_id?: UUID;
     } = {},
-  ) =>
-    api
-      .get<DokumentRead[]>('/dokumente', { params })
-      .then((r) => r.data),
+  ) => api.get<DokumentRead[]>('/dokumente', { params }).then((r) => r.data),
   upload: (
     file: File,
     opts: {
@@ -510,22 +440,15 @@ export const dokumentApi = {
       .then((r) => r.data);
   },
   update: (id: UUID, payload: DokumentUpdate) =>
-    api
-      .patch<DokumentRead>(`/dokumente/${id}`, payload)
-      .then((r) => r.data),
-  remove: (id: UUID) =>
-    api.delete<void>(`/dokumente/${id}`).then(() => undefined),
+    api.patch<DokumentRead>(`/dokumente/${id}`, payload).then((r) => r.data),
+  remove: (id: UUID) => api.delete<void>(`/dokumente/${id}`).then(() => undefined),
   fetchBlob: (id: UUID) =>
-    api
-      .get<Blob>(`/dokumente/${id}/file`, { responseType: 'blob' })
-      .then((r) => r.data),
+    api.get<Blob>(`/dokumente/${id}/file`, { responseType: 'blob' }).then((r) => r.data),
 };
 
 export const adresseApi = {
   list: (params: { search?: string; limit?: number; offset?: number } = {}) =>
-    api
-      .get<PaginatedResponse<AdresseRead>>('/adressen', { params })
-      .then((r) => r.data),
+    api.get<PaginatedResponse<AdresseRead>>('/adressen', { params }).then((r) => r.data),
   get: (id: string) => api.get<AdresseRead>(`/adressen/${id}`).then((r) => r.data),
   create: (payload: AdresseCreate) =>
     api.post<AdresseRead>('/adressen', payload).then((r) => r.data),
