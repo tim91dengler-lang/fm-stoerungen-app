@@ -134,7 +134,6 @@ export interface TicketRead {
   prioritaet: AuswahlWertRef;
   kategorie: AuswahlWertRef | null;
   quelle: AuswahlWertRef | null;
-  melder: string | null;
   objekt: ObjektRef | null;
   haus: HausRef | null;
   stockwerk: StockwerkRef | null;
@@ -207,7 +206,6 @@ export interface TicketCreate {
   prioritaet?: TicketPrioritaetSlug;
   kategorie?: string | null;
   quelle?: string | null;
-  melder?: string | null;
   objekt_id?: UUID | null;
   haus_id?: UUID | null;
   stockwerk_id?: UUID | null;
@@ -231,7 +229,6 @@ export interface TicketUpdate {
   prioritaet?: TicketPrioritaetSlug;
   kategorie?: string | null;
   quelle?: string | null;
-  melder?: string | null;
   objekt_id?: UUID | null;
   haus_id?: UUID | null;
   stockwerk_id?: UUID | null;
@@ -551,7 +548,6 @@ export interface PartnerTicketLinkRead {
   prioritaet_farbe: string | null;
   objekt_id: UUID | null;
   objekt_name: string | null;
-  melder: string | null;
   eroeffnet_am: string;
   /** 'partner' | 'wartet_nachunternehmer' */
   rolle_am_ticket: string;
@@ -868,6 +864,7 @@ export interface ProjektListFilters {
   status?: string[];
   projekttyp?: string[];
   include_deleted?: boolean;
+  limit?: number;
 }
 
 export interface ProjektTicketsParams {

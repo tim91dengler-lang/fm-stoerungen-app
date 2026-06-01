@@ -91,7 +91,6 @@ async def create_ticket(
             anlage_id=payload.anlage_id,
             fehlercode_id=payload.fehlercode_id,
             quelle_slug=payload.quelle,
-            melder=payload.melder,
             faelligkeit_am=payload.faelligkeit_am,
             wiederholung=payload.wiederholung,
         )

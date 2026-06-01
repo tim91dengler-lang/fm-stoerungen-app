@@ -16,7 +16,7 @@ interface Props {
  *
  * Default: nur offene/in-Arbeit. Erledigte werden per Toggle zugeschaltet
  * (Endpoint-Param `include_erledigt`). 4 Default-Spalten: # / Titel / Status / Objekt.
- * Zuschaltbar: Priorität, Erstellt am, Melder.
+ * Zuschaltbar: Priorität, Erstellt am.
  */
 export function PartnerTabTickets({ partnerId, partnerName }: Props) {
   const [includeErledigt, setIncludeErledigt] = useState(false);
@@ -24,8 +24,7 @@ export function PartnerTabTickets({ partnerId, partnerName }: Props) {
   const [showOptional, setShowOptional] = useState<{
     prio: boolean;
     erstellt: boolean;
-    melder: boolean;
-  }>({ prio: false, erstellt: false, melder: false });
+  }>({ prio: false, erstellt: false });
 
   const q = useQuery({
     queryKey: ['partner', partnerId, 'tickets', includeErledigt],
@@ -37,7 +36,7 @@ export function PartnerTabTickets({ partnerId, partnerName }: Props) {
     if (!search) return q.data;
     const needle = search.toLowerCase();
     return q.data.filter((r) =>
-      [r.titel, r.status_label, r.objekt_name ?? '', r.melder ?? '', `#${r.nummer}`].some(
+      [r.titel, r.status_label, r.objekt_name ?? '', `#${r.nummer}`].some(
         (v) => v.toLowerCase().includes(needle),
       ),
     );
@@ -59,7 +58,7 @@ export function PartnerTabTickets({ partnerId, partnerName }: Props) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔍 Suche nach Nr / Titel / Objekt / Melder"
+          placeholder="🔍 Suche nach Nr / Titel / Objekt / Status"
           className="w-80 rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
         />
         <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
@@ -84,11 +83,6 @@ export function PartnerTabTickets({ partnerId, partnerName }: Props) {
             checked={showOptional.erstellt}
             onToggle={(v) => setShowOptional((s) => ({ ...s, erstellt: v }))}
           />
-          <ColCheck
-            label="Melder"
-            checked={showOptional.melder}
-            onToggle={(v) => setShowOptional((s) => ({ ...s, melder: v }))}
-          />
         </div>
       </div>
 
@@ -106,7 +100,6 @@ export function PartnerTabTickets({ partnerId, partnerName }: Props) {
               {showOptional.erstellt && (
                 <th className="px-3 py-2 font-medium">Erstellt</th>
               )}
-              {showOptional.melder && <th className="px-3 py-2 font-medium">Melder</th>}
               <th className="w-10 px-3 py-2"></th>
             </tr>
           </thead>
@@ -147,9 +140,6 @@ export function PartnerTabTickets({ partnerId, partnerName }: Props) {
                   <td className="px-3 py-2 text-xs text-zinc-400">
                     {new Date(r.eroeffnet_am).toLocaleDateString('de-DE')}
                   </td>
-                )}
-                {showOptional.melder && (
-                  <td className="px-3 py-2 text-zinc-400">{r.melder ?? '—'}</td>
                 )}
                 <td className="px-3 py-2">
                   <Link

@@ -95,6 +95,7 @@ async def list_projekte(
     status_filter: list[str] | None = None,
     projekttyp_filter: list[str] | None = None,
     include_deleted: bool = False,
+    limit: int | None = None,
 ) -> list[tuple[Projekt, int]]:
     base = select(Projekt).where(Projekt.mandant_id == mandant_id)
     if not include_deleted:
@@ -129,12 +130,10 @@ async def list_projekte(
         )
         base = base.where(Projekt.projekttyp_id.in_(typ_ids_subq))
 
-    items = (
-        (await db.execute(base.options(*_PROJEKT_LOAD_OPTIONS).order_by(desc(Projekt.created_at))))
-        .scalars()
-        .unique()
-        .all()
-    )
+    items_stmt = base.options(*_PROJEKT_LOAD_OPTIONS).order_by(desc(Projekt.created_at))
+    if limit is not None:
+        items_stmt = items_stmt.limit(limit)
+    items = (await db.execute(items_stmt)).scalars().unique().all()
 
     # Ticket-Count je Projekt
     counts: dict[UUID, int] = {}

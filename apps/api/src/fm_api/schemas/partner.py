@@ -247,6 +247,5 @@ class PartnerTicketLinkRead(BaseModel):
     prioritaet_farbe: str | None = None
     objekt_id: UUID | None = None
     objekt_name: str | None = None
-    melder: str | None = None
     eroeffnet_am: str
     rolle_am_ticket: str  # 'partner' | 'wartet_nachunternehmer'

@@ -134,7 +134,6 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         ForeignKey("auswahllisten_werte.id", ondelete="RESTRICT"),
         nullable=True,
     )
-    melder: Mapped[str | None] = mapped_column(String(200), nullable=True)
     wartet_grund_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("auswahllisten_werte.id", ondelete="RESTRICT"),

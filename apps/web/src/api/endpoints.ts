@@ -338,6 +338,7 @@ export const anlageApi = {
       search?: string;
       objekt_id?: UUID;
       aktiv_only?: boolean;
+      limit?: number;
     } = {},
   ) =>
     api.get<AnlageRead[]>('/anlagen', { params }).then((r) => r.data),
@@ -357,6 +358,7 @@ export const fehlercodeApi = {
       search?: string;
       anlage_id?: UUID;
       aktiv_only?: boolean;
+      limit?: number;
     } = {},
   ) =>
     api

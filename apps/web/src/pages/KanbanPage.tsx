@@ -42,7 +42,7 @@ export function KanbanPage() {
     if (!search.trim()) return items;
     const q = search.toLowerCase();
     return items.filter((t) =>
-      [t.titel, t.beschreibung, t.objekt?.name ?? '', t.melder ?? '', t.nummer.toString()]
+      [t.titel, t.beschreibung, t.objekt?.name ?? '', t.nummer.toString()]
         .some((v) => v.toLowerCase().includes(q)),
     );
   }, [ticketsQuery.data, search]);

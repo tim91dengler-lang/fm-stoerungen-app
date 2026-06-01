@@ -72,7 +72,6 @@ const INPUT_RENDERERS: Record<string, FeldRenderer> = {
   prio: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Priorität wählen" />,
   kategorie: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Kategorie" />,
   quelle: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Eingangskanal" />,
-  melder: (f) => <PreviewInput id={`preview-${f.feld_key}`} placeholder="Name oder Telefonnummer" />,
   objekt: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Objekt auswählen" />,
   haus: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Haus" />,
   stockwerk: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Stockwerk" />,

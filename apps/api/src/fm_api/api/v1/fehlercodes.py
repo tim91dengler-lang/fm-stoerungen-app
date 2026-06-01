@@ -89,6 +89,7 @@ async def list_fehlercodes(
     search: str | None = Query(default=None, max_length=200),
     anlage_id: UUID | None = Query(default=None),
     aktiv_only: bool = Query(default=False),
+    limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> list[FehlercodeRead]:
     items = await fehlercode_service.list_fehlercodes(
         db,
@@ -96,6 +97,7 @@ async def list_fehlercodes(
         search=search,
         anlage_id=anlage_id,
         aktiv_only=aktiv_only,
+        limit=limit,
     )
     return [_serialize(f, c) for f, c in items]
 

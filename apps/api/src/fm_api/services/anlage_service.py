@@ -28,6 +28,7 @@ async def list_anlagen(
     objekt_id: UUID | None = None,
     aktiv_only: bool = False,
     include_deleted: bool = False,
+    limit: int | None = None,
 ) -> list[Anlage]:
     stmt = select(Anlage).where(Anlage.mandant_id == mandant_id)
     if not include_deleted:
@@ -40,6 +41,8 @@ async def list_anlagen(
         like = f"%{search.lower()}%"
         stmt = stmt.where(func.lower(Anlage.bezeichnung).like(like))
     stmt = stmt.options(*_LOAD_OPTIONS).order_by(asc(Anlage.reihenfolge), asc(Anlage.bezeichnung))
+    if limit is not None:
+        stmt = stmt.limit(limit)
     return list((await db.execute(stmt)).scalars().all())
 
 

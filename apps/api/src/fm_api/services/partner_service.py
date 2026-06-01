@@ -828,7 +828,6 @@ async def list_tickets_fuer_partner(
             Ticket.id,
             Ticket.nummer,
             Ticket.titel,
-            Ticket.melder,
             Ticket.eroeffnet_am,
             Ticket.partner_id,
             Ticket.wartet_nachunternehmer_id,
@@ -883,7 +882,6 @@ async def list_tickets_fuer_partner(
                 "prioritaet_farbe": r.prio_farbe,
                 "objekt_id": r.objekt_id,
                 "objekt_name": r.objekt_name,
-                "melder": r.melder,
                 "eroeffnet_am": r.eroeffnet_am.isoformat(),
                 "rolle_am_ticket": rolle,
             }

@@ -29,6 +29,7 @@ async def list_fehlercodes(
     anlage_id: UUID | None = None,
     aktiv_only: bool = False,
     include_deleted: bool = False,
+    limit: int | None = None,
 ) -> list[tuple[Fehlercode, int]]:
     stmt = select(Fehlercode).where(Fehlercode.mandant_id == mandant_id)
     if not include_deleted:
@@ -46,6 +47,8 @@ async def list_fehlercodes(
             )
         )
     stmt = stmt.options(*_LOAD_OPTIONS).order_by(asc(Fehlercode.code))
+    if limit is not None:
+        stmt = stmt.limit(limit)
     items = list((await db.execute(stmt)).scalars().all())
 
     # Nutzungs-Statistik (wie oft als fehlercode_id an einem Ticket referenziert)

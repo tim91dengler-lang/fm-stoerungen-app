@@ -24,24 +24,22 @@ interface EntitySearchSelectProps {
   /** Resolve the label for a preset id when no initialLabel is known (rare; e.g. defaults). */
   loadLabel?: (id: string) => Promise<string | null>;
   placeholder?: string;
-  /** Hint shown before the minimum query length is reached. */
-  emptyHint?: string;
   disabled?: boolean;
   allowClear?: boolean;
   id?: string;
   className?: string;
 }
 
-const SEARCH_MIN_LEN = 2;
 const DEBOUNCE_MS = 250;
 
 /**
  * Single-select picker mit Server-Side-Search — für Bewegungsdaten-Felder mit
  * tausenden bis hunderttausenden Einträgen (Geschäftspartner, Objekte, Projekte).
  *
- * Kein Vorab-Load: tippen ab 2 Zeichen → debounced Server-Suche. Anders als das
- * Multi-Select `PartnerSearchSelect` liefert/erwartet diese Komponente genau einen Wert
- * und ist über einen austauschbaren `fetcher` für jede Entität nutzbar.
+ * Beim Öffnen wird die erste Seite (~20) geladen, danach debounced gefiltert —
+ * nicht leer, aber tippbar. Anders als das Multi-Select `PartnerSearchSelect`
+ * liefert/erwartet diese Komponente genau einen Wert und ist über einen
+ * austauschbaren `fetcher` für jede Entität nutzbar.
  */
 export function EntitySearchSelect({
   value,
@@ -51,7 +49,6 @@ export function EntitySearchSelect({
   initialLabel = null,
   loadLabel,
   placeholder = 'Suchen …',
-  emptyHint = 'Mindestens 2 Zeichen eingeben.',
   disabled = false,
   allowClear = true,
   id,
@@ -113,7 +110,10 @@ export function EntitySearchSelect({
     };
   }, [open]);
 
-  const searchEnabled = open && debouncedQuery.length >= SEARCH_MIN_LEN;
+  // Beim Öffnen direkt die erste Seite laden (Browse), auch ohne Eingabe — nicht
+  // leer, aber tippend filterbar (Tim 2026-06-01). Bei 1 Zeichen wird ebenfalls
+  // schon gesucht; der Server liefert je nur ~20 Treffer → günstig.
+  const searchEnabled = open;
 
   const searchQuery = useQuery({
     queryKey: ['entity-search', queryKey, debouncedQuery],
@@ -184,13 +184,11 @@ export function EntitySearchSelect({
             />
           </div>
           <div className="max-h-60 overflow-y-auto p-1">
-            {!searchEnabled ? (
-              <p className="px-2 py-3 text-center text-xs text-zinc-500">{emptyHint}</p>
-            ) : searchQuery.isFetching ? (
+            {searchQuery.isFetching ? (
               <p className="px-2 py-3 text-center text-xs text-zinc-500">Suche …</p>
             ) : hits.length === 0 ? (
               <p className="px-2 py-3 text-center text-xs text-zinc-500">
-                Keine Treffer für „{debouncedQuery}“.
+                {debouncedQuery ? `Keine Treffer für „${debouncedQuery}“.` : 'Keine Einträge.'}
               </p>
             ) : (
               hits.map((opt) => {
