@@ -56,6 +56,10 @@ jobs:
         with:
           context: apps/web
           push: true
+          # Stufe C (vorlage_layout_v2) auf Staging standardmäßig AN — Tim
+          # testet live ohne Flag-Umschaltung. Code-Default bleibt AUS.
+          build-args: |
+            VITE_VORLAGE_LAYOUT_V2=1
           tags: |
             ${{ env.IMAGE_WEB }}:${{ steps.meta.outputs.tag }}
             ${{ env.IMAGE_WEB }}:staging

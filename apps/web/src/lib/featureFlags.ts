@@ -33,6 +33,26 @@ export function isVorlageLayoutV2(): boolean {
   return truthy(import.meta.env.VITE_VORLAGE_LAYOUT_V2);
 }
 
+/**
+ * Übernimmt einen `?ff_vorlage_layout_v2=1|0`-URL-Parameter in localStorage,
+ * damit das Flag per Link (statt DevTools-Konsole) umgeschaltet werden kann —
+ * gedacht für die Staging-Acceptance durch nicht-technische Tester. Der Wert
+ * wird persistiert und bleibt so über Navigation/Reload erhalten.
+ *
+ * Beim App-Start (`main.tsx`) genau einmal aufrufen.
+ */
+export function syncVorlageLayoutV2FromUrl(): void {
+  try {
+    const raw = new URLSearchParams(window.location.search).get(
+      VORLAGE_LAYOUT_V2_STORAGE_KEY,
+    );
+    if (raw === null) return;
+    window.localStorage.setItem(VORLAGE_LAYOUT_V2_STORAGE_KEY, truthy(raw) ? '1' : '0');
+  } catch {
+    // localStorage/URL nicht verfügbar (Privatmodus o. Ä.) — Flag bleibt auf Default.
+  }
+}
+
 /** Nur für Tests: Flag erzwingen (`true`/`false`) oder auf Env zurücksetzen (`null`). */
 export function __setVorlageLayoutV2(value: boolean | null): void {
   override = value;
