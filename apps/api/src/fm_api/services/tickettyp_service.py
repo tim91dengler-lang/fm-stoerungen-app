@@ -268,8 +268,42 @@ async def _reconcile_vorlage_layout(db: AsyncSession, tickettyp: Tickettyp) -> N
             seeded_block = True
     if seeded_block:
         await db.flush()
-    if not tickettyp.felder:
-        _seed_default_felder(db, tickettyp.id, block_by_key)
+
+    # Fehlende Katalog-Felder ergänzen — NICHT nur 0-Feld-Vorlagen, auch teilbefüllte
+    # Alt-Seeds (z.B. nur "titel") auf den vollen Katalog heben. Sonst rendert die
+    # datengetriebene Engine die Vorlage sparse, während der Alt-Pfad (Default-sichtbar)
+    # alle Felder zeigt. Block-lokale reihenfolge wird ans Ende des Blocks angehängt.
+    have = {f.feld_key for f in tickettyp.felder}
+    block_id_to_key = {b.id: b.block_key for b in block_by_key.values()}
+    next_idx: dict[str, int] = {}
+    for f in tickettyp.felder:
+        if f.block_id is None:
+            continue
+        bk = block_id_to_key.get(f.block_id)
+        if bk is not None:
+            next_idx[bk] = max(next_idx.get(bk, -1), f.reihenfolge)
+    changed = False
+    for feld_key, label, sichtbar, pflicht, _alt in DEFAULT_SYSTEM_FELDER:
+        if feld_key in have:
+            continue
+        target_key = DEFAULT_FELD_BLOCK_MAP.get(feld_key, FALLBACK_BLOCK_KEY)
+        block = block_by_key.get(target_key) or block_by_key[FALLBACK_BLOCK_KEY]
+        idx = next_idx.get(block.block_key, -1) + 1
+        next_idx[block.block_key] = idx
+        db.add(
+            TickettypFeld(
+                tickettyp_id=tickettyp.id,
+                feld_key=feld_key,
+                label=label,
+                ist_system_feld=True,
+                sichtbar=sichtbar,
+                pflicht=pflicht,
+                reihenfolge=idx,
+                block_id=block.id,
+            )
+        )
+        changed = True
+    if changed:
         await db.flush()
 
 
@@ -372,8 +406,9 @@ async def ensure_default_vorlagen(db: AsyncSession, mandant_id: UUID) -> None:
         .execution_options(populate_existing=True)
     )
     for tt in (await db.execute(stmt)).scalars().all():
-        if not tt.felder or not tt.bloecke:
-            await _reconcile_vorlage_layout(db, tt)
+        # Reconcile ist idempotent (ergänzt nur fehlende Blöcke/Felder) — auch
+        # teilbefüllte Alt-Seeds (z.B. nur "titel") auf den vollen Katalog heben.
+        await _reconcile_vorlage_layout(db, tt)
     await ensure_alles_vorlage_vollstaendig(db, mandant_id)
 
 
