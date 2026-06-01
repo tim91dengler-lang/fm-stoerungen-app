@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import {
   auswahllistenApi,
-  objektApi,
   objektstrukturApi,
   statusWorkflowApi,
   ticketApi,
@@ -30,6 +29,7 @@ import {
 } from '../api/endpoints';
 import { EntitySearchSelect } from './EntitySearchSelect';
 import { BeteiligteBlock } from './BeteiligteBlock';
+import { TicketAdresseField } from './TicketAdresseField';
 import {
   makeAnlageSearch,
   makeFehlercodeSearch,
@@ -37,7 +37,6 @@ import {
   searchObjekte,
 } from '../lib/entitySearch';
 import type {
-  AdresseRead,
   StatusWertMini,
   TicketPrioritaetSlug,
   TicketRead,
@@ -60,22 +59,6 @@ import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 interface Props {
   ticketId: string | null;
   onClose: () => void;
-}
-
-/** Adresse einzeilig: „Straße Nr, PLZ Ort". */
-function formatAdresse(a: AdresseRead): string {
-  const strasse = [a.strasse, a.hausnummer].filter(Boolean).join(' ');
-  const ort = [a.plz, a.ort].filter(Boolean).join(' ');
-  return [strasse, ort].filter(Boolean).join(', ');
-}
-
-/** Google-Maps-Such-URL — Koordinaten bevorzugt (präziser), sonst Adress-String. */
-function mapsUrl(a: AdresseRead): string {
-  const query =
-    a.latitude != null && a.longitude != null
-      ? `${a.latitude},${a.longitude}`
-      : formatAdresse(a);
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 interface PendingSwitch {
@@ -184,14 +167,6 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     enabled: !!t0?.objekt?.id,
     staleTime: 30_000,
   });
-  // Objekt-Detail nur für die Adresse (Verortung) — der Techniker sieht, wo hin.
-  const objektDetailQuery = useQuery({
-    queryKey: ['objekt-detail', t0?.objekt?.id],
-    queryFn: () => objektApi.get(t0!.objekt!.id),
-    enabled: !!t0?.objekt?.id,
-    staleTime: 60_000,
-  });
-
   const felder = useMemo(() => vorlageFelder(tickettypQuery.data ?? null), [tickettypQuery.data]);
 
   const switchOptions = useMemo(() => {
@@ -621,25 +596,11 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             )}
                           </div>
                         )}
-                        {t.objekt && objektDetailQuery.data?.adresse && (
-                          <a
-                            href={mapsUrl(objektDetailQuery.data.adresse)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-start gap-1.5 rounded-md border border-zinc-800 bg-zinc-950/40 px-2.5 py-2 text-sky-300 hover:border-sky-500/40 hover:bg-sky-500/5"
-                            title="In Google Maps öffnen"
-                          >
-                            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                            <span className="flex flex-col leading-tight">
-                              <span className="font-medium">
-                                {formatAdresse(objektDetailQuery.data.adresse)}
-                              </span>
-                              <span className="text-[10px] text-zinc-500">
-                                In Google Maps öffnen ↗
-                              </span>
-                            </span>
-                          </a>
-                        )}
+                        <TicketAdresseField
+                          adresse={t.adresse}
+                          isEigen={!!t.adresse_id}
+                          onSet={(adresse_id) => update.mutate({ adresse_id })}
+                        />
                         {felder.sichtbar('anlage') && (
                           <FeldSearchSelect
                             label="Anlage"

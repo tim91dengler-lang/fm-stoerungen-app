@@ -13,6 +13,7 @@ from fm_api.db.base import Base
 from fm_api.models.mixins import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 if TYPE_CHECKING:
+    from fm_api.models.adresse import Adresse
     from fm_api.models.anlage import Anlage
     from fm_api.models.auswahlliste import AuswahllistenWert
     from fm_api.models.fehlercode import Fehlercode
@@ -83,6 +84,14 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     objekt_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("objekte.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # Ticket-eigene Adresse (frei wählbar, unabhängig vom Objekt). Default-Anzeige
+    # ist die Objekt-Adresse; ist diese FK gesetzt, überschreibt sie den Default.
+    adresse_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("adressen.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -192,6 +201,7 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         foreign_keys=[kategorie_id], lazy="raise"
     )
     objekt: Mapped["Objekt | None"] = relationship(lazy="raise")
+    adresse: Mapped["Adresse | None"] = relationship(foreign_keys=[adresse_id], lazy="raise")
     haus: Mapped["Haus | None"] = relationship(lazy="raise")
     stockwerk: Mapped["ObjektStockwerk | None"] = relationship(lazy="raise")
     einheit: Mapped["StockwerkEinheit | None"] = relationship(lazy="raise")

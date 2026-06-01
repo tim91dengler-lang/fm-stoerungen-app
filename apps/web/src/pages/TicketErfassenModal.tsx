@@ -18,6 +18,8 @@ import { farbeClassHover } from '../components/TickettypFarbe';
 import { iconFor } from '../components/TickettypIcon';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { GrundrissPin } from '../components/GrundrissPin';
+import { TicketAdresseField } from '../components/TicketAdresseField';
+import type { AdresseRead } from '../api/types';
 import { EntitySearchSelect } from '../components/EntitySearchSelect';
 import { BeteiligteCreateEditor } from '../components/BeteiligteCreateEditor';
 import type { TicketBeteiligterWrite } from '../api/types';
@@ -89,6 +91,8 @@ export function TicketErfassenModal({
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [beteiligte, setBeteiligte] = useState<TicketBeteiligterWrite[]>([]);
+  const [adresseId, setAdresseId] = useState<string | null>(null);
+  const [selectedAdresse, setSelectedAdresse] = useState<AdresseRead | null>(null);
 
   const {
     register,
@@ -192,6 +196,7 @@ export function TicketErfassenModal({
         kategorie: data.kategorie || null,
         quelle: data.quelle || null,
         objekt_id: data.objekt_id || null,
+        adresse_id: adresseId,
         haus_id: data.haus_id || null,
         stockwerk_id: data.stockwerk_id || null,
         einheit_id: data.einheit_id || null,
@@ -534,6 +539,17 @@ export function TicketErfassenModal({
                 </div>
               )}
             </div>
+          )}
+
+          {feldSichtbar('objekt') && (
+            <TicketAdresseField
+              adresse={selectedAdresse}
+              isEigen={!!adresseId}
+              onSet={(id, a) => {
+                setAdresseId(id);
+                setSelectedAdresse(a);
+              }}
+            />
           )}
 
           <div className="grid grid-cols-2 gap-3">

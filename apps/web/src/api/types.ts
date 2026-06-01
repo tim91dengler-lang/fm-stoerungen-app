@@ -135,6 +135,8 @@ export interface TicketRead {
   kategorie: AuswahlWertRef | null;
   quelle: AuswahlWertRef | null;
   objekt: ObjektRef | null;
+  adresse_id: UUID | null;
+  adresse: AdresseRead | null;
   haus: HausRef | null;
   stockwerk: StockwerkRef | null;
   einheit: EinheitRef | null;
@@ -207,6 +209,7 @@ export interface TicketCreate {
   kategorie?: string | null;
   quelle?: string | null;
   objekt_id?: UUID | null;
+  adresse_id?: UUID | null;
   haus_id?: UUID | null;
   stockwerk_id?: UUID | null;
   einheit_id?: UUID | null;
@@ -230,6 +233,7 @@ export interface TicketUpdate {
   kategorie?: string | null;
   quelle?: string | null;
   objekt_id?: UUID | null;
+  adresse_id?: UUID | null;
   haus_id?: UUID | null;
   stockwerk_id?: UUID | null;
   einheit_id?: UUID | null;

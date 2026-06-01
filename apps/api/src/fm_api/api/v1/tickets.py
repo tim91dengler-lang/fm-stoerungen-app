@@ -79,6 +79,7 @@ async def create_ticket(
             prioritaet_slug=payload.prioritaet,
             kategorie_slug=payload.kategorie,
             objekt_id=payload.objekt_id,
+            adresse_id=payload.adresse_id,
             haus_id=payload.haus_id,
             stockwerk_id=payload.stockwerk_id,
             einheit_id=payload.einheit_id,
