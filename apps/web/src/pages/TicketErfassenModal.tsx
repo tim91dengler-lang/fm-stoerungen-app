@@ -37,7 +37,6 @@ const schema = z.object({
   prioritaet: z.enum(['niedrig', 'mittel', 'hoch', 'kritisch']).default('mittel'),
   kategorie: z.string().optional().nullable(),
   quelle: z.string().optional().nullable(),
-  melder: z.string().max(200).optional().nullable(),
   objekt_id: z.string().uuid().optional().nullable(),
   haus_id: z.string().uuid().optional().nullable(),
   stockwerk_id: z.string().uuid().optional().nullable(),
@@ -107,7 +106,6 @@ export function TicketErfassenModal({
       prioritaet: 'mittel',
       kategorie: null,
       quelle: 'manuell',
-      melder: '',
       objekt_id: null,
       haus_id: null,
       stockwerk_id: null,
@@ -193,7 +191,6 @@ export function TicketErfassenModal({
         prioritaet: data.prioritaet,
         kategorie: data.kategorie || null,
         quelle: data.quelle || null,
-        melder: data.melder || null,
         objekt_id: data.objekt_id || null,
         haus_id: data.haus_id || null,
         stockwerk_id: data.stockwerk_id || null,
@@ -229,7 +226,6 @@ export function TicketErfassenModal({
       ['kategorie', 'Kategorie', data.kategorie],
       ['anlage', 'Anlage', data.anlage_id],
       ['fehlercode', 'Fehlercode', data.fehlercode_id],
-      ['melder', 'Melder', data.melder],
       ['quelle', 'Quelle', data.quelle],
       ['projekt', 'Projekt', data.projekt_id],
       ['faelligkeit_am', 'Fälligkeit', data.faelligkeit_am],
@@ -418,19 +414,6 @@ export function TicketErfassenModal({
                     </option>
                   ))}
                 </select>
-              </div>
-            )}
-            {feldSichtbar('melder') && (
-              <div>
-                <label htmlFor="melder" className="block text-sm font-medium text-zinc-300">
-                  Melder / Anrufer
-                </label>
-                <input
-                  id="melder"
-                  {...register('melder')}
-                  placeholder="Name oder Telefonnummer"
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-                />
               </div>
             )}
           </div>

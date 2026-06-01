@@ -108,7 +108,8 @@ DEFAULT_SYSTEM_FELDER: list[tuple[str, str, bool, bool, int]] = [
     ("kategorie", "Kategorie", True, False, 7),
     ("prio", "Priorität", True, False, 8),
     ("pin", "Foto-Pin", True, False, 9),
-    ("melder", "Melder", True, False, 10),
+    # "melder" entfernt 2026-06-01: durch die Beteiligten-Liste abgelöst (Tim).
+    # Die Ticket-Spalte ``melder`` bleibt zur Datenerhaltung bestehen.
     ("quelle", "Eingangskanal", True, False, 11),
     ("beschreibung", "Beschreibung", True, True, 12),
     ("foto", "Foto", True, False, 13),

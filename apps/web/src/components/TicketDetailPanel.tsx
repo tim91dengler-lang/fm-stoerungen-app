@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import {
   auswahllistenApi,
+  objektApi,
   objektstrukturApi,
   statusWorkflowApi,
   ticketApi,
@@ -36,6 +37,7 @@ import {
   searchObjekte,
 } from '../lib/entitySearch';
 import type {
+  AdresseRead,
   StatusWertMini,
   TicketPrioritaetSlug,
   TicketRead,
@@ -58,6 +60,22 @@ import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 interface Props {
   ticketId: string | null;
   onClose: () => void;
+}
+
+/** Adresse einzeilig: „Straße Nr, PLZ Ort". */
+function formatAdresse(a: AdresseRead): string {
+  const strasse = [a.strasse, a.hausnummer].filter(Boolean).join(' ');
+  const ort = [a.plz, a.ort].filter(Boolean).join(' ');
+  return [strasse, ort].filter(Boolean).join(', ');
+}
+
+/** Google-Maps-Such-URL — Koordinaten bevorzugt (präziser), sonst Adress-String. */
+function mapsUrl(a: AdresseRead): string {
+  const query =
+    a.latitude != null && a.longitude != null
+      ? `${a.latitude},${a.longitude}`
+      : formatAdresse(a);
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 interface PendingSwitch {
@@ -84,7 +102,6 @@ const FELD_NULL_CONFIG: {
   { feldKey: 'partner', label: 'Partner', hasValue: (t) => !!t.partner, patch: { partner_id: null } },
   { feldKey: 'kategorie', label: 'Kategorie', hasValue: (t) => !!t.kategorie, patch: { kategorie: null } },
   { feldKey: 'quelle', label: 'Quelle', hasValue: (t) => !!t.quelle, patch: { quelle: null } },
-  { feldKey: 'melder', label: 'Melder', hasValue: (t) => !!t.melder, patch: { melder: null } },
   { feldKey: 'projekt', label: 'Projekt', hasValue: (t) => !!t.projekt, patch: { projekt_id: null } },
   { feldKey: 'fehlercode', label: 'Fehlercode', hasValue: (t) => !!t.fehlercode, patch: { fehlercode_id: null } },
   { feldKey: 'faelligkeit_am', label: 'Fälligkeitsdatum', hasValue: (t) => !!t.faelligkeit_am, patch: { faelligkeit_am: null } },
@@ -166,6 +183,13 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     queryFn: () => objektstrukturApi.listHaus(t0!.objekt!.id),
     enabled: !!t0?.objekt?.id,
     staleTime: 30_000,
+  });
+  // Objekt-Detail nur für die Adresse (Verortung) — der Techniker sieht, wo hin.
+  const objektDetailQuery = useQuery({
+    queryKey: ['objekt-detail', t0?.objekt?.id],
+    queryFn: () => objektApi.get(t0!.objekt!.id),
+    enabled: !!t0?.objekt?.id,
+    staleTime: 60_000,
   });
 
   const felder = useMemo(() => vorlageFelder(tickettypQuery.data ?? null), [tickettypQuery.data]);
@@ -492,32 +516,22 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                 )}
 
                 {/* ② KONTAKT & BETEILIGTE */}
-                {(felder.sichtbar('melder') || felder.sichtbar('partner')) && (
+                {felder.sichtbar('partner') && (
                   <div className="order-2 lg:order-none">
                     <Accordion title="Kontakt & Beteiligte" defaultOpen>
                       <div className="space-y-3">
-                        {felder.sichtbar('melder') && (
-                          <TextField
-                            key={`melder-${t.id}`}
-                            label="Melder / Anrufer"
-                            defaultValue={t.melder ?? ''}
-                            onCommit={(v) => update.mutate({ melder: v || null })}
-                          />
-                        )}
-                        {felder.sichtbar('partner') && (
-                          <div>
-                            <div className="mb-1 flex items-center gap-1 text-xs text-zinc-400">
-                              <Users2 className="h-3.5 w-3.5" /> Beteiligte
-                            </div>
-                            <BeteiligteBlock
-                              beteiligte={t.beteiligte}
-                              rolleOptions={aktiveWerte(beteiligtenRolleListe?.werte).map(
-                                (w) => ({ key: w.key, label: w.label }),
-                              )}
-                              onChange={(beteiligte) => update.mutate({ beteiligte })}
-                            />
+                        <div>
+                          <div className="mb-1 flex items-center gap-1 text-xs text-zinc-400">
+                            <Users2 className="h-3.5 w-3.5" /> Beteiligte
                           </div>
-                        )}
+                          <BeteiligteBlock
+                            beteiligte={t.beteiligte}
+                            rolleOptions={aktiveWerte(beteiligtenRolleListe?.werte).map(
+                              (w) => ({ key: w.key, label: w.label }),
+                            )}
+                            onChange={(beteiligte) => update.mutate({ beteiligte })}
+                          />
+                        </div>
                       </div>
                     </Accordion>
                   </div>
@@ -606,6 +620,25 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                               </FeldSelect>
                             )}
                           </div>
+                        )}
+                        {t.objekt && objektDetailQuery.data?.adresse && (
+                          <a
+                            href={mapsUrl(objektDetailQuery.data.adresse)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-start gap-1.5 rounded-md border border-zinc-800 bg-zinc-950/40 px-2.5 py-2 text-sky-300 hover:border-sky-500/40 hover:bg-sky-500/5"
+                            title="In Google Maps öffnen"
+                          >
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span className="flex flex-col leading-tight">
+                              <span className="font-medium">
+                                {formatAdresse(objektDetailQuery.data.adresse)}
+                              </span>
+                              <span className="text-[10px] text-zinc-500">
+                                In Google Maps öffnen ↗
+                              </span>
+                            </span>
+                          </a>
                         )}
                         {felder.sichtbar('anlage') && (
                           <FeldSearchSelect
@@ -1080,29 +1113,6 @@ function FeldSearchSelect({
           placeholder={placeholder}
         />
       </div>
-    </div>
-  );
-}
-
-/** Editierbares Textfeld mit Commit beim Verlassen (onBlur). */
-function TextField({
-  label,
-  defaultValue,
-  onCommit,
-}: {
-  label: string;
-  defaultValue: string;
-  onCommit: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label className="block text-xs text-zinc-400">{label}</label>
-      <input
-        type="text"
-        defaultValue={defaultValue}
-        onBlur={(e) => e.target.value !== defaultValue && onCommit(e.target.value)}
-        className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
-      />
     </div>
   );
 }
