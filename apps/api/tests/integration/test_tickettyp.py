@@ -39,7 +39,7 @@ async def _seed_system_tickettyp(db, mandant_id, key: str = "reparatur") -> Tick
 
 
 @pytest.mark.integration
-async def test_create_tickettyp_seedet_19_systemfelder(client, admin_user) -> None:
+async def test_create_tickettyp_seedet_18_systemfelder(client, admin_user) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
 
@@ -55,7 +55,8 @@ async def test_create_tickettyp_seedet_19_systemfelder(client, admin_user) -> No
     assert body["label"] == "Umzug"
     assert body["ist_system"] is False
     assert body["aktiv"] is True
-    assert len(body["felder"]) == 19
+    assert len(body["felder"]) == 18
+    assert "melder" not in {f["feld_key"] for f in body["felder"]}
 
     feld_keys = {f["feld_key"] for f in body["felder"]}
     assert "titel" in feld_keys
