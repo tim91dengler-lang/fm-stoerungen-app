@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from fm_api.models import Tickettyp
+from fm_api.models import Tickettyp, TickettypFeld
 from fm_api.services import tickettyp_service as svc
 
 
@@ -121,3 +121,42 @@ async def test_reconcile_hebt_felderlose_altvorlage(db, mandant) -> None:
     ).scalar_one()
     assert len(reloaded.felder) == 19
     assert len(reloaded.bloecke) == 7
+
+
+@pytest.mark.integration
+async def test_reconcile_fuellt_teilbefuellte_altvorlage(db, mandant) -> None:
+    """H2-Folge: eine Vorlage mit nur 1 Feld (Alt-Seed) wird auf den vollen Katalog
+    gehoben — sonst rendert die datengetriebene Engine sparse."""
+    legacy = Tickettyp(
+        mandant_id=mandant.id, key="legacy1", label="Legacy1", ist_system=True, aktiv=True
+    )
+    db.add(legacy)
+    await db.flush()
+    db.add(
+        TickettypFeld(
+            tickettyp_id=legacy.id,
+            feld_key="titel",
+            label="Titel",
+            ist_system_feld=True,
+            sichtbar=True,
+            pflicht=True,
+            reihenfolge=0,
+        )
+    )
+    await db.flush()
+    legacy_id = legacy.id
+
+    await svc.ensure_default_vorlagen(db, mandant.id)
+
+    reloaded = (
+        await db.execute(
+            select(Tickettyp)
+            .where(Tickettyp.id == legacy_id)
+            .options(selectinload(Tickettyp.felder), selectinload(Tickettyp.bloecke))
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
+    assert len(reloaded.felder) == 19
+    assert len(reloaded.bloecke) == 7
+    # titel bleibt erhalten (nicht dupliziert)
+    assert sum(1 for f in reloaded.felder if f.feld_key == "titel") == 1
