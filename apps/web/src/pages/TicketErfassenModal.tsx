@@ -549,10 +549,7 @@ export function TicketErfassenModal({
             </div>
           )}
 
-          {(feldSichtbar('objekt') ||
-            feldSichtbar('haus') ||
-            feldSichtbar('stockwerk') ||
-            feldSichtbar('einheit')) && (
+          {feldSichtbar('adresse') && (
             <TicketAdresseField
               adresse={adresseId ? selectedAdresse : (objektDetail?.adresse ?? null)}
               isEigen={!!adresseId}

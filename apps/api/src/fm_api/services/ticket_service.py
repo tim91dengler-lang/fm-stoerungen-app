@@ -8,24 +8,39 @@ from sqlalchemy.orm import selectinload
 
 from fm_api.models import (
     Adresse,
+    Anlage,
     Auswahlliste,
     AuswahllistenWert,
+    Fehlercode,
     GeschaeftsPartner,
+    Haus,
     Objekt,
+    ObjektStockwerk,
     PartnerKontakt,
     Projekt,
+    StockwerkEinheit,
     Ticket,
     TicketBeteiligter,
+    Tickettyp,
     User,
 )
 from fm_api.models.ticket import TicketStatusSlug
 from fm_api.services import status_workflow_service
 from fm_api.services.adresse_service import AdresseNotFoundError
+from fm_api.services.anlage_service import AnlageNotFoundError
 from fm_api.services.auswahlliste_service import (
     AuswahllistenWertNotFoundError,
     get_wert_by_id,
     get_wert_by_key,
 )
+from fm_api.services.fehlercode_service import FehlercodeNotFoundError
+from fm_api.services.objektstruktur_service import (
+    EinheitNotFoundError,
+    HausNotFoundError,
+    StockwerkNotFoundError,
+)
+from fm_api.services.projekt_service import ProjektNotFoundError
+from fm_api.services.tickettyp_service import TickettypNotFoundError
 
 
 class TicketNotFoundError(Exception):
@@ -172,6 +187,39 @@ async def _validate_adresse(db: AsyncSession, adresse_id: UUID, mandant_id: UUID
         raise AdresseNotFoundError(f"adresse {adresse_id} not found")
 
 
+async def _validate_anlage(db: AsyncSession, anlage_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen einer fremden Anlage (IDOR)."""
+    stmt = select(Anlage.id).where(
+        Anlage.id == anlage_id,
+        Anlage.mandant_id == mandant_id,
+        Anlage.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise AnlageNotFoundError(f"anlage {anlage_id} not found")
+
+
+async def _validate_fehlercode(db: AsyncSession, fehlercode_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen eines fremden Fehlercodes (IDOR)."""
+    stmt = select(Fehlercode.id).where(
+        Fehlercode.id == fehlercode_id,
+        Fehlercode.mandant_id == mandant_id,
+        Fehlercode.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise FehlercodeNotFoundError(f"fehlercode {fehlercode_id} not found")
+
+
+async def _validate_projekt(db: AsyncSession, projekt_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen eines fremden Projekts (IDOR)."""
+    stmt = select(Projekt.id).where(
+        Projekt.id == projekt_id,
+        Projekt.mandant_id == mandant_id,
+        Projekt.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise ProjektNotFoundError(f"projekt {projekt_id} not found")
+
+
 async def _validate_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID) -> None:
     stmt = select(GeschaeftsPartner.id).where(
         GeschaeftsPartner.id == partner_id,
@@ -180,6 +228,47 @@ async def _validate_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise PartnerNotFoundError(f"partner {partner_id} not found")
+
+
+async def _validate_haus(db: AsyncSession, haus_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen eines fremden Hauses (IDOR)."""
+    stmt = select(Haus.id).where(
+        Haus.id == haus_id, Haus.mandant_id == mandant_id, Haus.deleted_at.is_(None)
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise HausNotFoundError(f"haus {haus_id} not found")
+
+
+async def _validate_stockwerk(db: AsyncSession, stockwerk_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen eines fremden Stockwerks (IDOR)."""
+    stmt = select(ObjektStockwerk.id).where(
+        ObjektStockwerk.id == stockwerk_id,
+        ObjektStockwerk.mandant_id == mandant_id,
+        ObjektStockwerk.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise StockwerkNotFoundError(f"stockwerk {stockwerk_id} not found")
+
+
+async def _validate_einheit(db: AsyncSession, einheit_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen einer fremden Einheit (IDOR)."""
+    stmt = select(StockwerkEinheit.id).where(
+        StockwerkEinheit.id == einheit_id,
+        StockwerkEinheit.mandant_id == mandant_id,
+        StockwerkEinheit.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise EinheitNotFoundError(f"einheit {einheit_id} not found")
+
+
+async def _validate_tickettyp(db: AsyncSession, tickettyp_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen einer fremden Vorlage (IDOR)."""
+    stmt = select(Tickettyp.id).where(
+        Tickettyp.id == tickettyp_id,
+        Tickettyp.mandant_id == mandant_id,
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise TickettypNotFoundError(f"tickettyp {tickettyp_id} not found")
 
 
 async def _resolve_slug(
@@ -427,6 +516,20 @@ async def create_ticket(
         await _validate_adresse(db, adresse_id, mandant_id)
     if partner_id is not None:
         await _validate_partner(db, partner_id, mandant_id)
+    if anlage_id is not None:
+        await _validate_anlage(db, anlage_id, mandant_id)
+    if fehlercode_id is not None:
+        await _validate_fehlercode(db, fehlercode_id, mandant_id)
+    if projekt_id is not None:
+        await _validate_projekt(db, projekt_id, mandant_id)
+    if haus_id is not None:
+        await _validate_haus(db, haus_id, mandant_id)
+    if stockwerk_id is not None:
+        await _validate_stockwerk(db, stockwerk_id, mandant_id)
+    if einheit_id is not None:
+        await _validate_einheit(db, einheit_id, mandant_id)
+    if tickettyp_id is not None:
+        await _validate_tickettyp(db, tickettyp_id, mandant_id)
 
     zugewiesen_am = now if zugewiesen_an_id is not None else None
     erledigt_am = now if status_wert.key == TicketStatusSlug.ERLEDIGT.value else None
@@ -504,16 +607,26 @@ async def update_ticket(
         "wiederholung",
         "faelligkeit_am",
         "pins",
-        "haus_id",
-        "stockwerk_id",
-        "einheit_id",
-        "tickettyp_id",
-        "projekt_id",
-        "anlage_id",
-        "fehlercode_id",
     ):
         if direct in updates:
             setattr(ticket, direct, updates[direct])
+
+    # Mandantengebunden validierte FKs (IDOR-Schutz) — None bleibt erlaubt.
+    for fk, validator in (
+        ("anlage_id", _validate_anlage),
+        ("fehlercode_id", _validate_fehlercode),
+        ("projekt_id", _validate_projekt),
+        ("haus_id", _validate_haus),
+        ("stockwerk_id", _validate_stockwerk),
+        ("einheit_id", _validate_einheit),
+        ("wartet_nachunternehmer_id", _validate_partner),
+        ("tickettyp_id", _validate_tickettyp),
+    ):
+        if fk in updates:
+            new_val = updates[fk]
+            if new_val is not None:
+                await validator(db, new_val, mandant_id)
+            setattr(ticket, fk, new_val)
 
     if "prioritaet" in updates and updates["prioritaet"] is not None:
         prio_wert = await _resolve_slug(db, mandant_id, LISTE_KEY_PRIORITAET, updates["prioritaet"])
@@ -541,9 +654,6 @@ async def update_ticket(
         else:
             w_wert = await _resolve_slug(db, mandant_id, "wartet_grund", updates["wartet_grund"])
             ticket.wartet_grund_id = w_wert.id
-
-    if "wartet_nachunternehmer_id" in updates:
-        ticket.wartet_nachunternehmer_id = updates["wartet_nachunternehmer_id"]
 
     if "objekt_id" in updates:
         new_objekt = updates["objekt_id"]

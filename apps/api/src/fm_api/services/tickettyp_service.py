@@ -103,8 +103,14 @@ DEFAULT_SYSTEM_FELDER: list[tuple[str, str, bool, bool, int]] = [
     ("haus", "Haus", True, False, 2),
     ("stockwerk", "Stockwerk", True, False, 3),
     ("einheit", "Einheit", True, False, 4),
+    # Adresse-Feld (2026-06-01): steuert das frei wählbare Ticket-Adressfeld
+    # (eigene/Objekt-Adresse + Maps). Reihenfolge 19 = ans Ende des Katalogs,
+    # sortiert sich im Designer hinter die übrigen (Layout ist block-basiert).
+    ("adresse", "Adresse", True, False, 19),
     ("anlage", "Anlage", True, False, 5),
-    ("partner", "Partner", True, False, 6),
+    # feld_key bleibt "partner" (Bestandskompatibilität), steuert aber den
+    # Beteiligte-Block (mehrere Kontakte) — daher Label "Beteiligte".
+    ("partner", "Beteiligte", True, False, 6),
     ("kategorie", "Kategorie", True, False, 7),
     ("prio", "Priorität", True, False, 8),
     ("pin", "Foto-Pin", True, False, 9),

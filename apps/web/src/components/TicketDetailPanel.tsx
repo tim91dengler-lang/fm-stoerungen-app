@@ -84,6 +84,7 @@ const FELD_NULL_CONFIG: {
   { feldKey: 'einheit', label: 'Einheit', hasValue: (t) => !!t.einheit, patch: { einheit_id: null } },
   { feldKey: 'anlage', label: 'Anlage', hasValue: (t) => !!t.anlage, patch: { anlage_id: null } },
   { feldKey: 'partner', label: 'Partner', hasValue: (t) => !!t.partner, patch: { partner_id: null } },
+  { feldKey: 'adresse', label: 'Adresse', hasValue: (t) => !!t.adresse_id, patch: { adresse_id: null } },
   { feldKey: 'kategorie', label: 'Kategorie', hasValue: (t) => !!t.kategorie, patch: { kategorie: null } },
   { feldKey: 'quelle', label: 'Quelle', hasValue: (t) => !!t.quelle, patch: { quelle: null } },
   { feldKey: 'projekt', label: 'Projekt', hasValue: (t) => !!t.projekt, patch: { projekt_id: null } },
@@ -517,6 +518,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
 
                 {/* ④ VERORTUNG */}
                 {(ortSichtbar ||
+                  felder.sichtbar('adresse') ||
                   felder.sichtbar('anlage') ||
                   (felder.sichtbar('pin') && t.stockwerk?.has_grundriss)) && (
                   <div className="order-4 lg:order-none">
@@ -599,11 +601,13 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             )}
                           </div>
                         )}
-                        <TicketAdresseField
-                          adresse={t.adresse}
-                          isEigen={!!t.adresse_id}
-                          onSet={(adresse_id) => update.mutate({ adresse_id })}
-                        />
+                        {felder.sichtbar('adresse') && (
+                          <TicketAdresseField
+                            adresse={t.adresse}
+                            isEigen={!!t.adresse_id}
+                            onSet={(adresse_id) => update.mutate({ adresse_id })}
+                          />
+                        )}
                         {felder.sichtbar('anlage') && (
                           <FeldSearchSelect
                             label="Anlage"
