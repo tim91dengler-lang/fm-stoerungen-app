@@ -155,6 +155,24 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
     wartet_kontakt_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     wartet_kontakt_telefon: Mapped[str | None] = mapped_column(String(64), nullable=True)
     wartet_kontakt_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Zeigt auf einen Ticket-Beteiligten, auf den gewartet wird (löst die
+    # wartet_kontakt_*-Freitextfelder ab). Kein Relationship → kein Import-Zyklus;
+    # die Auflösung läuft über die separat geladene Beteiligten-Liste.
+    wartet_beteiligter_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        # use_alter: tickets ↔ ticket_beteiligte ist ein FK-Zyklus. Ohne den
+        # Zyklus-Brecher bringt metadata.create_all/drop_all (Test-Harness) die
+        # DDL-Reihenfolge durcheinander. Die weiche Zeiger-FK wird daher per
+        # separatem ALTER angelegt/entfernt (Name = wie in Migration 0027).
+        ForeignKey(
+            "ticket_beteiligte.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_tickets_wartet_beteiligter_id",
+        ),
+        nullable=True,
+        index=True,
+    )
     faelligkeit_am: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     wiederholung: Mapped[str | None] = mapped_column(String(32), nullable=True)
     anlage_id: Mapped[UUID | None] = mapped_column(

@@ -67,12 +67,7 @@ export interface PartnerRef {
 // Bekannte System-Slugs (in Migration als ist_system=TRUE geseedet).
 // Frontend rechnet damit für hardcoded UI-Optionen; ab Iteration 2.2
 // werden die Optionen dynamisch aus /api/v1/auswahllisten geladen.
-export type TicketStatusSlug =
-  | 'neu'
-  | 'pruefung'
-  | 'bearbeitung'
-  | 'wartet'
-  | 'erledigt';
+export type TicketStatusSlug = 'neu' | 'pruefung' | 'bearbeitung' | 'wartet' | 'erledigt';
 
 export type TicketPrioritaetSlug = 'niedrig' | 'mittel' | 'hoch' | 'kritisch';
 
@@ -154,6 +149,8 @@ export interface TicketRead {
   wartet_kontakt_name: string | null;
   wartet_kontakt_telefon: string | null;
   wartet_kontakt_email: string | null;
+  // Beteiligter, auf den gewartet wird; Kontakt wird aus `beteiligte` aufgelöst.
+  wartet_beteiligter_id: UUID | null;
   eroeffnet_von: UserRef;
   zugewiesen_an: UserRef | null;
   eroeffnet_am: string;
@@ -252,6 +249,7 @@ export interface TicketUpdate {
   wartet_kontakt_name?: string | null;
   wartet_kontakt_telefon?: string | null;
   wartet_kontakt_email?: string | null;
+  wartet_beteiligter_id?: UUID | null;
 }
 
 export interface TicketListFilters {
@@ -816,11 +814,7 @@ export type TickettypUpdate = Partial<Omit<TickettypCreate, 'key'>>;
  * dynamisch geladen — `ProjektStatusSlug` listet nur die System-Seeds für
  * Default-Auswahl und Bulk-Aktionen.
  */
-export type ProjektStatusSlug =
-  | 'geplant'
-  | 'aktiv'
-  | 'pausiert'
-  | 'abgeschlossen';
+export type ProjektStatusSlug = 'geplant' | 'aktiv' | 'pausiert' | 'abgeschlossen';
 
 export interface ProjektRead {
   id: UUID;

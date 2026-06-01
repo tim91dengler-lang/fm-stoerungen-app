@@ -22,6 +22,7 @@ from fm_api.services.ticket_service import (
     PartnerNotFoundError,
     TicketNotFoundError,
     UnknownAuswahlSlugError,
+    WartetBeteiligterNotFoundError,
 )
 from fm_api.services.tickettyp_service import TickettypNotFoundError
 
@@ -182,6 +183,7 @@ async def update_ticket(
         StockwerkNotFoundError,
         EinheitNotFoundError,
         TickettypNotFoundError,
+        WartetBeteiligterNotFoundError,
     ) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except PartnerNotFoundError as exc:
