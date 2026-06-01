@@ -86,6 +86,14 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
         index=True,
     )
+    # Ticket-eigene Adresse (frei wählbar, unabhängig vom Objekt). Default-Anzeige
+    # ist die Objekt-Adresse; ist diese FK gesetzt, überschreibt sie den Default.
+    adresse_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("adressen.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     haus_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("haus.id", ondelete="SET NULL"),
@@ -192,6 +200,9 @@ class Ticket(UuidPkMixin, TimestampMixin, SoftDeleteMixin, Base):
         foreign_keys=[kategorie_id], lazy="raise"
     )
     objekt: Mapped["Objekt | None"] = relationship(lazy="raise")
+    # Keine ``adresse``-Relationship (vermeidet Modul-Import-Zyklus
+    # ticket → adresse → mandant → ticket). Die eigene Ticket-Adresse lädt der
+    # Service separat und hängt sie transient an.
     haus: Mapped["Haus | None"] = relationship(lazy="raise")
     stockwerk: Mapped["ObjektStockwerk | None"] = relationship(lazy="raise")
     einheit: Mapped["StockwerkEinheit | None"] = relationship(lazy="raise")

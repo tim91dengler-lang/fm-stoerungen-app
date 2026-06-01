@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from fm_api.models import (
+    Adresse,
     Auswahlliste,
     AuswahllistenWert,
     GeschaeftsPartner,
@@ -19,6 +20,7 @@ from fm_api.models import (
 )
 from fm_api.models.ticket import TicketStatusSlug
 from fm_api.services import status_workflow_service
+from fm_api.services.adresse_service import AdresseNotFoundError
 from fm_api.services.auswahlliste_service import (
     AuswahllistenWertNotFoundError,
     get_wert_by_id,
@@ -60,7 +62,7 @@ _TICKET_LOAD_OPTIONS = (
     selectinload(Ticket.status_wert),
     selectinload(Ticket.prioritaet_wert),
     selectinload(Ticket.kategorie_wert),
-    selectinload(Ticket.objekt),
+    selectinload(Ticket.objekt).selectinload(Objekt.adresse),
     selectinload(Ticket.haus),
     selectinload(Ticket.stockwerk),
     selectinload(Ticket.einheit),
@@ -111,6 +113,34 @@ async def _attach_beteiligte(db: AsyncSession, tickets: list[Ticket]) -> None:
         setattr(t, "beteiligte", by_ticket.get(t.id, []))  # noqa: B010
 
 
+async def _attach_eigene_adresse(db: AsyncSession, tickets: list[Ticket]) -> None:
+    """Lädt die ticket-eigene Adresse (adresse_id) separat und hängt sie transient
+    an ``ticket._eigene_adresse``. Bewusst ohne Mapped-Relationship am Ticket
+    (Import-Zyklus-Vermeidung); die effektive Adresse löst das Schema auf
+    (eigene Adresse, sonst Objekt-Adresse)."""
+    ids = [t.adresse_id for t in tickets if t.adresse_id is not None]
+    by_id: dict[UUID, Adresse] = {}
+    if ids:
+        # Defense-in-depth: nur Adressen des Mandanten (Tickets sind bereits
+        # mandantengefiltert) — eine fremde FK kann nie auflösen.
+        mandant_ids = {t.mandant_id for t in tickets}
+        rows = (
+            (
+                await db.execute(
+                    select(Adresse).where(Adresse.id.in_(ids), Adresse.mandant_id.in_(mandant_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        by_id = {a.id: a for a in rows}
+    for t in tickets:
+        # setattr: transientes Attribut, vom ORM-Mapper nicht erfasst.
+        setattr(  # noqa: B010
+            t, "_eigene_adresse", by_id.get(t.adresse_id) if t.adresse_id else None
+        )
+
+
 async def _validate_assignee(db: AsyncSession, user_id: UUID, mandant_id: UUID) -> None:
     stmt = select(User.id).where(
         User.id == user_id,
@@ -130,6 +160,16 @@ async def _validate_objekt(db: AsyncSession, objekt_id: UUID, mandant_id: UUID) 
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise ObjektNotFoundError(f"objekt {objekt_id} not found")
+
+
+async def _validate_adresse(db: AsyncSession, adresse_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen einer fremden Adresse (IDOR)."""
+    stmt = select(Adresse.id).where(
+        Adresse.id == adresse_id,
+        Adresse.mandant_id == mandant_id,
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise AdresseNotFoundError(f"adresse {adresse_id} not found")
 
 
 async def _validate_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID) -> None:
@@ -310,6 +350,7 @@ async def list_tickets(
     )
     items = list((await db.execute(items_stmt)).scalars().unique().all())
     await _attach_beteiligte(db, items)
+    await _attach_eigene_adresse(db, items)
     return items, total
 
 
@@ -327,6 +368,7 @@ async def get_ticket(db: AsyncSession, ticket_id: UUID, mandant_id: UUID) -> Tic
     if ticket is None:
         raise TicketNotFoundError(f"ticket {ticket_id} not found")
     await _attach_beteiligte(db, [ticket])
+    await _attach_eigene_adresse(db, [ticket])
     return ticket
 
 
@@ -341,6 +383,7 @@ async def create_ticket(
     prioritaet_slug: str = "mittel",
     kategorie_slug: str | None = None,
     objekt_id: UUID | None = None,
+    adresse_id: UUID | None = None,
     haus_id: UUID | None = None,
     stockwerk_id: UUID | None = None,
     einheit_id: UUID | None = None,
@@ -380,6 +423,8 @@ async def create_ticket(
         await _validate_assignee(db, zugewiesen_an_id, mandant_id)
     if objekt_id is not None:
         await _validate_objekt(db, objekt_id, mandant_id)
+    if adresse_id is not None:
+        await _validate_adresse(db, adresse_id, mandant_id)
     if partner_id is not None:
         await _validate_partner(db, partner_id, mandant_id)
 
@@ -401,6 +446,7 @@ async def create_ticket(
         prioritaet_id=prioritaet_wert.id,
         kategorie_id=kategorie_wert.id if kategorie_wert is not None else None,
         objekt_id=objekt_id,
+        adresse_id=adresse_id,
         haus_id=haus_id,
         stockwerk_id=stockwerk_id,
         einheit_id=einheit_id,
@@ -504,6 +550,12 @@ async def update_ticket(
         if new_objekt is not None:
             await _validate_objekt(db, new_objekt, mandant_id)
         ticket.objekt_id = new_objekt
+
+    if "adresse_id" in updates:
+        new_adresse = updates["adresse_id"]
+        if new_adresse is not None:
+            await _validate_adresse(db, new_adresse, mandant_id)
+        ticket.adresse_id = new_adresse  # None = zurück auf Objekt-Adresse
 
     if "partner_id" in updates:
         new_partner = updates["partner_id"]

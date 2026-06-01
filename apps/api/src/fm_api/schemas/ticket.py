@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from fm_api.schemas.adresse import AdresseRead
 from fm_api.schemas.common import ORMModel, TimestampedRead
 
 
@@ -147,6 +148,7 @@ class TicketCreate(BaseModel):
     kategorie: str | None = Field(default=None, max_length=64)
     quelle: str | None = Field(default=None, max_length=64)
     objekt_id: UUID | None = None
+    adresse_id: UUID | None = None
     haus_id: UUID | None = None
     stockwerk_id: UUID | None = None
     einheit_id: UUID | None = None
@@ -175,6 +177,7 @@ class TicketUpdate(BaseModel):
     kategorie: str | None = Field(default=None, max_length=64)
     quelle: str | None = Field(default=None, max_length=64)
     objekt_id: UUID | None = None
+    adresse_id: UUID | None = None
     haus_id: UUID | None = None
     stockwerk_id: UUID | None = None
     einheit_id: UUID | None = None
@@ -210,6 +213,10 @@ class TicketRead(TimestampedRead):
     kategorie: AuswahlWertRef | None = None
     quelle: AuswahlWertRef | None = None
     objekt: ObjektRef | None = None
+    # Ticket-eigene Adresse (FK) + aufgelöste effektive Adresse (eigene, sonst
+    # Objekt-Adresse als Default). adresse_id gesetzt ⇒ eigene Adresse.
+    adresse_id: UUID | None = None
+    adresse: AdresseRead | None = None
     haus: HausRef | None = None
     stockwerk: StockwerkRef | None = None
     einheit: EinheitRef | None = None
@@ -281,6 +288,16 @@ class TicketRead(TimestampedRead):
                 else None
             ),
             objekt=ObjektRef(id=t.objekt.id, name=t.objekt.name) if t.objekt else None,
+            adresse_id=t.adresse_id,
+            # Effektive Adresse: eigene Ticket-Adresse (transient via Service
+            # geladen), sonst Objekt-Adresse (Default).
+            adresse=(
+                AdresseRead.model_validate(eigene_adresse)
+                if (eigene_adresse := getattr(t, "_eigene_adresse", None)) is not None
+                else AdresseRead.model_validate(t.objekt.adresse)
+                if t.objekt is not None and t.objekt.adresse is not None
+                else None
+            ),
             haus=HausRef(id=t.haus.id, bezeichnung=t.haus.bezeichnung) if t.haus else None,
             stockwerk=StockwerkRef(
                 id=t.stockwerk.id,
