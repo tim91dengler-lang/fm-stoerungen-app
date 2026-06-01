@@ -18,6 +18,8 @@ import {
   VorlagePreviewFelder,
 } from '../components/VorlagePreviewFelder';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import { isVorlageLayoutV2 } from '../lib/featureFlags';
+import { VorlageLayoutBuilder } from '../components/VorlageLayoutBuilder';
 
 interface DesignerForm {
   key: string;
@@ -597,41 +599,53 @@ export function VorlageDesignerPage() {
         </section>
 
         {/* Pool + Vorschau */}
-        <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[18rem_1fr]">
-          {/* Versteckte Felder */}
-          <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-            <div>
-              <h2 className="text-sm font-semibold text-zinc-200">Versteckte Felder</h2>
-              <p className="mt-0.5 text-[11px] text-zinc-500">
-                Diese Felder erscheinen nicht im Erfassungs-Formular. Klick auf {'„+"'},
-                um sie einzublenden.
+        {isVorlageLayoutV2() && !isNew && vorlage ? (
+          <section className="mt-4">
+            <VorlageLayoutBuilder
+              tickettyp={vorlage}
+              onSaved={() => {
+                qc.invalidateQueries({ queryKey: ['tickettyp', vorlage.id] });
+                qc.invalidateQueries({ queryKey: ['tickettypen'] });
+              }}
+            />
+          </section>
+        ) : (
+          <section className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[18rem_1fr]">
+            {/* Versteckte Felder */}
+            <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-200">Versteckte Felder</h2>
+                <p className="mt-0.5 text-[11px] text-zinc-500">
+                  Diese Felder erscheinen nicht im Erfassungs-Formular. Klick auf {'„+"'},
+                  um sie einzublenden.
+                </p>
+              </div>
+              <VorlagenPool felder={versteckte} onShow={showFeld} />
+            </div>
+
+            {/* Live-Vorschau */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Live-Vorschau Erfassungs-Formular
+                </h2>
+                <div className="text-[11px] text-zinc-500">
+                  {felder.filter((f) => f.sichtbar).length} sichtbar ·{' '}
+                  {felder.filter((f) => f.sichtbar && f.pflicht).length} Pflicht
+                </div>
+              </div>
+              <VorlagePreviewFelder
+                tickettyp={previewTickettyp}
+                onReorder={setFelder}
+                onUpdateFeld={updateFeld}
+              />
+              <p className="mt-3 text-[10px] text-zinc-500">
+                Tipp: Karten per Drag-and-Drop sortieren. Hover über eine Karte →
+                Pflicht-Toggle (★) oder Verbergen (×). Klick aufs Label zum Umbenennen.
               </p>
             </div>
-            <VorlagenPool felder={versteckte} onShow={showFeld} />
-          </div>
-
-          {/* Live-Vorschau */}
-          <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Live-Vorschau Erfassungs-Formular
-              </h2>
-              <div className="text-[11px] text-zinc-500">
-                {felder.filter((f) => f.sichtbar).length} sichtbar ·{' '}
-                {felder.filter((f) => f.sichtbar && f.pflicht).length} Pflicht
-              </div>
-            </div>
-            <VorlagePreviewFelder
-              tickettyp={previewTickettyp}
-              onReorder={setFelder}
-              onUpdateFeld={updateFeld}
-            />
-            <p className="mt-3 text-[10px] text-zinc-500">
-              Tipp: Karten per Drag-and-Drop sortieren. Hover über eine Karte →
-              Pflicht-Toggle (★) oder Verbergen (×). Klick aufs Label zum Umbenennen.
-            </p>
-          </div>
-        </section>
+          </section>
+        )}
 
         {submitError && (
           <div className="mt-4 rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-300">
