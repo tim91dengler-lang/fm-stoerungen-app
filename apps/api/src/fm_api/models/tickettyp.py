@@ -45,12 +45,24 @@ class Tickettyp(UuidPkMixin, TimestampMixin, Base):
     aktiv: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    # Stufe C: genau eine "Alles-Vorlage" pro Mandant (Partial-Unique-Index in der
+    # Migration) — enthält ALLE Katalog-Felder und nimmt neue automatisch auf.
+    ist_alles_vorlage: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     mandant: Mapped["Mandant"] = relationship(lazy="raise")
     felder: Mapped[list["TickettypFeld"]] = relationship(
         back_populates="tickettyp",
         cascade="all, delete-orphan",
         order_by="TickettypFeld.reihenfolge",
+        lazy="raise",
+    )
+    # Stufe C: frei konfigurierbare Block-Gruppierungen je Vorlage.
+    bloecke: Mapped[list["TickettypBlock"]] = relationship(
+        back_populates="tickettyp",
+        cascade="all, delete-orphan",
+        order_by="TickettypBlock.reihenfolge",
         lazy="raise",
     )
 
@@ -89,5 +101,50 @@ class TickettypFeld(UuidPkMixin, TimestampMixin, Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Stufe C: Zuordnung zu einer Block-Gruppierung. SET NULL = beim Löschen eines
+    # Blocks fällt das Feld in den Auffang-Block "weitere", kein Feld geht verloren.
+    # `reihenfolge` wird ab Stufe C als block-lokale Reihenfolge interpretiert.
+    block_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("tickettyp_block.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     tickettyp: Mapped["Tickettyp"] = relationship(back_populates="felder", lazy="raise")
+
+
+class TickettypBlock(UuidPkMixin, TimestampMixin, Base):
+    """Frei konfigurierbare Block-Gruppierung je Vorlage (Stufe C).
+
+    Der Admin legt im Designer eigene Blöcke an, benennt/sortiert sie und ordnet
+    sie einer Region (linke/rechte Spalte) zu. Felder zeigen per
+    ``TickettypFeld.block_id`` auf ihren Block. Geschützte System-Blöcke
+    (``kopf``, ``weitere``) sind nicht löschbar.
+    """
+
+    __tablename__ = "tickettyp_block"
+    __table_args__ = (
+        UniqueConstraint(
+            "tickettyp_id", "block_key", name="uq_tickettyp_block_tickettyp_block_key"
+        ),
+    )
+
+    tickettyp_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("tickettypen.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    block_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    region: Mapped[str] = mapped_column(String(16), nullable=False, server_default="links")
+    reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    ist_system_block: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    collapsible_default_open: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+
+    tickettyp: Mapped["Tickettyp"] = relationship(back_populates="bloecke", lazy="raise")

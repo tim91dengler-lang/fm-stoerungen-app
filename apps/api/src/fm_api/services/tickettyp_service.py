@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fm_api.models import Tickettyp, TickettypFeld
+from fm_api.models import Tickettyp, TickettypBlock, TickettypFeld
 
 
 class TickettypNotFoundError(Exception):
@@ -126,7 +126,63 @@ DEFAULT_SYSTEM_FELDER: list[tuple[str, str, bool, bool, int]] = [
 ]
 
 
-_LOAD_OPTIONS = (selectinload(Tickettyp.felder),)
+# Stufe C: Default-Block-Layout je Vorlage. (block_key, label, region, reihenfolge,
+# ist_system_block). Gespiegelt aus dem heutigen Ticket-Layout (TicketDetailPanel).
+# kopf + weitere sind geschützt (nicht löschbar); chat ist ein fester Engine-Slot,
+# kein Designer-Block. Reihenfolge ist je Region.
+SYSTEM_BLOECKE: list[tuple[str, str, str, int, bool]] = [
+    ("kopf", "Kopf", "links", 0, True),
+    ("problem", "Problem & Bearbeitung", "links", 1, False),
+    ("beteiligte", "Kontakt & Beteiligte", "links", 2, False),
+    ("verortung", "Verortung", "links", 3, False),
+    ("klassifizierung", "Klassifizierung", "links", 4, False),
+    ("belege", "Belege & Kommunikation", "rechts", 0, False),
+    ("weitere", "Weitere Felder", "links", 5, True),
+]
+
+# Default-Zuordnung feld_key → block_key. Ungemappte/Custom-Felder → "weitere".
+FALLBACK_BLOCK_KEY = "weitere"
+DEFAULT_FELD_BLOCK_MAP: dict[str, str] = {
+    "titel": "kopf",
+    "beschreibung": "problem",
+    "faelligkeit_am": "problem",
+    "wiederholung": "problem",
+    "partner": "beteiligte",
+    "objekt": "verortung",
+    "haus": "verortung",
+    "stockwerk": "verortung",
+    "einheit": "verortung",
+    "adresse": "verortung",
+    "anlage": "verortung",
+    "pin": "verortung",
+    "prio": "klassifizierung",
+    "kategorie": "klassifizierung",
+    "quelle": "klassifizierung",
+    "projekt": "klassifizierung",
+    "fehlercode": "klassifizierung",
+    "foto": "belege",
+    "dokumente": "belege",
+}
+
+
+def _seed_bloecke(db: AsyncSession, tickettyp_id: UUID) -> dict[str, TickettypBlock]:
+    """Legt die System-Blöcke für eine Vorlage an und gibt block_key→Block zurück."""
+    by_key: dict[str, TickettypBlock] = {}
+    for block_key, label, region, reihenfolge, ist_system in SYSTEM_BLOECKE:
+        block = TickettypBlock(
+            tickettyp_id=tickettyp_id,
+            block_key=block_key,
+            label=label,
+            region=region,
+            reihenfolge=reihenfolge,
+            ist_system_block=ist_system,
+        )
+        db.add(block)
+        by_key[block_key] = block
+    return by_key
+
+
+_LOAD_OPTIONS = (selectinload(Tickettyp.felder), selectinload(Tickettyp.bloecke))
 
 
 async def list_tickettypen(
@@ -184,8 +240,16 @@ async def create_tickettyp(
             f"Tickettyp-Key '{payload.get('key')}' ist bereits vergeben."
         ) from exc
 
-    # Seed 19 System-Felder mit Default-Konfiguration (Spec §4.1)
-    for feld_key, label, sichtbar, pflicht, reihenfolge in DEFAULT_SYSTEM_FELDER:
+    # Stufe C: erst die System-Blöcke anlegen, dann die 19 Felder block-lokal
+    # zuordnen (reihenfolge = Index innerhalb des Blocks, aus der Default-Sortierung).
+    block_by_key = _seed_bloecke(db, item.id)
+    await db.flush()  # block.id verfügbar machen
+
+    block_counter: dict[str, int] = {}
+    for feld_key, label, sichtbar, pflicht, _alt_reihenfolge in DEFAULT_SYSTEM_FELDER:
+        block_key = DEFAULT_FELD_BLOCK_MAP.get(feld_key, FALLBACK_BLOCK_KEY)
+        idx = block_counter.get(block_key, 0)
+        block_counter[block_key] = idx + 1
         db.add(
             TickettypFeld(
                 tickettyp_id=item.id,
@@ -194,7 +258,8 @@ async def create_tickettyp(
                 ist_system_feld=True,
                 sichtbar=sichtbar,
                 pflicht=pflicht,
-                reihenfolge=reihenfolge,
+                reihenfolge=idx,
+                block_id=block_by_key[block_key].id,
             )
         )
     await db.flush()
@@ -254,7 +319,27 @@ async def duplicate_tickettyp(db: AsyncSession, mandant_id: UUID, source_id: UUI
     db.add(item)
     await db.flush()
 
+    # Stufe C: Blöcke der Quelle klonen (NEUE IDs) und die Feld→Block-Zuordnung
+    # auf die neuen Blöcke remappen — nie auf die Block-IDs der Quelle zeigen.
+    src_block_id_to_key = {b.id: b.block_key for b in source.bloecke}
+    new_block_by_key: dict[str, TickettypBlock] = {}
+    for src_block in source.bloecke:
+        nb = TickettypBlock(
+            tickettyp_id=item.id,
+            block_key=src_block.block_key,
+            label=src_block.label,
+            region=src_block.region,
+            reihenfolge=src_block.reihenfolge,
+            ist_system_block=src_block.ist_system_block,
+            collapsible_default_open=src_block.collapsible_default_open,
+        )
+        db.add(nb)
+        new_block_by_key[src_block.block_key] = nb
+    await db.flush()
+
     for src_feld in source.felder:
+        src_key = src_block_id_to_key.get(src_feld.block_id) if src_feld.block_id else None
+        new_block = new_block_by_key.get(src_key) if src_key else None
         db.add(
             TickettypFeld(
                 tickettyp_id=item.id,
@@ -265,6 +350,7 @@ async def duplicate_tickettyp(db: AsyncSession, mandant_id: UUID, source_id: UUI
                 pflicht=src_feld.pflicht,
                 nur_admin_sichtbar=src_feld.nur_admin_sichtbar,
                 reihenfolge=src_feld.reihenfolge,
+                block_id=new_block.id if new_block else None,
             )
         )
     await db.flush()

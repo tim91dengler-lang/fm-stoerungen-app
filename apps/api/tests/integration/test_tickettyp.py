@@ -72,6 +72,81 @@ async def test_create_tickettyp_seedet_19_systemfelder(client, admin_user) -> No
 
 
 @pytest.mark.integration
+async def test_create_tickettyp_seedet_bloecke(client, admin_user) -> None:
+    """Stufe C C1: neue Vorlage bekommt die 7 System-Blöcke; jedes Feld ist einem
+    Block zugeordnet; reihenfolge ist block-lokal."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+
+    res = await client.post(
+        "/api/v1/tickettypen",
+        headers=headers,
+        json={"key": "umzug-bloecke", "label": "Umzug-Blöcke"},
+    )
+    assert res.status_code == 201, res.text
+    body = res.json()
+
+    by_key = {b["block_key"]: b for b in body["bloecke"]}
+    assert set(by_key) == {
+        "kopf",
+        "problem",
+        "beteiligte",
+        "verortung",
+        "klassifizierung",
+        "belege",
+        "weitere",
+    }
+    assert by_key["belege"]["region"] == "rechts"
+    assert by_key["kopf"]["region"] == "links"
+    assert by_key["kopf"]["ist_system_block"] is True
+    assert by_key["weitere"]["ist_system_block"] is True
+    assert by_key["verortung"]["ist_system_block"] is False
+
+    # Alle 19 Felder sind einem Block zugeordnet (keiner None).
+    assert all(f["block_id"] is not None for f in body["felder"])
+    titel = next(f for f in body["felder"] if f["feld_key"] == "titel")
+    assert titel["block_id"] == by_key["kopf"]["id"]
+    objekt = next(f for f in body["felder"] if f["feld_key"] == "objekt")
+    assert objekt["block_id"] == by_key["verortung"]["id"]
+    # block-lokale Reihenfolge: die 7 Verortungs-Felder sind 0..6 eindeutig.
+    verortung_orders = sorted(
+        f["reihenfolge"] for f in body["felder"] if f["block_id"] == by_key["verortung"]["id"]
+    )
+    assert verortung_orders == [0, 1, 2, 3, 4, 5, 6]
+
+
+@pytest.mark.integration
+async def test_duplicate_kloniert_bloecke_mit_eigenen_ids(client, admin_user) -> None:
+    """Duplikat hat EIGENE Block-IDs; Felder zeigen auf die neuen Blöcke (N1)."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+
+    src = await client.post(
+        "/api/v1/tickettypen",
+        headers=headers,
+        json={"key": "src-dup", "label": "Quelle"},
+    )
+    src_body = src.json()
+    src_block_ids = {b["id"] for b in src_body["bloecke"]}
+
+    dup = await client.post(
+        f"/api/v1/tickettypen/{src_body['id']}/duplicate", headers=headers
+    )
+    assert dup.status_code == 201, dup.text
+    dup_body = dup.json()
+    dup_block_ids = {b["id"] for b in dup_body["bloecke"]}
+
+    assert dup_block_ids.isdisjoint(src_block_ids)
+    assert {b["block_key"] for b in dup_body["bloecke"]} == {
+        b["block_key"] for b in src_body["bloecke"]
+    }
+    # Jedes Feld des Duplikats zeigt auf einen Block DES DUPLIKATS, nie der Quelle.
+    for f in dup_body["felder"]:
+        if f["block_id"] is not None:
+            assert f["block_id"] in dup_block_ids
+
+
+@pytest.mark.integration
 async def test_duplicate_tickettyp_kloniert_komplett(client, admin_user, db, mandant) -> None:
     src = await _seed_system_tickettyp(db, mandant.id, key="reparatur")
 

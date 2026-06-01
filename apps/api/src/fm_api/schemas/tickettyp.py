@@ -6,6 +6,18 @@ from pydantic import BaseModel, ConfigDict, Field
 from fm_api.schemas.common import TimestampedRead
 
 
+class TickettypBlockRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    block_key: str
+    label: str
+    region: str
+    reihenfolge: int
+    ist_system_block: bool
+    collapsible_default_open: bool
+
+
 class TickettypFeldRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -17,6 +29,8 @@ class TickettypFeldRead(BaseModel):
     pflicht: bool
     nur_admin_sichtbar: bool
     reihenfolge: int
+    # Stufe C: Zuordnung zu einer Block-Gruppierung (None ⇒ Auffang-Block "weitere").
+    block_id: UUID | None = None
 
 
 class TickettypFeldUpdate(BaseModel):
@@ -64,7 +78,9 @@ class TickettypRead(TimestampedRead, TickettypBase):
 
     mandant_id: UUID
     ist_system: bool
+    ist_alles_vorlage: bool = False
     felder: list[TickettypFeldRead] = Field(default_factory=list)
+    bloecke: list[TickettypBlockRead] = Field(default_factory=list)
 
 
 class TickettypMini(BaseModel):
