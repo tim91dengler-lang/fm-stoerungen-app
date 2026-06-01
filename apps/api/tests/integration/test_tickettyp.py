@@ -129,9 +129,7 @@ async def test_duplicate_kloniert_bloecke_mit_eigenen_ids(client, admin_user) ->
     src_body = src.json()
     src_block_ids = {b["id"] for b in src_body["bloecke"]}
 
-    dup = await client.post(
-        f"/api/v1/tickettypen/{src_body['id']}/duplicate", headers=headers
-    )
+    dup = await client.post(f"/api/v1/tickettypen/{src_body['id']}/duplicate", headers=headers)
     assert dup.status_code == 201, dup.text
     dup_body = dup.json()
     dup_block_ids = {b["id"] for b in dup_body["bloecke"]}
