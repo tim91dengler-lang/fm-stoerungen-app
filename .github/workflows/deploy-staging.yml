@@ -144,10 +144,24 @@ jobs:
               "http://${{ secrets.HETZNER_HOST }}:8080/health" || echo "000")
             if [[ "$code" == "200" ]]; then
               echo "Staging healthy."
-              exit 0
+              break
             fi
             echo "Attempt $i: $code — retrying …"
             sleep 5
+            if [[ "$i" == "30" ]]; then
+              echo "::error::Staging did not become healthy."
+              exit 1
+            fi
           done
-          echo "::error::Staging did not become healthy."
-          exit 1
+
+      - name: Provision per-tenant base data (vorlagen + auswahllisten)
+        run: |
+          # Idempotent: ensures system auswahllisten + default vorlagen
+          # (blocks + full field catalog + self-growing Alles-Vorlage) for
+          # every tenant. Runs against the freshly migrated + restarted API
+          # container, so staging is testable without manual SSH. Strict
+          # (no `|| true`): a provisioning failure must surface, same
+          # philosophy as migrate.sh.
+          ssh root@${{ secrets.HETZNER_HOST }} bash -lc '
+            docker exec fm-staging-api python -m fm_api.scripts.provision_vorlagen
+          '
