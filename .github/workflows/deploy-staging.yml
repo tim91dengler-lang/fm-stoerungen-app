@@ -82,7 +82,7 @@ jobs:
         # webfactory/ssh-agent parses the key robustly (handles CR, BOM, missing
         # trailing newline) and registers it with ssh-agent, so subsequent ssh/scp
         # calls don't need `-i ~/.ssh/id_ed25519`.
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
