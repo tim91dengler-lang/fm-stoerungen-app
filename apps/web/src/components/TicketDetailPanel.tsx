@@ -39,6 +39,7 @@ import {
 } from '../lib/entitySearch';
 import type {
   StatusWertMini,
+  TicketBeteiligterRead,
   TicketPrioritaetSlug,
   TicketRead,
   TicketStatusSlug,
@@ -48,10 +49,6 @@ import { ChatPanel } from './ChatPanel';
 import { PhotoGallery } from './PhotoGallery';
 import { TicketDokumente } from './TicketDokumente';
 import { GrundrissPin } from './GrundrissPin';
-import {
-  PartnerKontaktPicker,
-  type PartnerKontaktAuswahl,
-} from './PartnerKontaktPicker';
 import { vorlageFelder } from '../lib/vorlageFelder';
 import { aktiveWerte } from '../lib/aktiveWerte';
 import { PRIO_SLUGS, formatRelativeDateTime, labelForPrioSlug } from '../lib/format';
@@ -78,26 +75,106 @@ const FELD_NULL_CONFIG: {
   hasValue: (t: TicketRead) => boolean;
   patch: TicketUpdate;
 }[] = [
-  { feldKey: 'objekt', label: 'Objekt/Ort', hasValue: (t) => !!t.objekt, patch: { objekt_id: null, haus_id: null, stockwerk_id: null, einheit_id: null } },
-  { feldKey: 'haus', label: 'Haus', hasValue: (t) => !!t.haus, patch: { haus_id: null, stockwerk_id: null, einheit_id: null } },
-  { feldKey: 'stockwerk', label: 'Stockwerk', hasValue: (t) => !!t.stockwerk, patch: { stockwerk_id: null, einheit_id: null } },
-  { feldKey: 'einheit', label: 'Einheit', hasValue: (t) => !!t.einheit, patch: { einheit_id: null } },
-  { feldKey: 'anlage', label: 'Anlage', hasValue: (t) => !!t.anlage, patch: { anlage_id: null } },
-  { feldKey: 'partner', label: 'Partner', hasValue: (t) => !!t.partner, patch: { partner_id: null } },
-  { feldKey: 'adresse', label: 'Adresse', hasValue: (t) => !!t.adresse_id, patch: { adresse_id: null } },
-  { feldKey: 'kategorie', label: 'Kategorie', hasValue: (t) => !!t.kategorie, patch: { kategorie: null } },
-  { feldKey: 'quelle', label: 'Quelle', hasValue: (t) => !!t.quelle, patch: { quelle: null } },
-  { feldKey: 'projekt', label: 'Projekt', hasValue: (t) => !!t.projekt, patch: { projekt_id: null } },
-  { feldKey: 'fehlercode', label: 'Fehlercode', hasValue: (t) => !!t.fehlercode, patch: { fehlercode_id: null } },
-  { feldKey: 'faelligkeit_am', label: 'Fälligkeitsdatum', hasValue: (t) => !!t.faelligkeit_am, patch: { faelligkeit_am: null } },
-  { feldKey: 'wiederholung', label: 'Wiederholung', hasValue: (t) => !!t.wiederholung, patch: { wiederholung: null } },
-  { feldKey: 'beschreibung', label: 'Beschreibung', hasValue: (t) => !!t.beschreibung, patch: { beschreibung: '' } },
-  { feldKey: 'pin', label: 'Grundriss-Pins', hasValue: (t) => (t.pins ?? []).length > 0, patch: { pins: [] } },
+  {
+    feldKey: 'objekt',
+    label: 'Objekt/Ort',
+    hasValue: (t) => !!t.objekt,
+    patch: { objekt_id: null, haus_id: null, stockwerk_id: null, einheit_id: null },
+  },
+  {
+    feldKey: 'haus',
+    label: 'Haus',
+    hasValue: (t) => !!t.haus,
+    patch: { haus_id: null, stockwerk_id: null, einheit_id: null },
+  },
+  {
+    feldKey: 'stockwerk',
+    label: 'Stockwerk',
+    hasValue: (t) => !!t.stockwerk,
+    patch: { stockwerk_id: null, einheit_id: null },
+  },
+  {
+    feldKey: 'einheit',
+    label: 'Einheit',
+    hasValue: (t) => !!t.einheit,
+    patch: { einheit_id: null },
+  },
+  {
+    feldKey: 'anlage',
+    label: 'Anlage',
+    hasValue: (t) => !!t.anlage,
+    patch: { anlage_id: null },
+  },
+  {
+    feldKey: 'partner',
+    label: 'Partner',
+    hasValue: (t) => !!t.partner,
+    patch: { partner_id: null },
+  },
+  {
+    feldKey: 'adresse',
+    label: 'Adresse',
+    hasValue: (t) => !!t.adresse_id,
+    patch: { adresse_id: null },
+  },
+  {
+    feldKey: 'kategorie',
+    label: 'Kategorie',
+    hasValue: (t) => !!t.kategorie,
+    patch: { kategorie: null },
+  },
+  {
+    feldKey: 'quelle',
+    label: 'Quelle',
+    hasValue: (t) => !!t.quelle,
+    patch: { quelle: null },
+  },
+  {
+    feldKey: 'projekt',
+    label: 'Projekt',
+    hasValue: (t) => !!t.projekt,
+    patch: { projekt_id: null },
+  },
+  {
+    feldKey: 'fehlercode',
+    label: 'Fehlercode',
+    hasValue: (t) => !!t.fehlercode,
+    patch: { fehlercode_id: null },
+  },
+  {
+    feldKey: 'faelligkeit_am',
+    label: 'Fälligkeitsdatum',
+    hasValue: (t) => !!t.faelligkeit_am,
+    patch: { faelligkeit_am: null },
+  },
+  {
+    feldKey: 'wiederholung',
+    label: 'Wiederholung',
+    hasValue: (t) => !!t.wiederholung,
+    patch: { wiederholung: null },
+  },
+  {
+    feldKey: 'beschreibung',
+    label: 'Beschreibung',
+    hasValue: (t) => !!t.beschreibung,
+    patch: { beschreibung: '' },
+  },
+  {
+    feldKey: 'pin',
+    label: 'Grundriss-Pins',
+    hasValue: (t) => (t.pins ?? []).length > 0,
+    patch: { pins: [] },
+  },
 ];
 
 /** Baut einen mailto-Entwurf mit Ticket-Zusammenfassung (Konzept §9, Stufe 1). */
 function buildBeteiligteMailto(t: TicketRead): string {
-  const ort = [t.objekt?.name, t.haus?.bezeichnung, t.stockwerk?.bezeichnung, t.einheit?.bezeichnung]
+  const ort = [
+    t.objekt?.name,
+    t.haus?.bezeichnung,
+    t.stockwerk?.bezeichnung,
+    t.einheit?.bezeichnung,
+  ]
     .filter(Boolean)
     .join(' › ');
   const lines = [
@@ -111,7 +188,8 @@ function buildBeteiligteMailto(t: TicketRead): string {
     '',
     t.beschreibung || '',
   ].filter((l) => l !== '');
-  const to = t.wartet_kontakt_email ?? '';
+  const wartetBeteiligter = t.beteiligte.find((b) => b.id === t.wartet_beteiligter_id);
+  const to = wartetBeteiligter?.email ?? t.wartet_kontakt_email ?? '';
   const subject = `Ticket #${t.nummer}: ${t.titel}`;
   return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
 }
@@ -171,7 +249,10 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     enabled: !!t0?.objekt?.id,
     staleTime: 30_000,
   });
-  const felder = useMemo(() => vorlageFelder(tickettypQuery.data ?? null), [tickettypQuery.data]);
+  const felder = useMemo(
+    () => vorlageFelder(tickettypQuery.data ?? null),
+    [tickettypQuery.data],
+  );
 
   const switchOptions = useMemo(() => {
     const list = (tickettypenQuery.data ?? []).map((x) => ({ id: x.id, label: x.label }));
@@ -181,9 +262,13 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     return list;
   }, [tickettypenQuery.data, t0?.tickettyp]);
 
-  const kategorienListe = auswahllistenQuery.data?.find((l) => l.key === 'ticket_kategorie');
+  const kategorienListe = auswahllistenQuery.data?.find(
+    (l) => l.key === 'ticket_kategorie',
+  );
   const quellenListe = auswahllistenQuery.data?.find((l) => l.key === 'eingangskanal');
-  const wartetGruendeListe = auswahllistenQuery.data?.find((l) => l.key === 'wartet_grund');
+  const wartetGruendeListe = auswahllistenQuery.data?.find(
+    (l) => l.key === 'wartet_grund',
+  );
   const beteiligtenRolleListe = auswahllistenQuery.data?.find(
     (l) => l.key === 'beteiligten_rolle',
   );
@@ -254,14 +339,20 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
     if (!t || !newTypId || newTypId === t.tickettyp?.id) return;
     const newTyp = tickettypenQuery.data?.find((x) => x.id === newTypId) ?? null;
     const nf = vorlageFelder(newTyp);
-    const betroffen = FELD_NULL_CONFIG.filter((c) => !nf.sichtbar(c.feldKey) && c.hasValue(t));
+    const betroffen = FELD_NULL_CONFIG.filter(
+      (c) => !nf.sichtbar(c.feldKey) && c.hasValue(t),
+    );
     if (betroffen.length === 0) {
       update.mutate({ tickettyp_id: newTypId });
       return;
     }
     const patch: TicketUpdate = { tickettyp_id: newTypId };
     for (const c of betroffen) Object.assign(patch, c.patch);
-    setPendingSwitch({ tickettypId: newTypId, labels: betroffen.map((c) => c.label), patch });
+    setPendingSwitch({
+      tickettypId: newTypId,
+      labels: betroffen.map((c) => c.label),
+      patch,
+    });
   }
 
   const workflow = workflowQuery.data;
@@ -405,7 +496,10 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             }}
                             options={[
                               { value: t.status.key, label: t.status.label },
-                              ...statusTargets.map((s) => ({ value: s.key, label: s.label })),
+                              ...statusTargets.map((s) => ({
+                                value: s.key,
+                                label: s.label,
+                              })),
                             ]}
                           />
                           <div>
@@ -415,7 +509,9 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             <select
                               value={t.zugewiesen_an?.id ?? ''}
                               onChange={(e) =>
-                                update.mutate({ zugewiesen_an_id: e.target.value || null })
+                                update.mutate({
+                                  zugewiesen_an_id: e.target.value || null,
+                                })
                               }
                               className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                             >
@@ -431,7 +527,10 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                         {statusErfordertGrund && (
                           <WartetSubBar
                             ticket={t}
-                            wartetGruende={aktiveWerte(wartetGruendeListe?.werte, t.wartet_grund?.key)}
+                            wartetGruende={aktiveWerte(
+                              wartetGruendeListe?.werte,
+                              t.wartet_grund?.key,
+                            )}
                             onSave={(payload) => update.mutate(payload)}
                           />
                         )}
@@ -454,7 +553,8 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             />
                           </div>
                         )}
-                        {(felder.sichtbar('faelligkeit_am') || felder.sichtbar('wiederholung')) && (
+                        {(felder.sichtbar('faelligkeit_am') ||
+                          felder.sichtbar('wiederholung')) && (
                           <div className="grid grid-cols-2 gap-3">
                             {felder.sichtbar('faelligkeit_am') && (
                               <div>
@@ -468,7 +568,9 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                                   type="date"
                                   value={t.faelligkeit_am ?? ''}
                                   onChange={(e) =>
-                                    update.mutate({ faelligkeit_am: e.target.value || null })
+                                    update.mutate({
+                                      faelligkeit_am: e.target.value || null,
+                                    })
                                   }
                                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
                                 />
@@ -478,7 +580,9 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                               <FeldSelect
                                 label="Wiederholung"
                                 value={t.wiederholung ?? ''}
-                                onChange={(v) => update.mutate({ wiederholung: v || null })}
+                                onChange={(v) =>
+                                  update.mutate({ wiederholung: v || null })
+                                }
                               >
                                 <option value="">— (keine) —</option>
                                 <option value="weekly">Wöchentlich</option>
@@ -572,7 +676,10 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                                 disabled={!t.haus}
                                 value={t.stockwerk?.id ?? ''}
                                 onChange={(v) =>
-                                  update.mutate({ stockwerk_id: v || null, einheit_id: null })
+                                  update.mutate({
+                                    stockwerk_id: v || null,
+                                    einheit_id: null,
+                                  })
                                 }
                               >
                                 <option value="">— (keins) —</option>
@@ -674,7 +781,10 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             onChange={(v) =>
                               update.mutate({ prioritaet: v as TicketPrioritaetSlug })
                             }
-                            options={PRIO_SLUGS.map((p) => ({ value: p, label: labelForPrioSlug(p) }))}
+                            options={PRIO_SLUGS.map((p) => ({
+                              value: p,
+                              label: labelForPrioSlug(p),
+                            }))}
                           />
                         )}
                         {felder.sichtbar('kategorie') && (
@@ -684,7 +794,10 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             onChange={(v) => update.mutate({ kategorie: v || null })}
                             options={[
                               { value: '', label: '— (keine) —' },
-                              ...aktiveWerte(kategorienListe?.werte, t.kategorie?.key).map((w) => ({
+                              ...aktiveWerte(
+                                kategorienListe?.werte,
+                                t.kategorie?.key,
+                              ).map((w) => ({
                                 value: w.key,
                                 label: w.label,
                               })),
@@ -844,18 +957,29 @@ interface WartetSubBarProps {
 
 function WartetSubBar({ ticket, wartetGruende, onSave }: WartetSubBarProps) {
   const grund = ticket.wartet_grund;
-  const showKontakt = grund?.key === 'mieter' || grund?.key === 'extern';
-  const showNachunternehmer = grund?.key === 'material' || grund?.key === 'extern';
-  const showKontaktBlock = showKontakt || showNachunternehmer;
+  // Bei Mieter/Extern/Material wartet man typisch auf eine konkrete Person —
+  // jetzt einer der Ticket-Beteiligten (löst die früheren Freitext-Kontaktfelder ab).
+  const showBeteiligter =
+    grund?.key === 'mieter' || grund?.key === 'extern' || grund?.key === 'material';
 
-  // Partner gewählt → Kontaktfelder aus dem Partner-Stamm vorbefüllen + ID setzen.
-  function waehlePartner(p: PartnerKontaktAuswahl) {
-    onSave({
-      wartet_nachunternehmer_id: p.id,
-      wartet_kontakt_name: p.ansprechpartner || p.name || null,
-      wartet_kontakt_telefon: p.telefon || p.mobil || null,
-      wartet_kontakt_email: p.email || null,
-    });
+  const beteiligte = ticket.beteiligte;
+  const selected = beteiligte.find((b) => b.id === ticket.wartet_beteiligter_id) ?? null;
+  const selectedTel = selected?.telefon || selected?.mobil || null;
+  // Altdaten aus den abgelösten Freitextfeldern — nur Lese-Hinweis, bis ein
+  // Beteiligter gewählt ist (Bestandstickets verlieren ihre Info nicht).
+  const legacy = [
+    ticket.wartet_kontakt_name,
+    ticket.wartet_kontakt_telefon,
+    ticket.wartet_kontakt_email,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  function beteiligterLabel(b: TicketBeteiligterRead): string {
+    const base = b.kontakt?.name
+      ? `${b.partner.name} · ${b.kontakt.name}`
+      : b.partner.name;
+    return b.rolle ? `${base} (${b.rolle.label})` : base;
   }
 
   return (
@@ -879,92 +1003,66 @@ function WartetSubBar({ ticket, wartetGruende, onSave }: WartetSubBarProps) {
             ))}
           </select>
         </div>
-        {showKontaktBlock && (
+        {showBeteiligter && (
           <div className="sm:col-span-2">
             <label className="block text-[10px] text-zinc-400">
-              Kontakt / Nachunternehmer (Geschäftspartner)
+              Warte auf (Beteiligten wählen)
             </label>
-            <PartnerKontaktPicker
-              value={
-                ticket.wartet_nachunternehmer
-                  ? {
-                      id: ticket.wartet_nachunternehmer.id,
-                      name: ticket.wartet_nachunternehmer.name,
-                    }
-                  : null
-              }
-              onSelect={waehlePartner}
-              onClear={() => onSave({ wartet_nachunternehmer_id: null })}
-            />
-            <p className="mt-1 text-[10px] text-zinc-500">
-              Auswahl füllt Name/Telefon/E-Mail automatisch — unten anpassbar.
-            </p>
-          </div>
-        )}
-        {showKontaktBlock && (
-          <>
-            <div className="sm:col-span-2">
-              <label className="block text-[10px] text-zinc-400">Kontakt-Name</label>
-              <input
-                key={`wkname-${ticket.wartet_kontakt_name ?? ''}`}
-                type="text"
-                defaultValue={ticket.wartet_kontakt_name ?? ''}
-                onBlur={(e) =>
-                  e.target.value !== (ticket.wartet_kontakt_name ?? '') &&
-                  onSave({ wartet_kontakt_name: e.target.value || null })
+            {beteiligte.length === 0 ? (
+              <p className="mt-0.5 rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-400">
+                Noch keine Beteiligten — oben im Block „Kontakt &amp; Beteiligte“
+                hinzufügen, dann hier auswählen.
+              </p>
+            ) : (
+              <select
+                value={ticket.wartet_beteiligter_id ?? ''}
+                onChange={(e) =>
+                  onSave({ wartet_beteiligter_id: e.target.value || null })
                 }
                 className="mt-0.5 w-full rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] text-zinc-400">Telefon</label>
-              <div className="mt-0.5 flex gap-1">
-                <input
-                  key={`wktel-${ticket.wartet_kontakt_telefon ?? ''}`}
-                  type="text"
-                  defaultValue={ticket.wartet_kontakt_telefon ?? ''}
-                  onBlur={(e) =>
-                    e.target.value !== (ticket.wartet_kontakt_telefon ?? '') &&
-                    onSave({ wartet_kontakt_telefon: e.target.value || null })
-                  }
-                  className="flex-1 rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
-                />
-                {ticket.wartet_kontakt_telefon && (
+              >
+                <option value="">— (keiner) —</option>
+                {beteiligte.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {beteiligterLabel(b)}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {selected && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-zinc-300">
+                <span className="text-zinc-400">Kontakt (aus Stamm):</span>
+                {selectedTel && (
                   <a
-                    href={`tel:${ticket.wartet_kontakt_telefon}`}
-                    className="rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-amber-300 hover:bg-zinc-800"
+                    href={`tel:${selectedTel}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1 text-amber-300 hover:bg-zinc-800"
                     title="Anrufen"
                   >
-                    <Phone className="h-3.5 w-3.5" />
+                    <Phone className="h-3.5 w-3.5" /> {selectedTel}
                   </a>
                 )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] text-zinc-400">E-Mail</label>
-              <div className="mt-0.5 flex gap-1">
-                <input
-                  key={`wkmail-${ticket.wartet_kontakt_email ?? ''}`}
-                  type="email"
-                  defaultValue={ticket.wartet_kontakt_email ?? ''}
-                  onBlur={(e) =>
-                    e.target.value !== (ticket.wartet_kontakt_email ?? '') &&
-                    onSave({ wartet_kontakt_email: e.target.value || null })
-                  }
-                  className="flex-1 rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100"
-                />
-                {ticket.wartet_kontakt_email && (
+                {selected.email && (
                   <a
-                    href={`mailto:${ticket.wartet_kontakt_email}?subject=${encodeURIComponent(`Ticket #${ticket.nummer}: ${ticket.titel}`)}`}
-                    className="rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1.5 text-amber-300 hover:bg-zinc-800"
+                    href={`mailto:${selected.email}?subject=${encodeURIComponent(`Ticket #${ticket.nummer}: ${ticket.titel}`)}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-zinc-900 px-2 py-1 text-amber-300 hover:bg-zinc-800"
                     title="E-Mail schreiben"
                   >
-                    <Mail className="h-3.5 w-3.5" />
+                    <Mail className="h-3.5 w-3.5" /> {selected.email}
                   </a>
                 )}
+                {!selectedTel && !selected.email && (
+                  <span className="text-zinc-500">— keine Kontaktdaten im Stamm —</span>
+                )}
               </div>
-            </div>
-          </>
+            )}
+
+            {!selected && legacy && (
+              <p className="mt-1.5 rounded-md border border-zinc-700 bg-zinc-900/60 px-2 py-1.5 text-[11px] text-zinc-400">
+                Alt-Kontakt (bitte oben als Beteiligten anlegen und hier wählen): {legacy}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -1095,7 +1193,10 @@ function Accordion({
   children: React.ReactNode;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-md border border-zinc-800 bg-zinc-900">
+    <details
+      open={defaultOpen}
+      className="group rounded-md border border-zinc-800 bg-zinc-900"
+    >
       <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 lg:min-h-0">
         <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
         {title}

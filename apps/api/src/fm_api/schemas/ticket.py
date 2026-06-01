@@ -196,6 +196,10 @@ class TicketUpdate(BaseModel):
     wartet_kontakt_name: str | None = Field(default=None, max_length=200)
     wartet_kontakt_telefon: str | None = Field(default=None, max_length=64)
     wartet_kontakt_email: str | None = Field(default=None, max_length=255)
+    # Zeiger auf einen Ticket-Beteiligten, auf den gewartet wird (löst die
+    # wartet_kontakt_*-Freitextfelder ab). Server-seitig ticket-/mandantengebunden
+    # validiert.
+    wartet_beteiligter_id: UUID | None = None
 
     @field_validator("status", "prioritaet", "kategorie", "quelle", "wartet_grund", mode="before")
     @classmethod
@@ -234,6 +238,9 @@ class TicketRead(TimestampedRead):
     wartet_kontakt_name: str | None = None
     wartet_kontakt_telefon: str | None = None
     wartet_kontakt_email: str | None = None
+    # ID des Beteiligten, auf den gewartet wird; Kontakt wird im Client aus der
+    # beteiligte-Liste aufgelöst (kein eigener Relationship-Load nötig).
+    wartet_beteiligter_id: UUID | None = None
 
     eroeffnet_von: UserRef
     zugewiesen_an: UserRef | None = None
@@ -421,6 +428,7 @@ class TicketRead(TimestampedRead):
             wartet_kontakt_name=t.wartet_kontakt_name,
             wartet_kontakt_telefon=t.wartet_kontakt_telefon,
             wartet_kontakt_email=t.wartet_kontakt_email,
+            wartet_beteiligter_id=t.wartet_beteiligter_id,
             eroeffnet_von=UserRef(id=t.eroeffnet_von.id, full_name=t.eroeffnet_von.full_name),
             zugewiesen_an=(
                 UserRef(id=t.zugewiesen_an.id, full_name=t.zugewiesen_an.full_name)

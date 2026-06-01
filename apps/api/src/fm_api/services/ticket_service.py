@@ -63,6 +63,12 @@ class PartnerNotFoundError(Exception):
     pass
 
 
+class WartetBeteiligterNotFoundError(Exception):
+    """Der als Wartet-Kontakt gewählte Beteiligte gehört nicht zu diesem Ticket."""
+
+    pass
+
+
 class UnknownAuswahlSlugError(Exception):
     pass
 
@@ -294,6 +300,26 @@ async def _validate_partner_kontakt(
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise PartnerNotFoundError(
             f"partner_kontakt {kontakt_id} not found for partner {partner_id}"
+        )
+
+
+async def _validate_wartet_beteiligter(
+    db: AsyncSession, beteiligter_id: UUID, ticket_id: UUID, mandant_id: UUID
+) -> None:
+    """Der Wartet-Zeiger darf nur auf einen Beteiligten DIESES Tickets zeigen.
+
+    Ticket- UND mandantengebunden — verhindert, dass ein fremder Beteiligten-Datensatz
+    (anderes Ticket / anderer Mandant) als Wartet-Kontakt zugewiesen und über die
+    Read-Auflösung ausgelesen wird (IDOR).
+    """
+    stmt = select(TicketBeteiligter.id).where(
+        TicketBeteiligter.id == beteiligter_id,
+        TicketBeteiligter.ticket_id == ticket_id,
+        TicketBeteiligter.mandant_id == mandant_id,
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise WartetBeteiligterNotFoundError(
+            f"beteiligter {beteiligter_id} not found for ticket {ticket_id}"
         )
 
 
@@ -729,6 +755,15 @@ async def update_ticket(
 
     if "beteiligte" in updates and updates["beteiligte"] is not None:
         await _apply_beteiligte(db, ticket, mandant_id, updates["beteiligte"], is_new=False)
+
+    if "wartet_beteiligter_id" in updates:
+        new_wb = updates["wartet_beteiligter_id"]
+        if new_wb is not None:
+            # Flush, damit ein in derselben Anfrage neu angelegter Beteiligter
+            # für die Validierungs-Query sichtbar ist.
+            await db.flush()
+            await _validate_wartet_beteiligter(db, new_wb, ticket.id, mandant_id)
+        ticket.wartet_beteiligter_id = new_wb
 
     await db.flush()
     # Identity-Map invalidieren, sonst liefert get_ticket die alte Relationship-Cache
