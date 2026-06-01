@@ -89,21 +89,33 @@ export function TicketFormEngine({
       </div>
     );
   }
+  // Rechte Spalte nur reservieren, wenn sie etwas trägt (Blöcke oder Chat) —
+  // sonst nimmt die linke Region die volle Breite ein, statt eine leere
+  // 2/5-Lücke zu zeigen (z. B. Vorlagen ohne rechts-Blöcke).
+  const showRight = layout.rechts.length > 0 || Boolean(chatSlot);
   return (
     <>
-      <div className="contents lg:flex lg:w-3/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:px-5 lg:py-4">
+      <div
+        className={
+          showRight
+            ? 'contents lg:flex lg:w-3/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:px-5 lg:py-4'
+            : 'contents lg:flex lg:w-full lg:flex-col lg:gap-3 lg:overflow-y-auto lg:px-5 lg:py-4'
+        }
+      >
         {leftHeaderSlot}
         {layout.links.map((block) => (
           <BlockSection key={block.block_key} block={block} renderFeld={renderFeld} />
         ))}
         {leftFooterSlot}
       </div>
-      <div className="contents lg:flex lg:w-2/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:border-l lg:border-zinc-800 lg:px-5 lg:py-4">
-        {chatSlot}
-        {layout.rechts.map((block) => (
-          <BlockSection key={block.block_key} block={block} renderFeld={renderFeld} />
-        ))}
-      </div>
+      {showRight && (
+        <div className="contents lg:flex lg:w-2/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:border-l lg:border-zinc-800 lg:px-5 lg:py-4">
+          {chatSlot}
+          {layout.rechts.map((block) => (
+            <BlockSection key={block.block_key} block={block} renderFeld={renderFeld} />
+          ))}
+        </div>
+      )}
     </>
   );
 }
