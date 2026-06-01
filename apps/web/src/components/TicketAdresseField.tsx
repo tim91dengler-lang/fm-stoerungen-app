@@ -47,6 +47,7 @@ export function TicketAdresseField({ adresse, isEigen, onSet }: Props) {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<NewForm>({ ...EMPTY });
   const [suggestQuery, setSuggestQuery] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const createMut = useMutation({
     mutationFn: (payload: AdresseCreate) => adresseApi.create(payload),
@@ -54,6 +55,7 @@ export function TicketAdresseField({ adresse, isEigen, onSet }: Props) {
       onSet(a.id, a);
       close();
     },
+    onError: () => setCreateError('Adresse konnte nicht angelegt werden.'),
   });
 
   function close() {
@@ -61,6 +63,7 @@ export function TicketAdresseField({ adresse, isEigen, onSet }: Props) {
     setCreating(false);
     setForm({ ...EMPTY });
     setSuggestQuery('');
+    setCreateError(null);
   }
 
   function applySuggestion(s: AdresseSuggestion) {
@@ -238,6 +241,7 @@ export function TicketAdresseField({ adresse, isEigen, onSet }: Props) {
                   {createMut.isPending ? 'Anlegen …' : 'Anlegen & übernehmen'}
                 </button>
               </div>
+              {createError && <p className="text-[11px] text-red-400">{createError}</p>}
             </div>
           )}
         </div>

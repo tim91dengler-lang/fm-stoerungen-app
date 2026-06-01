@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import {
   auswahllistenApi,
   fehlercodeApi,
+  objektApi,
   objektstrukturApi,
   ticketApi,
   tickettypApi,
@@ -154,6 +155,13 @@ export function TicketErfassenModal({
     queryFn: () => objektstrukturApi.listHaus(selectedObjektId!),
     enabled: !!selectedObjektId,
     staleTime: 30_000,
+  });
+  // Objekt-Adresse als Default-Vorschau (solange keine eigene Adresse gesetzt).
+  const { data: objektDetail } = useQuery({
+    queryKey: ['objekt-adresse', selectedObjektId],
+    queryFn: () => objektApi.get(selectedObjektId!),
+    enabled: !!selectedObjektId && !adresseId,
+    staleTime: 60_000,
   });
 
   const haus = useMemo(
@@ -541,9 +549,12 @@ export function TicketErfassenModal({
             </div>
           )}
 
-          {feldSichtbar('objekt') && (
+          {(feldSichtbar('objekt') ||
+            feldSichtbar('haus') ||
+            feldSichtbar('stockwerk') ||
+            feldSichtbar('einheit')) && (
             <TicketAdresseField
-              adresse={selectedAdresse}
+              adresse={adresseId ? selectedAdresse : (objektDetail?.adresse ?? null)}
               isEigen={!!adresseId}
               onSet={(id, a) => {
                 setAdresseId(id);

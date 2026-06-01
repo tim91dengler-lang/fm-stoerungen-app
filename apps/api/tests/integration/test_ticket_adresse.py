@@ -102,6 +102,48 @@ async def test_ticket_own_adresse_overrides_objekt(client, admin_user) -> None:
 
 
 @pytest.mark.integration
+async def test_unknown_adresse_id_rejected(client, admin_user) -> None:
+    """Sicherheit: eine adresse_id, die nicht zum Mandanten gehört (oder nicht
+    existiert), wird mandantengebunden abgewiesen — kein IDOR-Leak."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    res = await client.post(
+        "/api/v1/tickets",
+        headers=headers,
+        json={
+            "titel": "Fremde Adresse",
+            "adresse_id": "00000000-0000-0000-0000-000000000000",
+        },
+    )
+    assert res.status_code == 400, res.text
+
+
+@pytest.mark.integration
+async def test_foreign_mandant_adresse_rejected(client, admin_user, db) -> None:
+    """Echter Cross-Mandant-Fall: Adresse eines fremden Mandanten → 400."""
+    from uuid import uuid4
+
+    from fm_api.models import Adresse, Mandant
+
+    other = Mandant(name="Fremd-Mandant", slug=f"fremd-{uuid4().hex[:8]}")
+    db.add(other)
+    await db.flush()
+    foreign = Adresse(mandant_id=other.id, strasse="Fremdweg 1", plz="99999", ort="Fernort")
+    db.add(foreign)
+    await db.flush()
+    await db.commit()
+
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    res = await client.post(
+        "/api/v1/tickets",
+        headers=headers,
+        json={"titel": "Cross-Mandant", "adresse_id": str(foreign.id)},
+    )
+    assert res.status_code == 400, res.text
+
+
+@pytest.mark.integration
 async def test_ticket_no_objekt_with_adresse(client, admin_user) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)

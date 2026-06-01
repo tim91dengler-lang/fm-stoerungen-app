@@ -30,6 +30,7 @@ import {
 import { EntitySearchSelect } from './EntitySearchSelect';
 import { BeteiligteBlock } from './BeteiligteBlock';
 import { TicketAdresseField } from './TicketAdresseField';
+import { formatAdresse, mapsUrl } from '../lib/adresse';
 import {
   makeAnlageSearch,
   makeFehlercodeSearch,
@@ -102,6 +103,8 @@ function buildBeteiligteMailto(t: TicketRead): string {
     `Ticket #${t.nummer}: ${t.titel}`,
     `Status: ${t.status.label} · Priorität: ${t.prioritaet.label}`,
     ort ? `Ort: ${ort}` : '',
+    t.adresse ? `Adresse: ${formatAdresse(t.adresse)}` : '',
+    t.adresse ? `Karte: ${mapsUrl(t.adresse)}` : '',
     t.partner ? `Partner: ${t.partner.name}` : '',
     t.faelligkeit_am ? `Fällig: ${t.faelligkeit_am}` : '',
     '',

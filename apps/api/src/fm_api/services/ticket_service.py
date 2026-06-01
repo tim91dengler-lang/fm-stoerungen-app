@@ -20,6 +20,7 @@ from fm_api.models import (
 )
 from fm_api.models.ticket import TicketStatusSlug
 from fm_api.services import status_workflow_service
+from fm_api.services.adresse_service import AdresseNotFoundError
 from fm_api.services.auswahlliste_service import (
     AuswahllistenWertNotFoundError,
     get_wert_by_id,
@@ -120,7 +121,18 @@ async def _attach_eigene_adresse(db: AsyncSession, tickets: list[Ticket]) -> Non
     ids = [t.adresse_id for t in tickets if t.adresse_id is not None]
     by_id: dict[UUID, Adresse] = {}
     if ids:
-        rows = (await db.execute(select(Adresse).where(Adresse.id.in_(ids)))).scalars().all()
+        # Defense-in-depth: nur Adressen des Mandanten (Tickets sind bereits
+        # mandantengefiltert) — eine fremde FK kann nie auflösen.
+        mandant_ids = {t.mandant_id for t in tickets}
+        rows = (
+            (
+                await db.execute(
+                    select(Adresse).where(Adresse.id.in_(ids), Adresse.mandant_id.in_(mandant_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
         by_id = {a.id: a for a in rows}
     for t in tickets:
         # setattr: transientes Attribut, vom ORM-Mapper nicht erfasst.
@@ -148,6 +160,16 @@ async def _validate_objekt(db: AsyncSession, objekt_id: UUID, mandant_id: UUID) 
     )
     if (await db.execute(stmt)).scalar_one_or_none() is None:
         raise ObjektNotFoundError(f"objekt {objekt_id} not found")
+
+
+async def _validate_adresse(db: AsyncSession, adresse_id: UUID, mandant_id: UUID) -> None:
+    """Mandantengebunden — verhindert Zuweisen einer fremden Adresse (IDOR)."""
+    stmt = select(Adresse.id).where(
+        Adresse.id == adresse_id,
+        Adresse.mandant_id == mandant_id,
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise AdresseNotFoundError(f"adresse {adresse_id} not found")
 
 
 async def _validate_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID) -> None:
@@ -401,6 +423,8 @@ async def create_ticket(
         await _validate_assignee(db, zugewiesen_an_id, mandant_id)
     if objekt_id is not None:
         await _validate_objekt(db, objekt_id, mandant_id)
+    if adresse_id is not None:
+        await _validate_adresse(db, adresse_id, mandant_id)
     if partner_id is not None:
         await _validate_partner(db, partner_id, mandant_id)
 
@@ -480,7 +504,6 @@ async def update_ticket(
         "wiederholung",
         "faelligkeit_am",
         "pins",
-        "adresse_id",
         "haus_id",
         "stockwerk_id",
         "einheit_id",
@@ -527,6 +550,12 @@ async def update_ticket(
         if new_objekt is not None:
             await _validate_objekt(db, new_objekt, mandant_id)
         ticket.objekt_id = new_objekt
+
+    if "adresse_id" in updates:
+        new_adresse = updates["adresse_id"]
+        if new_adresse is not None:
+            await _validate_adresse(db, new_adresse, mandant_id)
+        ticket.adresse_id = new_adresse  # None = zurück auf Objekt-Adresse
 
     if "partner_id" in updates:
         new_partner = updates["partner_id"]
