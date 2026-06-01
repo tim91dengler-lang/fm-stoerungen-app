@@ -333,7 +333,15 @@ export const CREATE_RENDERERS: Record<string, Renderer> = {
         type="date"
         value={values.faelligkeit_am ?? ''}
         onChange={(e) => setField('faelligkeit_am', e.target.value || null)}
-        className={fieldCls}
+        // Klick aufs ganze Feld öffnet den Kalender (nativ nur übers Icon).
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker();
+          } catch {
+            /* showPicker nicht unterstützt — natives Verhalten bleibt */
+          }
+        }}
+        className={`${fieldCls} cursor-pointer`}
       />
     </div>
   ),

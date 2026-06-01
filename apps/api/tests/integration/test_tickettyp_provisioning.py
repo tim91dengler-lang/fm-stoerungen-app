@@ -60,6 +60,36 @@ async def test_alles_vorlage_adoptiert_vorhandenen_key(db, mandant) -> None:
 
 
 @pytest.mark.integration
+async def test_reconcile_benennt_altes_pin_label_um(db, mandant) -> None:
+    # Bestehendes pin-Feld mit altem Default-Label "Foto-Pin" → Reconcile benennt
+    # es in den neuen Default um (nur solange unverändert).
+    await svc.ensure_default_vorlagen(db, mandant.id)
+    # Auf den Test-Mandanten scopen (sonst evtl. ein Pin-Feld eines anderen
+    # Mandanten erwischt, das der mandantengebundene Reconcile nicht anfasst).
+    pin = (
+        await db.execute(
+            select(TickettypFeld)
+            .join(Tickettyp, TickettypFeld.tickettyp_id == Tickettyp.id)
+            .where(TickettypFeld.feld_key == "pin", Tickettyp.mandant_id == mandant.id)
+            .limit(1)
+        )
+    ).scalar_one()
+    pin.label = "Foto-Pin"  # auf altes Default-Label zurücksetzen
+    await db.flush()
+
+    await svc.ensure_default_vorlagen(db, mandant.id)
+
+    refreshed = (
+        await db.execute(
+            select(TickettypFeld)
+            .where(TickettypFeld.id == pin.id)
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one()
+    assert refreshed.label == "Grundriss / Foto-Pin"
+
+
+@pytest.mark.integration
 async def test_ensure_default_vorlagen_seedet_system_mit_feldern_und_bloecken(db, mandant) -> None:
     await svc.ensure_default_vorlagen(db, mandant.id)
     rows = await _load_vorlagen(db, mandant.id)

@@ -145,7 +145,7 @@ DEFAULT_SYSTEM_FELDER: list[tuple[str, str, bool, bool, int]] = [
     ("partner", "Beteiligte", True, False, 6),
     ("kategorie", "Kategorie", True, False, 7),
     ("prio", "Priorität", True, False, 8),
-    ("pin", "Foto-Pin", True, False, 9),
+    ("pin", "Grundriss / Foto-Pin", True, False, 9),
     # "melder" entfernt 2026-06-01: durch die Beteiligten-Liste abgelöst (Tim).
     ("quelle", "Eingangskanal", True, False, 11),
     ("beschreibung", "Beschreibung", True, True, 12),
@@ -156,6 +156,24 @@ DEFAULT_SYSTEM_FELDER: list[tuple[str, str, bool, bool, int]] = [
     ("wiederholung", "Wiederholung", True, False, 17),
     ("fehlercode", "Fehlercode", True, False, 18),
 ]
+
+# Bekannte Umbenennungen von System-Feld-Default-Labels {feld_key: (alt, neu)}.
+# Beim Reconcile auf bestehende Felder angewandt — ABER nur, wenn das Label noch
+# dem alten Default entspricht (selbst gewählte Admin-Labels bleiben unangetastet).
+# Idempotent; hier eintragen, wenn ein System-Feld-Default umbenannt wird.
+SYSTEM_FELD_RELABELS: dict[str, tuple[str, str]] = {
+    "pin": ("Foto-Pin", "Grundriss / Foto-Pin"),
+}
+
+
+def _apply_system_feld_relabels(felder: list["TickettypFeld"]) -> bool:
+    changed = False
+    for f in felder:
+        rename = SYSTEM_FELD_RELABELS.get(f.feld_key)
+        if rename is not None and f.label == rename[0]:
+            f.label = rename[1]
+            changed = True
+    return changed
 
 
 # Stufe C: Default-Block-Layout je Vorlage. (block_key, label, region, reihenfolge,
@@ -307,6 +325,8 @@ async def _reconcile_vorlage_layout(db: AsyncSession, tickettyp: Tickettyp) -> N
             )
         )
         changed = True
+    if _apply_system_feld_relabels(tickettyp.felder):
+        changed = True
     if changed:
         await db.flush()
 
@@ -399,6 +419,8 @@ async def ensure_alles_vorlage_vollstaendig(db: AsyncSession, mandant_id: UUID) 
                 block_id=block.id,
             )
         )
+        changed = True
+    if _apply_system_feld_relabels(av.felder):
         changed = True
     if changed:
         await db.flush()

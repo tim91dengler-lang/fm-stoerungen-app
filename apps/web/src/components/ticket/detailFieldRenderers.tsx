@@ -97,7 +97,15 @@ export const DETAIL_RENDERERS: Record<string, Renderer> = {
         type="date"
         value={t.faelligkeit_am ?? ''}
         onChange={(e) => onPatch({ faelligkeit_am: e.target.value || null })}
-        className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+        // Klick aufs ganze Feld öffnet den Kalender (nativ nur übers Icon).
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker();
+          } catch {
+            /* showPicker nicht unterstützt — natives Verhalten bleibt */
+          }
+        }}
+        className="mt-1 w-full cursor-pointer rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
       />
     </div>
   ),

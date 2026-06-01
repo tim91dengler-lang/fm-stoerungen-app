@@ -136,7 +136,7 @@ const DEFAULT_FELDER_PREVIEW: TickettypFeldRead[] = [
   {
     id: 'default-pin',
     feld_key: 'pin',
-    label: 'Foto-Pin',
+    label: 'Grundriss / Foto-Pin',
     ist_system_feld: true,
     sichtbar: true,
     pflicht: false,
