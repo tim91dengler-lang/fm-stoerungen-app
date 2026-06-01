@@ -36,6 +36,30 @@ async def _load_alles(db, mandant_id) -> Tickettyp:
 
 
 @pytest.mark.integration
+async def test_alles_vorlage_adoptiert_vorhandenen_key(db, mandant) -> None:
+    # Alt-Daten/Slug-Kollision: eine Vorlage trägt bereits key='alle-felder', ist
+    # aber NICHT als Alles-Vorlage markiert. ensure_alles darf NICHT crashen
+    # (IntegrityError auf uq_tickettypen_mandant_id_key), sondern adoptieren.
+    existing = Tickettyp(
+        mandant_id=mandant.id,
+        key=svc.ALLES_VORLAGE_KEY,
+        label="Alle Felder",
+        ist_system=False,
+        ist_alles_vorlage=False,
+        aktiv=True,
+    )
+    db.add(existing)
+    await db.flush()
+
+    await svc.ensure_alles_vorlage_vollstaendig(db, mandant.id)
+
+    alles = await _load_alles(db, mandant.id)  # scalar_one → es darf genau eine geben
+    assert alles.key == svc.ALLES_VORLAGE_KEY
+    assert alles.ist_alles_vorlage is True
+    assert len(alles.felder) > 0  # leer adoptiert → Reconcile füllt den Katalog
+
+
+@pytest.mark.integration
 async def test_ensure_default_vorlagen_seedet_system_mit_feldern_und_bloecken(db, mandant) -> None:
     await svc.ensure_default_vorlagen(db, mandant.id)
     rows = await _load_vorlagen(db, mandant.id)

@@ -22,7 +22,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
-import { ArrowLeftRight, Eye, EyeOff, GripVertical, Plus, Star, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, Eye, EyeOff, GripVertical, Lock, Plus, Star, Trash2 } from 'lucide-react';
 
 import { tickettypApi } from '../api/endpoints';
 import type {
@@ -268,7 +268,12 @@ export function VorlageLayoutBuilder({
   }
 
   function addBlock(region: BlockRegion) {
-    const seq = customSeq + 1;
+    // Kollisionsfreien Key vergeben: hochzählen, bis `custom-N` nicht schon
+    // existiert (sonst würden zwei Blöcke denselben Key teilen und beim Speichern
+    // still zusammengeführt). Robust auch nach Reload, wenn customSeq bei 0 startet.
+    const taken = new Set(blocks.map((b) => b.block_key));
+    let seq = customSeq + 1;
+    while (taken.has(`custom-${seq}`)) seq++;
     setCustomSeq(seq);
     const maxR = Math.max(
       -1,
@@ -466,7 +471,8 @@ function BlockCard({
   onToggleSichtbar: (feldKey: string, v: boolean) => void;
   onTogglePflicht: (feldKey: string, v: boolean) => void;
 }) {
-  const sortable = useSortable({ id: `b:${block.block_key}` });
+  const isProtected = PROTECTED.has(block.block_key);
+  const sortable = useSortable({ id: `b:${block.block_key}`, disabled: isProtected });
   const { setNodeRef: setZoneRef, isOver: zoneOver } = useDroppable({
     id: `z:${block.block_key}`,
   });
@@ -485,31 +491,45 @@ function BlockCard({
       )}
     >
       <div className="mb-2 flex items-center gap-1">
-        <button
-          type="button"
-          aria-label={`Block ${block.label} ziehen`}
-          title="ziehen zum Sortieren / Region wechseln"
-          className="cursor-grab touch-none rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 active:cursor-grabbing"
-          {...sortable.attributes}
-          {...sortable.listeners}
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+        {isProtected ? (
+          <span
+            title="Geschützter System-Block — fix"
+            aria-label={`Block ${block.label} ist geschützt`}
+            className="rounded p-1 text-zinc-600"
+          >
+            <Lock className="h-3.5 w-3.5" />
+          </span>
+        ) : (
+          <button
+            type="button"
+            aria-label={`Block ${block.label} ziehen`}
+            title="ziehen zum Sortieren / Region wechseln"
+            className="cursor-grab touch-none rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 active:cursor-grabbing"
+            {...sortable.attributes}
+            {...sortable.listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        )}
         <input
           aria-label={`Block-Name ${block.block_key}`}
           value={block.label}
           onChange={(e) => onRename(e.target.value)}
-          className="min-w-0 flex-1 rounded-sm border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100"
+          readOnly={isProtected}
+          title={isProtected ? 'Geschützter Block — nicht umbenennbar' : undefined}
+          className="min-w-0 flex-1 rounded-sm border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm text-zinc-100 read-only:text-zinc-400"
         />
-        <button
-          type="button"
-          title="Region wechseln"
-          onClick={onSwapRegion}
-          className="rounded p-1 text-zinc-400 hover:bg-zinc-800"
-        >
-          <ArrowLeftRight className="h-3.5 w-3.5" />
-        </button>
-        {!PROTECTED.has(block.block_key) && (
+        {!isProtected && (
+          <button
+            type="button"
+            title="Region wechseln"
+            onClick={onSwapRegion}
+            className="rounded p-1 text-zinc-400 hover:bg-zinc-800"
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {!isProtected && (
           <button
             type="button"
             title="Block löschen"

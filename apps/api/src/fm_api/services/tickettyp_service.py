@@ -33,6 +33,10 @@ class LayoutValidationError(Exception):
 # außer kopf/weitere sind frei löschbar). kopf trägt das Kernfeld, weitere ist
 # der Auffang-Block.
 PROTECTED_BLOCK_KEYS: frozenset[str] = frozenset({"kopf", "weitere"})
+# Reservierter Key der selbst-wachsenden Alles-Vorlage. Darf nicht für eine
+# User-Vorlage vergeben werden (Label „Alle Felder" slugt sonst dorthin und
+# kollidiert beim Provisioning) — siehe create_tickettyp + ensure_alles_vorlage.
+ALLES_VORLAGE_KEY = "alle-felder"
 
 # Eltern-Sichtbarkeit (H4): ist ein abhängiges Feld sichtbar, müssen alle seine
 # Eltern ebenfalls sichtbar sein — sonst entsteht eine unbedienbare Vorlage
@@ -322,19 +326,28 @@ async def ensure_alles_vorlage_vollstaendig(db: AsyncSession, mandant_id: UUID) 
     )
     av = (await db.execute(stmt)).scalar_one_or_none()
     if av is None:
-        av = Tickettyp(
-            mandant_id=mandant_id,
-            key="alle-felder",
-            label="Alle Felder",
-            beschreibung="Enthält automatisch alle verfügbaren Felder.",
-            ist_system=False,
-            ist_alles_vorlage=True,
-            aktiv=True,
-        )
-        db.add(av)
-        await db.flush()
-        await _seed_bloecke_und_felder(db, av.id)
-        return True
+        # Robust gegen eine bereits vorhandene Vorlage mit dem reservierten Key
+        # (z. B. Alt-Daten): adoptieren statt blind INSERT — sonst IntegrityError
+        # auf uq_tickettypen_mandant_id_key, der den ganzen Provision-Lauf killt.
+        existing = await get_tickettyp_by_key(db, mandant_id, ALLES_VORLAGE_KEY)
+        if existing is not None:
+            existing.ist_alles_vorlage = True
+            av = existing
+            # fällt in den Reconcile-Zweig unten (ergänzt fehlende Blöcke/Felder)
+        else:
+            av = Tickettyp(
+                mandant_id=mandant_id,
+                key=ALLES_VORLAGE_KEY,
+                label="Alle Felder",
+                beschreibung="Enthält automatisch alle verfügbaren Felder.",
+                ist_system=False,
+                ist_alles_vorlage=True,
+                aktiv=True,
+            )
+            db.add(av)
+            await db.flush()
+            await _seed_bloecke_und_felder(db, av.id)
+            return True
 
     # Reconcile: fehlende System-Blöcke + fehlende Katalog-Felder ergänzen.
     block_by_key = {b.block_key: b for b in av.bloecke}
@@ -468,6 +481,10 @@ async def get_tickettyp_by_key(db: AsyncSession, mandant_id: UUID, key: str) -> 
 async def create_tickettyp(
     db: AsyncSession, mandant_id: UUID, *, payload: dict[str, Any]
 ) -> Tickettyp:
+    if payload.get("key") == ALLES_VORLAGE_KEY:
+        raise TickettypKeyConflictError(
+            f"Der Key '{ALLES_VORLAGE_KEY}' ist für die Alles-Vorlage reserviert."
+        )
     item = Tickettyp(mandant_id=mandant_id, ist_system=False, **payload)
     db.add(item)
     try:
@@ -670,9 +687,13 @@ async def save_layout(
             db.add(blk)
             existing_blocks[bw["block_key"]] = blk
         else:
-            blk.label = bw["label"]
-            blk.region = bw["region"]
-            blk.reihenfolge = bw["reihenfolge"]
+            # Geschützte System-Blöcke (kopf/weitere) sind Anker: Label/Region/
+            # Reihenfolge bleiben fix, egal was der Payload schickt. Nur das
+            # Aufklapp-Verhalten ist anpassbar.
+            if bw["block_key"] not in PROTECTED_BLOCK_KEYS:
+                blk.label = bw["label"]
+                blk.region = bw["region"]
+                blk.reihenfolge = bw["reihenfolge"]
             blk.collapsible_default_open = bw.get("collapsible_default_open", True)
     # Nicht mehr enthaltene Blöcke löschen (außer geschützt).
     for bkey, blk in list(existing_blocks.items()):

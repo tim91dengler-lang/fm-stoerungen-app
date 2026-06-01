@@ -51,9 +51,9 @@ async def test_ticket_nummer_increments_per_mandant(client, admin_user) -> None:
 
 
 @pytest.mark.integration
-async def test_create_with_assignee_sets_status_bearbeitung(
-    client, admin_user, techniker_user
-) -> None:
+async def test_create_with_assignee_keeps_status_neu(client, admin_user, techniker_user) -> None:
+    # Tim 2026-06-01: Die Bearbeiter-Zuordnung darf den Status NICHT setzen.
+    # Ohne expliziten Status bleibt ein neues Ticket „neu", auch mit Zuweisung.
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)
     tech, _ = techniker_user
@@ -64,8 +64,31 @@ async def test_create_with_assignee_sets_status_bearbeitung(
         json={"titel": "Mit Zuweisung", "zugewiesen_an_id": str(tech.id)},
     )
     assert res.status_code == 201
-    assert res.json()["status"]["key"] == "bearbeitung"
+    assert res.json()["status"]["key"] == "neu"
     assert res.json()["zugewiesen_an"]["id"] == str(tech.id)
+
+
+@pytest.mark.integration
+async def test_assign_does_not_change_status(client, admin_user, techniker_user) -> None:
+    # Einem bestehenden „neu"-Ticket einen Bearbeiter zuordnen → Status bleibt „neu"
+    # (kein Auto-Sprung neu→bearbeitung). Zeitstempel zugewiesen_am wird gesetzt.
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    tech, _ = techniker_user
+
+    create_res = await client.post("/api/v1/tickets", headers=headers, json={"titel": "Offen"})
+    assert create_res.json()["status"]["key"] == "neu"
+    tid = create_res.json()["id"]
+
+    patch_res = await client.patch(
+        f"/api/v1/tickets/{tid}",
+        headers=headers,
+        json={"zugewiesen_an_id": str(tech.id)},
+    )
+    assert patch_res.status_code == 200, patch_res.text
+    assert patch_res.json()["status"]["key"] == "neu"
+    assert patch_res.json()["zugewiesen_an"]["id"] == str(tech.id)
+    assert patch_res.json()["zugewiesen_am"] is not None
 
 
 @pytest.mark.integration
