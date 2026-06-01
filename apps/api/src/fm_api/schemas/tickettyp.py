@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,6 +44,38 @@ class TickettypFeldUpdate(BaseModel):
     nur_admin_sichtbar: bool | None = None
     reihenfolge: int | None = None
     label: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class BlockLayoutWrite(BaseModel):
+    """Ein Block im Layout-Payload (Stufe C). Identifikation über ``block_key``
+    (stabil, pro Vorlage eindeutig). Neue Blöcke bringen einen neuen Key mit —
+    der Server löst Keys NUR innerhalb dieser Vorlage auf (kein Cross-Vorlage-/
+    Cross-Mandant-Reparenting möglich)."""
+
+    block_key: str = Field(min_length=1, max_length=64)
+    label: str = Field(min_length=1, max_length=120)
+    region: Literal["links", "rechts"]
+    reihenfolge: int = 0
+    collapsible_default_open: bool = True
+
+
+class FeldLayoutWrite(BaseModel):
+    """Ein Feld im Layout-Payload: Zuordnung zu einem Block (per ``block_key``),
+    block-lokale Reihenfolge, Sichtbarkeit/Pflicht und optionale Umbenennung."""
+
+    feld_key: str = Field(min_length=1, max_length=64)
+    block_key: str = Field(min_length=1, max_length=64)
+    reihenfolge: int = 0
+    sichtbar: bool = True
+    pflicht: bool = False
+    label: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class LayoutWrite(BaseModel):
+    """Vollständiges Layout einer Vorlage (Designer-Save, transaktional)."""
+
+    bloecke: list[BlockLayoutWrite]
+    felder: list[FeldLayoutWrite]
 
 
 class TickettypBase(BaseModel):
