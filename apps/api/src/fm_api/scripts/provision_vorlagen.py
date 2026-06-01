@@ -27,18 +27,27 @@ from fm_api.services.tickettyp_service import ensure_default_vorlagen
 
 
 async def main() -> int:
+    failures = 0
     async with SessionLocal() as db:
         tenants = (await db.execute(select(Mandant))).scalars().all()
         if not tenants:
             print("[provision] no tenants found — nothing to do.")
             return 0
+        # Pro Mandant committen + isoliert fangen: ein kaputter Mandant darf den
+        # Provision-Lauf für die übrigen NICHT killen (Session-Vergiftung). Bei
+        # mind. einem Fehler Exit 1 → der Deploy-Schritt meldet es sichtbar.
         for tenant in tenants:
-            await ensure_system_auswahllisten(db, tenant.id)
-            await ensure_default_vorlagen(db, tenant.id)
-            print(f"[provision] ensured base data for tenant '{tenant.slug}'")
-        await db.commit()
-        print(f"[provision] done — {len(tenants)} tenant(s).")
-        return 0
+            try:
+                await ensure_system_auswahllisten(db, tenant.id)
+                await ensure_default_vorlagen(db, tenant.id)
+                await db.commit()
+                print(f"[provision] ensured base data for tenant '{tenant.slug}'")
+            except Exception as exc:
+                await db.rollback()
+                failures += 1
+                print(f"[provision] FAILED for tenant '{tenant.slug}': {exc!r}")
+        print(f"[provision] done — {len(tenants)} tenant(s), {failures} failed.")
+        return 1 if failures else 0
 
 
 if __name__ == "__main__":

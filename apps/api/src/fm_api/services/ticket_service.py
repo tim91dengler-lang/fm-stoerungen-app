@@ -516,15 +516,9 @@ async def create_ticket(
 ) -> Ticket:
     now = datetime.now(UTC)
 
-    # Status: explizit angegeben oder „neu"; wenn zugewiesen → „bearbeitung"
-    if status_slug is None:
-        effective_status = (
-            TicketStatusSlug.BEARBEITUNG.value
-            if zugewiesen_an_id is not None
-            else TicketStatusSlug.NEU.value
-        )
-    else:
-        effective_status = status_slug
+    # Status: explizit angegeben, sonst „neu". Bewusst NICHT von der Zuweisung
+    # abhängig (Tim 2026-06-01: Bearbeiter-Zuordnung darf den Status nicht setzen).
+    effective_status = status_slug if status_slug is not None else TicketStatusSlug.NEU.value
 
     status_wert = await _resolve_slug(db, mandant_id, LISTE_KEY_STATUS, effective_status)
     prioritaet_wert = await _resolve_slug(db, mandant_id, LISTE_KEY_PRIORITAET, prioritaet_slug)
@@ -705,14 +699,11 @@ async def update_ticket(
         if new_assignee is not None:
             await _validate_assignee(db, new_assignee, mandant_id)
         ticket.zugewiesen_an_id = new_assignee
+        # Zeitstempel der Zuweisung festhalten — aber den STATUS NICHT automatisch
+        # ändern (Tim 2026-06-01: Status ist unabhängig von der Bearbeiter-Zuordnung;
+        # der frühere Auto-Sprung neu→bearbeitung war unerwünscht).
         if new_assignee is not None and ticket.zugewiesen_am is None:
             ticket.zugewiesen_am = now
-            current_status_slug = ticket.status_wert.key
-            if current_status_slug == TicketStatusSlug.NEU.value:
-                bearbeitung_wert = await _resolve_slug(
-                    db, mandant_id, LISTE_KEY_STATUS, TicketStatusSlug.BEARBEITUNG.value
-                )
-                ticket.status_id = bearbeitung_wert.id
         # Notification senden wenn neuer Bearbeiter ungleich altem + ungleich Aktor
         if (
             new_assignee is not None

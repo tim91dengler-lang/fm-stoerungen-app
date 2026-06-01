@@ -56,6 +56,52 @@ def _block_key_of(body: dict, feld_key: str) -> str:
 
 
 @pytest.mark.integration
+async def test_reserved_alles_felder_key_rejected(client, admin_user) -> None:
+    # Der Key 'alle-felder' ist für die Alles-Vorlage reserviert (Label „Alle Felder"
+    # slugt dorthin) — eine User-Vorlage damit muss abgelehnt werden (409), sonst
+    # kollidiert das Provisioning.
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    res = await client.post(
+        "/api/v1/tickettypen",
+        headers=headers,
+        json={"key": svc.ALLES_VORLAGE_KEY, "label": "Alle Felder"},
+    )
+    assert res.status_code == 409, res.text
+
+
+@pytest.mark.integration
+async def test_protected_blocks_not_renamable_or_movable(client, admin_user) -> None:
+    # Geschützte System-Blöcke kopf/weitere sind Anker: Label/Region bleiben fix,
+    # egal was der Payload schickt.
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    v = await _create_vorlage(client, headers, key="prot-test", label="Prot-Test")
+    layout = _layout_from(v)
+    for b in layout["bloecke"]:
+        if b["block_key"] == "kopf":
+            b["label"] = "GEHACKT"
+            b["region"] = "rechts"
+    res = await client.put(f"/api/v1/tickettypen/{v['id']}/layout", headers=headers, json=layout)
+    assert res.status_code == 200, res.text
+    kopf = next(b for b in res.json()["bloecke"] if b["block_key"] == "kopf")
+    assert kopf["label"] == "Kopf"
+    assert kopf["region"] == "links"
+
+
+@pytest.mark.integration
+async def test_duplicate_block_key_rejected_422(client, admin_user) -> None:
+    # Doppelte block_key würden serverseitig still zusammengeführt → hart ablehnen.
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    v = await _create_vorlage(client, headers, key="dup-test", label="Dup-Test")
+    layout = _layout_from(v)
+    layout["bloecke"].append(dict(layout["bloecke"][0]))  # Block duplizieren
+    res = await client.put(f"/api/v1/tickettypen/{v['id']}/layout", headers=headers, json=layout)
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.integration
 async def test_layout_reorder_move_hide(client, admin_user) -> None:
     token = await _login_admin(client, admin_user)
     headers = auth_header(token)

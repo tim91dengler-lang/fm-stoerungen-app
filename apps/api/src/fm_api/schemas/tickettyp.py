@@ -1,7 +1,7 @@
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fm_api.schemas.common import TimestampedRead
 
@@ -76,6 +76,18 @@ class LayoutWrite(BaseModel):
 
     bloecke: list[BlockLayoutWrite]
     felder: list[FeldLayoutWrite]
+
+    @model_validator(mode="after")
+    def _no_duplicate_keys(self) -> "LayoutWrite":
+        # Doppelte Keys würden serverseitig still zusammengeführt (ein ORM-Objekt
+        # je Key) und so Layout-Intention verlieren — hart ablehnen (422).
+        block_keys = [b.block_key for b in self.bloecke]
+        if len(block_keys) != len(set(block_keys)):
+            raise ValueError("Doppelte block_key im Layout-Payload.")
+        feld_keys = [f.feld_key for f in self.felder]
+        if len(feld_keys) != len(set(feld_keys)):
+            raise ValueError("Doppelte feld_key im Layout-Payload.")
+        return self
 
 
 class TickettypBase(BaseModel):
