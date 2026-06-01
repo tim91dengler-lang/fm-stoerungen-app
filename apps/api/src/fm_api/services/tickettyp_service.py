@@ -75,9 +75,12 @@ async def ensure_system_tickettypen(db: AsyncSession, mandant_id: UUID) -> None:
 
     Ursprünglich nur von Migration 0006 für damals existierende Mandanten
     geseedet — neu angelegte Mandanten bekamen sie nicht. Wird daher beim
-    Provisioning (seed_dev) und im Mockup-Seed aufgerufen. Felder (felder/
-    TickettypFeld) werden bewusst nicht angelegt — wie in 0006; sie sind für
-    Slice-1-Tickets nicht nötig.
+    Provisioning (seed_dev) und im Mockup-Seed aufgerufen.
+
+    Stufe C (2026-06-01, H2): neu angelegte System-Vorlagen bekommen jetzt auch
+    ihre Blöcke + die 19 Default-Felder — sonst kollabieren sie im datengetriebenen
+    Renderer (alle Felder im Auffang-Block). Alt-Vorlagen ohne Felder werden über
+    ``ensure_default_vorlagen`` / ``_reconcile_vorlage_layout`` nachgezogen.
     """
     existing_keys = set(
         (await db.execute(select(Tickettyp.key).where(Tickettyp.mandant_id == mandant_id)))
@@ -87,7 +90,10 @@ async def ensure_system_tickettypen(db: AsyncSession, mandant_id: UUID) -> None:
     for cfg in SYSTEM_TICKETTYPEN:
         if cfg["key"] in existing_keys:
             continue
-        db.add(Tickettyp(mandant_id=mandant_id, ist_system=True, **cfg))
+        tt = Tickettyp(mandant_id=mandant_id, ist_system=True, **cfg)
+        db.add(tt)
+        await db.flush()  # tt.id
+        await _seed_bloecke_und_felder(db, tt.id)
     await db.flush()
 
 
@@ -182,7 +188,171 @@ def _seed_bloecke(db: AsyncSession, tickettyp_id: UUID) -> dict[str, TickettypBl
     return by_key
 
 
+def _seed_default_felder(
+    db: AsyncSession, tickettyp_id: UUID, block_by_key: dict[str, TickettypBlock]
+) -> None:
+    """Legt die 19 System-Felder block-lokal an (reihenfolge = Index im Block)."""
+    block_counter: dict[str, int] = {}
+    for feld_key, label, sichtbar, pflicht, _alt_reihenfolge in DEFAULT_SYSTEM_FELDER:
+        block_key = DEFAULT_FELD_BLOCK_MAP.get(feld_key, FALLBACK_BLOCK_KEY)
+        idx = block_counter.get(block_key, 0)
+        block_counter[block_key] = idx + 1
+        db.add(
+            TickettypFeld(
+                tickettyp_id=tickettyp_id,
+                feld_key=feld_key,
+                label=label,
+                ist_system_feld=True,
+                sichtbar=sichtbar,
+                pflicht=pflicht,
+                reihenfolge=idx,
+                block_id=block_by_key[block_key].id,
+            )
+        )
+
+
+async def _seed_bloecke_und_felder(db: AsyncSession, tickettyp_id: UUID) -> None:
+    """System-Blöcke + 19 Default-Felder für eine frische Vorlage."""
+    block_by_key = _seed_bloecke(db, tickettyp_id)
+    await db.flush()  # block.id verfügbar
+    _seed_default_felder(db, tickettyp_id, block_by_key)
+    await db.flush()
+
+
 _LOAD_OPTIONS = (selectinload(Tickettyp.felder), selectinload(Tickettyp.bloecke))
+
+
+async def _reconcile_vorlage_layout(db: AsyncSession, tickettyp: Tickettyp) -> None:
+    """Hebt eine Alt-Vorlage ohne Blöcke/Felder auf das Stufe-C-Layout (H2).
+
+    Erwartet ``tickettyp`` mit geladenen ``felder``/``bloecke`` (via _LOAD_OPTIONS).
+    Fehlende System-Blöcke werden ergänzt; eine felderlose Vorlage bekommt die 19
+    Default-Felder.
+    """
+    block_by_key = {b.block_key: b for b in tickettyp.bloecke}
+    seeded_block = False
+    for block_key, label, region, reihenfolge, ist_system in SYSTEM_BLOECKE:
+        if block_key not in block_by_key:
+            nb = TickettypBlock(
+                tickettyp_id=tickettyp.id,
+                block_key=block_key,
+                label=label,
+                region=region,
+                reihenfolge=reihenfolge,
+                ist_system_block=ist_system,
+            )
+            db.add(nb)
+            block_by_key[block_key] = nb
+            seeded_block = True
+    if seeded_block:
+        await db.flush()
+    if not tickettyp.felder:
+        _seed_default_felder(db, tickettyp.id, block_by_key)
+        await db.flush()
+
+
+async def ensure_alles_vorlage_vollstaendig(db: AsyncSession, mandant_id: UUID) -> bool:
+    """Erzeugt/ergänzt die Alles-Vorlage des Mandanten — sie enthält ALLE
+    Katalog-Felder und nimmt neue automatisch auf (Set-Diff, idempotent).
+
+    Gibt True zurück, wenn etwas geändert wurde (für lazy-on-read-Reload).
+    """
+    stmt = (
+        select(Tickettyp)
+        .where(Tickettyp.mandant_id == mandant_id, Tickettyp.ist_alles_vorlage.is_(True))
+        .options(*_LOAD_OPTIONS)
+        # gegen stale identity-mapped Collections in derselben Session reconcilen.
+        .execution_options(populate_existing=True)
+    )
+    av = (await db.execute(stmt)).scalar_one_or_none()
+    if av is None:
+        av = Tickettyp(
+            mandant_id=mandant_id,
+            key="alle-felder",
+            label="Alle Felder",
+            beschreibung="Enthält automatisch alle verfügbaren Felder.",
+            ist_system=False,
+            ist_alles_vorlage=True,
+            aktiv=True,
+        )
+        db.add(av)
+        await db.flush()
+        await _seed_bloecke_und_felder(db, av.id)
+        return True
+
+    # Reconcile: fehlende System-Blöcke + fehlende Katalog-Felder ergänzen.
+    block_by_key = {b.block_key: b for b in av.bloecke}
+    seeded_block = False
+    for block_key, label, region, reihenfolge, ist_system in SYSTEM_BLOECKE:
+        if block_key not in block_by_key:
+            nb = TickettypBlock(
+                tickettyp_id=av.id,
+                block_key=block_key,
+                label=label,
+                region=region,
+                reihenfolge=reihenfolge,
+                ist_system_block=ist_system,
+            )
+            db.add(nb)
+            block_by_key[block_key] = nb
+            seeded_block = True
+    if seeded_block:
+        await db.flush()
+
+    have = {f.feld_key for f in av.felder}
+    # block-lokaler Start-Index = aktueller Max-Wert je Block (Anhängen am Ende).
+    block_id_to_key = {b.id: b.block_key for b in block_by_key.values()}
+    next_idx: dict[str, int] = {}
+    for f in av.felder:
+        if f.block_id is None:
+            continue
+        bk = block_id_to_key.get(f.block_id)
+        if bk is not None:
+            next_idx[bk] = max(next_idx.get(bk, -1), f.reihenfolge)
+
+    changed = False
+    for feld_key, label, _sichtbar, pflicht, _alt in DEFAULT_SYSTEM_FELDER:
+        if feld_key in have:
+            continue
+        target_key = DEFAULT_FELD_BLOCK_MAP.get(feld_key, FALLBACK_BLOCK_KEY)
+        block = block_by_key.get(target_key) or block_by_key[FALLBACK_BLOCK_KEY]
+        idx = next_idx.get(block.block_key, -1) + 1
+        next_idx[block.block_key] = idx
+        db.add(
+            TickettypFeld(
+                tickettyp_id=av.id,
+                feld_key=feld_key,
+                label=label,
+                ist_system_feld=True,
+                sichtbar=True,  # Alles-Vorlage: immer sichtbar (enthält-alles-Garantie)
+                pflicht=pflicht,
+                reihenfolge=idx,
+                block_id=block.id,
+            )
+        )
+        changed = True
+    if changed:
+        await db.flush()
+    return changed
+
+
+async def ensure_default_vorlagen(db: AsyncSession, mandant_id: UUID) -> None:
+    """Provisioning-Einstieg (Stufe C): System-Vorlagen (mit Feldern/Blöcken) +
+    Alles-Vorlage idempotent sicherstellen. In seed_dev/seed_mockup nach den
+    Auswahllisten aufrufen (löst ``ensure_system_tickettypen`` als Einstieg ab).
+    """
+    await ensure_system_tickettypen(db, mandant_id)
+    # Alt-Vorlagen ohne Blöcke/Felder nachziehen (H2).
+    stmt = (
+        select(Tickettyp)
+        .where(Tickettyp.mandant_id == mandant_id)
+        .options(*_LOAD_OPTIONS)
+        .execution_options(populate_existing=True)
+    )
+    for tt in (await db.execute(stmt)).scalars().all():
+        if not tt.felder or not tt.bloecke:
+            await _reconcile_vorlage_layout(db, tt)
+    await ensure_alles_vorlage_vollstaendig(db, mandant_id)
 
 
 async def list_tickettypen(
@@ -211,6 +381,14 @@ async def get_tickettyp(db: AsyncSession, mandant_id: UUID, tickettyp_id: UUID) 
     item = (await db.execute(stmt)).scalar_one_or_none()
     if item is None:
         raise TickettypNotFoundError(f"tickettyp {tickettyp_id} not found")
+    # Lazy-on-read: die Alles-Vorlage nimmt fehlende Katalog-Felder beim Öffnen auf
+    # (schreibt nur bei echtem Delta; danach neu laden).
+    if item.ist_alles_vorlage and await ensure_alles_vorlage_vollstaendig(db, mandant_id):
+        item = (
+            await db.execute(stmt.execution_options(populate_existing=True))
+        ).scalar_one_or_none()
+        if item is None:
+            raise TickettypNotFoundError(f"tickettyp {tickettyp_id} not found")
     return item
 
 
@@ -240,29 +418,8 @@ async def create_tickettyp(
             f"Tickettyp-Key '{payload.get('key')}' ist bereits vergeben."
         ) from exc
 
-    # Stufe C: erst die System-Blöcke anlegen, dann die 19 Felder block-lokal
-    # zuordnen (reihenfolge = Index innerhalb des Blocks, aus der Default-Sortierung).
-    block_by_key = _seed_bloecke(db, item.id)
-    await db.flush()  # block.id verfügbar machen
-
-    block_counter: dict[str, int] = {}
-    for feld_key, label, sichtbar, pflicht, _alt_reihenfolge in DEFAULT_SYSTEM_FELDER:
-        block_key = DEFAULT_FELD_BLOCK_MAP.get(feld_key, FALLBACK_BLOCK_KEY)
-        idx = block_counter.get(block_key, 0)
-        block_counter[block_key] = idx + 1
-        db.add(
-            TickettypFeld(
-                tickettyp_id=item.id,
-                feld_key=feld_key,
-                label=label,
-                ist_system_feld=True,
-                sichtbar=sichtbar,
-                pflicht=pflicht,
-                reihenfolge=idx,
-                block_id=block_by_key[block_key].id,
-            )
-        )
-    await db.flush()
+    # Stufe C: System-Blöcke + 19 Default-Felder block-lokal anlegen.
+    await _seed_bloecke_und_felder(db, item.id)
     return await get_tickettyp(db, mandant_id, item.id)
 
 

@@ -17,7 +17,7 @@ from fm_api.core.security import hash_password
 from fm_api.db.session import SessionLocal
 from fm_api.models import Mandant, Role, User
 from fm_api.services.auswahlliste_service import ensure_system_auswahllisten
-from fm_api.services.tickettyp_service import ensure_system_tickettypen
+from fm_api.services.tickettyp_service import ensure_default_vorlagen
 
 DEFAULT_TENANT_SLUG = "fm-staging-default"
 # `.local`, `.test`, `.localhost` etc. are rejected by Pydantic's EmailStr
@@ -40,8 +40,8 @@ async def main() -> int:
         await ensure_system_auswahllisten(db, tenant.id)
         print("[seed] ensured system auswahllisten for tenant")
 
-        await ensure_system_tickettypen(db, tenant.id)
-        print("[seed] ensured system tickettypen for tenant")
+        await ensure_default_vorlagen(db, tenant.id)
+        print("[seed] ensured default vorlagen (system + alles-vorlage) for tenant")
 
         roles_to_have = ["admin", "techniker", "leitstand"]
         existing_roles = {

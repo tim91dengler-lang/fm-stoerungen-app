@@ -48,7 +48,7 @@ from fm_api.models import (
 )
 from fm_api.models.ticket import Ticket
 from fm_api.services.auswahlliste_service import ensure_system_auswahllisten
-from fm_api.services.tickettyp_service import ensure_system_tickettypen
+from fm_api.services.tickettyp_service import ensure_default_vorlagen
 
 DEFAULT_TENANT_SLUG = os.environ.get("DEV_TENANT_SLUG", "fm-staging-default")
 
@@ -103,9 +103,8 @@ async def main() -> int:
         # unabhängig davon, ob seed_dev die partner_typ-Liste schon angelegt hat
         # (für Mandanten, die nach Migration 0013 entstanden, fehlte sie sonst).
         await ensure_system_auswahllisten(db, m_id)
-        # System-Tickettypen (Reparatur/Wartung/Baubegehung) ebenso sicherstellen
-        # — von Migration 0006 nur für damalige Mandanten geseedet.
-        await ensure_system_tickettypen(db, m_id)
+        # Stufe C: System-Vorlagen (mit Feldern/Blöcken) + Alles-Vorlage sicherstellen.
+        await ensure_default_vorlagen(db, m_id)
 
         # ---- Rollen + Techniker-User ---------------------------------------
         roles_by_name = {
