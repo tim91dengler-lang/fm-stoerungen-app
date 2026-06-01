@@ -16,7 +16,7 @@ interface Props {
  *
  * Default: nur offene/in-Arbeit. Erledigte werden per Toggle zugeschaltet
  * (Endpoint-Param `include_erledigt`). 4 Default-Spalten: # / Titel / Status / Objekt.
- * Zuschaltbar: Priorität, Erstellt am, Melder.
+ * Zuschaltbar: Priorität, Erstellt am.
  */
 export function PartnerTabTickets({ partnerId, partnerName }: Props) {
   const [includeErledigt, setIncludeErledigt] = useState(false);
@@ -58,7 +58,7 @@ export function PartnerTabTickets({ partnerId, partnerName }: Props) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔍 Suche nach Nr / Titel / Objekt / Melder"
+          placeholder="🔍 Suche nach Nr / Titel / Objekt / Status"
           className="w-80 rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
         />
         <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-zinc-300">

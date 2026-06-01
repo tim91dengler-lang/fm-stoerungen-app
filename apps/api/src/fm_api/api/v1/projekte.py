@@ -71,6 +71,7 @@ async def list_projekte(
     status_filter: list[str] | None = Query(default=None, alias="status"),
     projekttyp_filter: list[str] | None = Query(default=None, alias="projekttyp"),
     include_deleted: bool = Query(default=False),
+    limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> list[ProjektRead]:
     items = await projekt_service.list_projekte(
         db,
@@ -79,6 +80,7 @@ async def list_projekte(
         status_filter=status_filter,
         projekttyp_filter=projekttyp_filter,
         include_deleted=include_deleted,
+        limit=limit,
     )
     return [_serialize(p, c) for p, c in items]
 

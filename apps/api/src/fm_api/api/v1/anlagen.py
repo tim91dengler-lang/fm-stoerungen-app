@@ -64,6 +64,7 @@ async def list_anlagen(
     search: str | None = Query(default=None, max_length=200),
     objekt_id: UUID | None = Query(default=None),
     aktiv_only: bool = Query(default=False),
+    limit: int | None = Query(default=None, ge=1, le=1000),
 ) -> list[AnlageRead]:
     items = await anlage_service.list_anlagen(
         db,
@@ -71,6 +72,7 @@ async def list_anlagen(
         search=search,
         objekt_id=objekt_id,
         aktiv_only=aktiv_only,
+        limit=limit,
     )
     return [_serialize(a) for a in items]
 

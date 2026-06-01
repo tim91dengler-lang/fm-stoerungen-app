@@ -31,7 +31,7 @@ export function searchPartner(search: string): Promise<SearchOption[]> {
 export function makeProjektSearch(status?: string[]) {
   return (search: string): Promise<SearchOption[]> =>
     projektApi
-      .list({ search: search || undefined, status })
+      .list({ search: search || undefined, status, limit: SEARCH_LIMIT })
       .then((rows) =>
         rows
           .slice(0, SEARCH_LIMIT)
@@ -43,7 +43,7 @@ export function makeProjektSearch(status?: string[]) {
 export function makeAnlageSearch(objektId?: string | null) {
   return (search: string): Promise<SearchOption[]> =>
     anlageApi
-      .list({ search: search || undefined, aktiv_only: true, objekt_id: objektId ?? undefined })
+      .list({ search: search || undefined, aktiv_only: true, objekt_id: objektId ?? undefined, limit: SEARCH_LIMIT })
       .then((rows) =>
         rows
           .slice(0, SEARCH_LIMIT)
@@ -55,7 +55,7 @@ export function makeAnlageSearch(objektId?: string | null) {
 export function makeFehlercodeSearch(anlageId?: string | null) {
   return (search: string): Promise<SearchOption[]> =>
     fehlercodeApi
-      .list({ search: search || undefined, aktiv_only: true, anlage_id: anlageId ?? undefined })
+      .list({ search: search || undefined, aktiv_only: true, anlage_id: anlageId ?? undefined, limit: SEARCH_LIMIT })
       .then((rows) =>
         rows
           .slice(0, SEARCH_LIMIT)

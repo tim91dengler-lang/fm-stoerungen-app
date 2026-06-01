@@ -864,6 +864,7 @@ export interface ProjektListFilters {
   status?: string[];
   projekttyp?: string[];
   include_deleted?: boolean;
+  limit?: number;
 }
 
 export interface ProjektTicketsParams {
