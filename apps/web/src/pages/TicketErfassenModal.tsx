@@ -317,7 +317,7 @@ export function TicketErfassenModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-zinc-900 p-6 shadow-xl"
+        className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-zinc-900 p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -361,11 +361,16 @@ export function TicketErfassenModal({
           </div>
 
           {isVorlageLayoutV2() ? (
-            <TicketFormEngine
-              singleColumn
-              layout={layout}
-              renderFeld={(feld) => renderCreateFeld(feld.feld_key, createCtx)}
-            />
+            // Zweispaltig wie im Detail: linke Region + rechte Region (z. B.
+            // Belege) nebeneinander. Auf kleinen Screens stapelt die Engine via
+            // `contents`/`lg:flex` automatisch. Ohne rechts-Blöcke nimmt links
+            // die volle Breite (Engine-Collapse).
+            <div className="lg:flex lg:gap-0">
+              <TicketFormEngine
+                layout={layout}
+                renderFeld={(feld) => renderCreateFeld(feld.feld_key, createCtx)}
+              />
+            </div>
           ) : (
             <>
               {feldSichtbar('fehlercode') && (
