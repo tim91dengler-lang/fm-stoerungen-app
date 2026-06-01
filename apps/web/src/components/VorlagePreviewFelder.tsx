@@ -30,10 +30,18 @@ import { iconFor } from './TickettypIcon';
  * ist per DnD untereinander sortierbar. Versteckte Felder landen im
  * VorlagenPool (separate Komponente).
  *
+ * Block-Layout (Tim 2026-06-01, „Stufe A"): die Felder werden in genau die
+ * festen Sektionen des echten Tickets gruppiert (siehe TicketDetailPanel:
+ * Problem & Bearbeitung · Kontakt & Beteiligte · Verortung · Klassifizierung ·
+ * Belege & Kommunikation), damit der Admin sieht, wie das Ticket nachher
+ * aussieht. Die Block-Zuordnung ist fix (PREVIEW_BLOCKS) — kein Datenmodell.
+ * Sortieren ist auf den jeweiligen Block beschränkt.
+ *
  * Drift-Schutz: rendert direkt aus `tickettyp.felder`, dieselbe Quelle
  * wie das echte TicketErfassenModal — Sichtbar/Pflicht/Reihenfolge sind
  * synchron. Neue System-Felder erfordern parallel: Backend-Migration,
- * DEFAULT_SYSTEM_FELDER, TicketErfassenModal und diese Komponente.
+ * DEFAULT_SYSTEM_FELDER, TicketErfassenModal UND einen Eintrag in
+ * PREVIEW_BLOCKS hier (sonst landet das Feld im Block „Weitere Felder").
  */
 
 type FeldRenderer = (feld: TickettypFeldRead) => React.ReactNode;
@@ -52,7 +60,13 @@ function PreviewInput({ id, placeholder = '' }: { id: string; placeholder?: stri
 
 function PreviewTextarea({ id, placeholder = '' }: { id: string; placeholder?: string }) {
   return (
-    <textarea id={id} disabled rows={3} placeholder={placeholder} className={INPUT_CLASS} />
+    <textarea
+      id={id}
+      disabled
+      rows={3}
+      placeholder={placeholder}
+      className={INPUT_CLASS}
+    />
   );
 }
 
@@ -67,8 +81,15 @@ function PreviewSelect({ id, hint }: { id: string; hint: string }) {
 // Pro System-Feld eine Render-Funktion (nur die Input-Form, ohne Label-
 // Bereich — der wird von der Karten-Hülle gerendert). Fallback unten.
 const INPUT_RENDERERS: Record<string, FeldRenderer> = {
-  titel: (f) => <PreviewInput id={`preview-${f.feld_key}`} placeholder="Kurze Beschreibung des Problems" />,
-  beschreibung: (f) => <PreviewTextarea id={`preview-${f.feld_key}`} placeholder="Details zur Störung" />,
+  titel: (f) => (
+    <PreviewInput
+      id={`preview-${f.feld_key}`}
+      placeholder="Kurze Beschreibung des Problems"
+    />
+  ),
+  beschreibung: (f) => (
+    <PreviewTextarea id={`preview-${f.feld_key}`} placeholder="Details zur Störung" />
+  ),
   prio: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Priorität wählen" />,
   kategorie: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Kategorie" />,
   quelle: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Eingangskanal" />,
@@ -141,15 +162,73 @@ interface Props {
   onUpdateFeld?: (feldKey: string, update: FeldUpdate) => void;
 }
 
+// Feste Blöcke = die Sektionen des echten Tickets (TicketDetailPanel). Die
+// Block-Zuordnung ist Code-Konstante (kein Datenmodell). Neue Felder hier
+// einsortieren, sonst landen sie im Auffang-Block „Weitere Felder".
+interface PreviewBlockDef {
+  id: string;
+  label: string;
+  feldKeys: string[];
+}
+
+interface PreviewBlockGroup {
+  id: string;
+  label: string;
+  fields: TickettypFeldRead[];
+}
+
+const PREVIEW_BLOCKS: PreviewBlockDef[] = [
+  { id: 'kopf', label: 'Kopf', feldKeys: ['titel'] },
+  {
+    id: 'problem',
+    label: 'Problem & Bearbeitung',
+    feldKeys: ['beschreibung', 'faelligkeit_am', 'wiederholung'],
+  },
+  { id: 'beteiligte', label: 'Kontakt & Beteiligte', feldKeys: ['partner'] },
+  {
+    id: 'verortung',
+    label: 'Verortung',
+    feldKeys: ['objekt', 'haus', 'stockwerk', 'einheit', 'adresse', 'anlage', 'pin'],
+  },
+  {
+    id: 'klassifizierung',
+    label: 'Klassifizierung',
+    feldKeys: ['prio', 'kategorie', 'quelle', 'projekt', 'fehlercode'],
+  },
+  { id: 'belege', label: 'Belege & Kommunikation', feldKeys: ['foto', 'dokumente'] },
+];
+
+const FALLBACK_BLOCK_ID = 'weitere';
+
 export function VorlagePreviewFelder({ tickettyp, onReorder, onUpdateFeld }: Props) {
-  const sichtbar = useMemo<TickettypFeldRead[]>(() => {
+  // Sichtbare Felder in die festen Blöcke gruppieren; innerhalb eines Blocks
+  // nach `reihenfolge` (per DnD anpassbar). Unbekannte Feld-Keys → Auffang-Block.
+  const blocks = useMemo<PreviewBlockGroup[]>(() => {
     if (!tickettyp) return [];
-    return [...tickettyp.felder]
-      .filter((f) => f.sichtbar)
-      .sort((a, b) => a.reihenfolge - b.reihenfolge);
+    const visible = tickettyp.felder.filter((f) => f.sichtbar);
+    const known = new Set(PREVIEW_BLOCKS.flatMap((b) => b.feldKeys));
+    const groups: PreviewBlockGroup[] = PREVIEW_BLOCKS.map((b) => ({
+      id: b.id,
+      label: b.label,
+      fields: visible
+        .filter((f) => b.feldKeys.includes(f.feld_key))
+        .sort((a, z) => a.reihenfolge - z.reihenfolge),
+    })).filter((g) => g.fields.length > 0);
+    const rest = visible
+      .filter((f) => !known.has(f.feld_key))
+      .sort((a, z) => a.reihenfolge - z.reihenfolge);
+    if (rest.length > 0) {
+      groups.push({ id: FALLBACK_BLOCK_ID, label: 'Weitere Felder', fields: rest });
+    }
+    return groups;
   }, [tickettyp]);
 
-  const dndEnabled = !!onReorder && sichtbar.length > 1;
+  const visibleCount = useMemo(
+    () => blocks.reduce((n, b) => n + b.fields.length, 0),
+    [blocks],
+  );
+
+  const dndEnabled = !!onReorder && visibleCount > 1;
   const editEnabled = !!onUpdateFeld;
 
   const sensors = useSensors(
@@ -161,14 +240,21 @@ export function VorlagePreviewFelder({ tickettyp, onReorder, onUpdateFeld }: Pro
     if (!tickettyp || !onReorder) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIdx = sichtbar.findIndex((f) => f.id === active.id);
-    const newIdx = sichtbar.findIndex((f) => f.id === over.id);
+    // Sortieren ist auf den jeweiligen Block beschränkt — die Blöcke spiegeln
+    // die festen Ticket-Sektionen. Ein Drag über Block-Grenzen wird ignoriert.
+    const block = blocks.find((b) => b.fields.some((f) => f.id === active.id));
+    if (!block) return;
+    const oldIdx = block.fields.findIndex((f) => f.id === active.id);
+    const newIdx = block.fields.findIndex((f) => f.id === over.id);
     if (oldIdx < 0 || newIdx < 0) return;
 
-    const newVisibleOrder = arrayMove(sichtbar, oldIdx, newIdx);
-    const queue = [...newVisibleOrder];
-    const reordered = tickettyp.felder.map((f) => (f.sichtbar ? (queue.shift() ?? f) : f));
-    onReorder(reordered.map((f, idx) => ({ ...f, reihenfolge: idx })));
+    const reorderedBlock = arrayMove(block.fields, oldIdx, newIdx);
+    const newVisibleOrder = blocks.flatMap((b) =>
+      b.id === block.id ? reorderedBlock : b.fields,
+    );
+    const hidden = tickettyp.felder.filter((f) => !f.sichtbar);
+    const full = [...newVisibleOrder, ...hidden];
+    onReorder(full.map((f, idx) => ({ ...f, reihenfolge: idx })));
   }
 
   if (!tickettyp) {
@@ -181,27 +267,45 @@ export function VorlagePreviewFelder({ tickettyp, onReorder, onUpdateFeld }: Pro
 
   const Icon = iconFor(tickettyp.icon);
 
-  const cards = sichtbar.map((feld) => (
-    <PreviewFieldCard
-      key={feld.id ?? feld.feld_key}
-      feld={feld}
-      draggable={dndEnabled}
-      editable={editEnabled}
-      onUpdateFeld={onUpdateFeld}
-    />
-  ));
-
-  const grid = (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {cards.length > 0 ? (
-        cards
-      ) : (
-        <div className="col-span-full rounded-md border border-zinc-800 bg-zinc-950 p-6 text-center text-xs text-zinc-500">
-          Alle Felder ausgeblendet — links im Pool wieder einblenden.
-        </div>
-      )}
-    </div>
-  );
+  const body =
+    visibleCount > 0 ? (
+      <div className="space-y-5">
+        {blocks.map((block) => (
+          <section key={block.id} className="space-y-2">
+            <div className="flex items-center gap-2 border-b border-zinc-800/70 pb-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                {block.label}
+              </span>
+              <span className="text-[10px] text-zinc-600">{block.fields.length}</span>
+            </div>
+            {dndEnabled ? (
+              <SortableContext
+                items={block.fields.map((f) => f.id)}
+                strategy={rectSortingStrategy}
+              >
+                <BlockGrid
+                  block={block}
+                  editable={editEnabled}
+                  draggable
+                  onUpdateFeld={onUpdateFeld}
+                />
+              </SortableContext>
+            ) : (
+              <BlockGrid
+                block={block}
+                editable={editEnabled}
+                draggable={false}
+                onUpdateFeld={onUpdateFeld}
+              />
+            )}
+          </section>
+        ))}
+      </div>
+    ) : (
+      <div className="rounded-md border border-zinc-800 bg-zinc-950 p-6 text-center text-xs text-zinc-500">
+        Alle Felder ausgeblendet — links im Pool wieder einblenden.
+      </div>
+    );
 
   return (
     <div className="space-y-4">
@@ -225,13 +329,15 @@ export function VorlagePreviewFelder({ tickettyp, onReorder, onUpdateFeld }: Pro
       </div>
 
       {dndEnabled ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sichtbar.map((f) => f.id)} strategy={rectSortingStrategy}>
-            {grid}
-          </SortableContext>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          {body}
         </DndContext>
       ) : (
-        grid
+        body
       )}
 
       <div className="pt-2">
@@ -247,6 +353,31 @@ export function VorlagePreviewFelder({ tickettyp, onReorder, onUpdateFeld }: Pro
   );
 }
 
+interface BlockGridProps {
+  block: PreviewBlockGroup;
+  editable: boolean;
+  draggable: boolean;
+  onUpdateFeld?: (feldKey: string, update: FeldUpdate) => void;
+}
+
+// Kachel-Raster eines Blocks. Bei draggable steckt es in einem SortableContext
+// des Aufrufers; jede Karte wird dann zur Sortable-Karte.
+function BlockGrid({ block, editable, draggable, onUpdateFeld }: BlockGridProps) {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {block.fields.map((feld) => (
+        <PreviewFieldCard
+          key={feld.id ?? feld.feld_key}
+          feld={feld}
+          draggable={draggable}
+          editable={editable}
+          onUpdateFeld={onUpdateFeld}
+        />
+      ))}
+    </div>
+  );
+}
+
 interface CardProps {
   feld: TickettypFeldRead;
   draggable: boolean;
@@ -256,7 +387,9 @@ interface CardProps {
 
 function PreviewFieldCard({ feld, draggable, editable, onUpdateFeld }: CardProps) {
   if (draggable) {
-    return <SortableFieldCard feld={feld} editable={editable} onUpdateFeld={onUpdateFeld} />;
+    return (
+      <SortableFieldCard feld={feld} editable={editable} onUpdateFeld={onUpdateFeld} />
+    );
   }
   return (
     <CardBody
@@ -318,7 +451,7 @@ function CardBody({ feld, draggable, isDragging, editable, onUpdateFeld }: BodyP
         'group relative rounded-md p-2 transition-shadow',
         draggable && 'cursor-grab touch-none active:cursor-grabbing',
         isDragging
-          ? 'bg-emerald-500/5 opacity-60 ring-2 ring-emerald-400/60 shadow-lg'
+          ? 'bg-emerald-500/5 opacity-60 shadow-lg ring-2 ring-emerald-400/60'
           : draggable && 'hover:bg-zinc-800/30',
       )}
     >
@@ -423,7 +556,7 @@ function LabelArea({
       title={editable ? 'Klick zum Umbenennen' : undefined}
       className={clsx(
         'truncate text-sm font-medium text-zinc-300',
-        editable && 'cursor-text hover:text-zinc-100 hover:underline decoration-dotted',
+        editable && 'cursor-text decoration-dotted hover:text-zinc-100 hover:underline',
       )}
     >
       {feld.label}
@@ -432,7 +565,13 @@ function LabelArea({
   );
 }
 
-function PflichtToggleButton({ pflicht, onClick }: { pflicht: boolean; onClick: () => void }) {
+function PflichtToggleButton({
+  pflicht,
+  onClick,
+}: {
+  pflicht: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -447,12 +586,10 @@ function PflichtToggleButton({ pflicht, onClick }: { pflicht: boolean; onClick: 
         'rounded p-1 transition-colors',
         pflicht
           ? 'text-amber-400 hover:bg-amber-500/15'
-          : 'text-zinc-600 opacity-0 group-hover:opacity-100 hover:bg-zinc-800 hover:text-zinc-300',
+          : 'text-zinc-600 opacity-0 hover:bg-zinc-800 hover:text-zinc-300 group-hover:opacity-100',
       )}
     >
-      <Star
-        className={clsx('h-3.5 w-3.5', pflicht && 'fill-amber-400')}
-      />
+      <Star className={clsx('h-3.5 w-3.5', pflicht && 'fill-amber-400')} />
     </button>
   );
 }
