@@ -17,13 +17,13 @@ const SEARCH_LIMIT = 20;
 
 export function searchObjekte(search: string): Promise<SearchOption[]> {
   return objektApi
-    .list({ search, limit: SEARCH_LIMIT })
+    .list({ search: search || undefined, limit: SEARCH_LIMIT })
     .then((r) => r.items.map((o) => ({ id: o.id, label: o.name })));
 }
 
 export function searchPartner(search: string): Promise<SearchOption[]> {
   return partnerApi
-    .list({ search, limit: SEARCH_LIMIT })
+    .list({ search: search || undefined, limit: SEARCH_LIMIT })
     .then((r) => r.items.map((p) => ({ id: p.id, label: p.name })));
 }
 
@@ -31,7 +31,7 @@ export function searchPartner(search: string): Promise<SearchOption[]> {
 export function makeProjektSearch(status?: string[]) {
   return (search: string): Promise<SearchOption[]> =>
     projektApi
-      .list({ search, status })
+      .list({ search: search || undefined, status })
       .then((rows) =>
         rows
           .slice(0, SEARCH_LIMIT)
@@ -43,7 +43,7 @@ export function makeProjektSearch(status?: string[]) {
 export function makeAnlageSearch(objektId?: string | null) {
   return (search: string): Promise<SearchOption[]> =>
     anlageApi
-      .list({ search, aktiv_only: true, objekt_id: objektId ?? undefined })
+      .list({ search: search || undefined, aktiv_only: true, objekt_id: objektId ?? undefined })
       .then((rows) =>
         rows
           .slice(0, SEARCH_LIMIT)
@@ -55,7 +55,7 @@ export function makeAnlageSearch(objektId?: string | null) {
 export function makeFehlercodeSearch(anlageId?: string | null) {
   return (search: string): Promise<SearchOption[]> =>
     fehlercodeApi
-      .list({ search, aktiv_only: true, anlage_id: anlageId ?? undefined })
+      .list({ search: search || undefined, aktiv_only: true, anlage_id: anlageId ?? undefined })
       .then((rows) =>
         rows
           .slice(0, SEARCH_LIMIT)

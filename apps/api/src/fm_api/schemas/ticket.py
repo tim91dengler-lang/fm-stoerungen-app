@@ -146,7 +146,6 @@ class TicketCreate(BaseModel):
     prioritaet: str = Field(default="mittel", max_length=64)
     kategorie: str | None = Field(default=None, max_length=64)
     quelle: str | None = Field(default=None, max_length=64)
-    melder: str | None = Field(default=None, max_length=200)
     objekt_id: UUID | None = None
     haus_id: UUID | None = None
     stockwerk_id: UUID | None = None
@@ -175,7 +174,6 @@ class TicketUpdate(BaseModel):
     prioritaet: str | None = Field(default=None, max_length=64)
     kategorie: str | None = Field(default=None, max_length=64)
     quelle: str | None = Field(default=None, max_length=64)
-    melder: str | None = Field(default=None, max_length=200)
     objekt_id: UUID | None = None
     haus_id: UUID | None = None
     stockwerk_id: UUID | None = None
@@ -211,7 +209,6 @@ class TicketRead(TimestampedRead):
     prioritaet: AuswahlWertRef
     kategorie: AuswahlWertRef | None = None
     quelle: AuswahlWertRef | None = None
-    melder: str | None = None
     objekt: ObjektRef | None = None
     haus: HausRef | None = None
     stockwerk: StockwerkRef | None = None
@@ -283,7 +280,6 @@ class TicketRead(TimestampedRead):
                 if t.quelle_wert is not None
                 else None
             ),
-            melder=t.melder,
             objekt=ObjektRef(id=t.objekt.id, name=t.objekt.name) if t.objekt else None,
             haus=HausRef(id=t.haus.id, bezeichnung=t.haus.bezeichnung) if t.haus else None,
             stockwerk=StockwerkRef(

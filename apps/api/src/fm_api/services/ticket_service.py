@@ -353,7 +353,6 @@ async def create_ticket(
     anlage_id: UUID | None = None,
     fehlercode_id: UUID | None = None,
     quelle_slug: str | None = None,
-    melder: str | None = None,
     faelligkeit_am: Any | None = None,
     wiederholung: str | None = None,
 ) -> Ticket:
@@ -412,7 +411,6 @@ async def create_ticket(
         anlage_id=anlage_id,
         fehlercode_id=fehlercode_id,
         quelle_id=quelle_wert.id if quelle_wert else None,
-        melder=melder,
         eroeffnet_von_id=eroeffnet_von_id,
         zugewiesen_an_id=zugewiesen_an_id,
         eroeffnet_am=now,
@@ -454,7 +452,6 @@ async def update_ticket(
     for direct in (
         "titel",
         "beschreibung",
-        "melder",
         "wartet_kontakt_name",
         "wartet_kontakt_telefon",
         "wartet_kontakt_email",

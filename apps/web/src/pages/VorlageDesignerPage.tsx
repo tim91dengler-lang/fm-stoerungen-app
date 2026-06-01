@@ -52,7 +52,6 @@ const DEFAULT_FELDER_PREVIEW: TickettypFeldRead[] = [
   { id: 'default-kategorie', feld_key: 'kategorie', label: 'Kategorie', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 7 },
   { id: 'default-prio', feld_key: 'prio', label: 'Priorität', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 8 },
   { id: 'default-pin', feld_key: 'pin', label: 'Foto-Pin', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 9 },
-  { id: 'default-melder', feld_key: 'melder', label: 'Melder', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 10 },
   { id: 'default-quelle', feld_key: 'quelle', label: 'Eingangskanal', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 11 },
   { id: 'default-beschreibung', feld_key: 'beschreibung', label: 'Beschreibung', ist_system_feld: true, sichtbar: true, pflicht: true, nur_admin_sichtbar: false, reihenfolge: 12 },
   { id: 'default-foto', feld_key: 'foto', label: 'Foto', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 13 },
