@@ -61,27 +61,33 @@ function BlockSection({ block, renderFeld }: BlockSectionProps) {
 export interface TicketFormEngineProps {
   layout: VorlageLayout;
   renderFeld: (feld: TickettypFeldRead, block: LayoutBlock) => React.ReactNode;
-  /** Fester Slot (Chat/Verlauf) — kein Designer-Block; ans Ende der rechten Spalte. */
-  chatSlot?: React.ReactNode;
+  /** Feste Slots, die NICHT über den Designer laufen (kein Block). */
+  leftHeaderSlot?: React.ReactNode; // Status/Workflow/Wartet — oben links
+  leftFooterSlot?: React.ReactNode; // Verlauf/Löschen — unten links
+  chatSlot?: React.ReactNode; // Chat — oben rechts (Desktop)
 }
 
 export function TicketFormEngine({
   layout,
   renderFeld,
+  leftHeaderSlot,
+  leftFooterSlot,
   chatSlot,
 }: TicketFormEngineProps) {
   return (
     <>
       <div className="contents lg:flex lg:w-3/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:px-5 lg:py-4">
+        {leftHeaderSlot}
         {layout.links.map((block) => (
           <BlockSection key={block.block_key} block={block} renderFeld={renderFeld} />
         ))}
+        {leftFooterSlot}
       </div>
       <div className="contents lg:flex lg:w-2/5 lg:flex-col lg:gap-3 lg:overflow-y-auto lg:border-l lg:border-zinc-800 lg:px-5 lg:py-4">
+        {chatSlot}
         {layout.rechts.map((block) => (
           <BlockSection key={block.block_key} block={block} renderFeld={renderFeld} />
         ))}
-        {chatSlot}
       </div>
     </>
   );
