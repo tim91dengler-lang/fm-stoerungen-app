@@ -77,7 +77,16 @@ const INPUT_RENDERERS: Record<string, FeldRenderer> = {
   stockwerk: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Stockwerk" />,
   einheit: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Einheit" />,
   anlage: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Anlage" />,
-  partner: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Partner" />,
+  adresse: () => (
+    <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
+      Adresse (Objekt-Default, überschreibbar) + Google-Maps-Link.
+    </div>
+  ),
+  partner: () => (
+    <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
+      Beteiligte: mehrere Geschäftspartner + Ansprechpartner mit Rolle.
+    </div>
+  ),
   projekt: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Projekt" />,
   faelligkeit_am: (f) => (
     <input id={`preview-${f.feld_key}`} type="date" disabled className={INPUT_CLASS} />

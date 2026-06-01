@@ -517,6 +517,7 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
 
                 {/* ④ VERORTUNG */}
                 {(ortSichtbar ||
+                  felder.sichtbar('adresse') ||
                   felder.sichtbar('anlage') ||
                   (felder.sichtbar('pin') && t.stockwerk?.has_grundriss)) && (
                   <div className="order-4 lg:order-none">
@@ -599,11 +600,13 @@ export function TicketDetailPanel({ ticketId, onClose }: Props) {
                             )}
                           </div>
                         )}
-                        <TicketAdresseField
-                          adresse={t.adresse}
-                          isEigen={!!t.adresse_id}
-                          onSet={(adresse_id) => update.mutate({ adresse_id })}
-                        />
+                        {felder.sichtbar('adresse') && (
+                          <TicketAdresseField
+                            adresse={t.adresse}
+                            isEigen={!!t.adresse_id}
+                            onSet={(adresse_id) => update.mutate({ adresse_id })}
+                          />
+                        )}
                         {felder.sichtbar('anlage') && (
                           <FeldSearchSelect
                             label="Anlage"

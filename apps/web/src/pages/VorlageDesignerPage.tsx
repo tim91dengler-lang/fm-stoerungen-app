@@ -48,7 +48,7 @@ const DEFAULT_FELDER_PREVIEW: TickettypFeldRead[] = [
   { id: 'default-stockwerk', feld_key: 'stockwerk', label: 'Stockwerk', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 3 },
   { id: 'default-einheit', feld_key: 'einheit', label: 'Einheit', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 4 },
   { id: 'default-anlage', feld_key: 'anlage', label: 'Anlage', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 5 },
-  { id: 'default-partner', feld_key: 'partner', label: 'Partner', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 6 },
+  { id: 'default-partner', feld_key: 'partner', label: 'Beteiligte', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 6 },
   { id: 'default-kategorie', feld_key: 'kategorie', label: 'Kategorie', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 7 },
   { id: 'default-prio', feld_key: 'prio', label: 'Priorität', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 8 },
   { id: 'default-pin', feld_key: 'pin', label: 'Foto-Pin', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 9 },
@@ -60,6 +60,7 @@ const DEFAULT_FELDER_PREVIEW: TickettypFeldRead[] = [
   { id: 'default-faelligkeit_am', feld_key: 'faelligkeit_am', label: 'Fälligkeitsdatum', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 16 },
   { id: 'default-wiederholung', feld_key: 'wiederholung', label: 'Wiederholung', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 17 },
   { id: 'default-fehlercode', feld_key: 'fehlercode', label: 'Fehlercode', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 18 },
+  { id: 'default-adresse', feld_key: 'adresse', label: 'Adresse', ist_system_feld: true, sichtbar: true, pflicht: false, nur_admin_sichtbar: false, reihenfolge: 19 },
 ];
 
 export function VorlageDesignerPage() {
