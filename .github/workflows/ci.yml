@@ -223,10 +223,13 @@ jobs:
     steps:
       - name: Verify all required jobs passed
         run: |
+          # Semgrep (Schicht 2, Security) ist jetzt blockierend — vorher lief der Job,
+          # sein Ergebnis wurde hier aber nie geprüft, sodass Funde durchrutschten.
           if [[ "${{ needs.pre-checks.result }}" != "success" || \
                 "${{ needs.backend.result }}"   != "success" || \
-                "${{ needs.frontend.result }}"  != "success" ]]; then
-            echo "::error::A required job failed."
+                "${{ needs.frontend.result }}"  != "success" || \
+                "${{ needs.semgrep.result }}"   != "success" ]]; then
+            echo "::error::A required job failed (pre-checks / backend / frontend / semgrep)."
             exit 1
           fi
           echo "All required jobs passed."

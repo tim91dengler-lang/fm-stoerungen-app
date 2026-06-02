@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(fd -e md . docs/ -x ls -la --time-style=+%Y-%m-%d {})",
+      "Bash(sort -k6)",
+      "Read(//tmp/polish3-shots/**)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m ' *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/scripts/format-changed.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/scripts/skill-reminder.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/scripts/verify.sh",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
