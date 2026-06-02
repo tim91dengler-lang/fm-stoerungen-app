@@ -4,7 +4,9 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { DetailBlock } from './DetailBlock';
 import { DetailHeader } from './DetailHeader';
 import { DetailNavProvider, DetailScroll } from './DetailNav';
+import { DetailTabs } from './DetailTabs';
 import { RelationList } from './RelationList';
+import { RelationListView } from './RelationListView';
 import { DetailOverlay } from './DetailOverlay';
 
 afterEach(cleanup);
@@ -151,6 +153,85 @@ describe('Detail-Navigation (Sprung-Chips)', () => {
     expect(screen.getByRole('button', { name: 'Termine' })).not.toHaveAttribute('aria-current');
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe('DetailTabs', () => {
+  it('zeigt nur den aktiven Reiter; Klick schaltet um (Lazy-Render)', () => {
+    const renderA = vi.fn(() => <div>Inhalt A</div>);
+    const renderB = vi.fn(() => <div>Inhalt B</div>);
+    render(
+      <DetailTabs
+        tabs={[
+          { key: 'a', label: 'Alpha', render: renderA },
+          { key: 'b', label: 'Beta', count: 3, isRelation: true, render: renderB },
+        ]}
+      />,
+    );
+    // Initial: A aktiv und gerendert, B noch NICHT (lazy)
+    expect(screen.getByText('Inhalt A')).toBeTruthy();
+    expect(screen.queryByText('Inhalt B')).toBeNull();
+    expect(renderB).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'true');
+
+    // Reiter „Beta" klicken → B rendert, A ist weg
+    fireEvent.click(screen.getByRole('tab', { name: /Beta/ }));
+    expect(screen.getByText('Inhalt B')).toBeTruthy();
+    expect(screen.queryByText('Inhalt A')).toBeNull();
+    expect(renderB).toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: /Beta/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('Pfeiltasten schalten den Reiter um (Roving-Tabindex)', () => {
+    render(
+      <DetailTabs
+        tabs={[
+          { key: 'a', label: 'Alpha', render: () => <div>Inhalt A</div> },
+          { key: 'b', label: 'Beta', render: () => <div>Inhalt B</div> },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: 'Beta' })).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
+
+    expect(screen.getByRole('tab', { name: 'Beta' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Beta' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByText('Inhalt B')).toBeTruthy();
+  });
+});
+
+describe('RelationListView', () => {
+  const columns = [{ key: 'name', label: 'Objekt' }];
+  const rows = [
+    { id: '1', search: 'wohnpark heilbronner', cells: ['Wohnpark Heilbronner'] },
+    { id: '2', search: 'bürohaus marktplatz', cells: ['Bürohaus Marktplatz'] },
+  ];
+
+  it('filtert per Suche und feuert onRowClick', () => {
+    const onRow = vi.fn();
+    render(<RelationListView columns={columns} rows={rows} onRowClick={onRow} />);
+    expect(screen.getByText('Wohnpark Heilbronner')).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText(/suchen/i), { target: { value: 'büro' } });
+    expect(screen.queryByText('Wohnpark Heilbronner')).toBeNull();
+    expect(screen.getByText('Bürohaus Marktplatz')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Bürohaus Marktplatz'));
+    expect(onRow).toHaveBeenCalledWith('2');
+  });
+
+  it('zeigt leeren Zustand', () => {
+    render(<RelationListView columns={columns} rows={[]} emptyLabel="nichts da" />);
+    expect(screen.getByText('nichts da')).toBeTruthy();
+  });
+
+  it('kennzeichnet eine serverseitig gekappte Liste ehrlich im Zähler', () => {
+    // 2 geladene Zeilen, aber 500 gesamt → Suche kann nur die 2 erreichen.
+    render(<RelationListView columns={columns} rows={rows} total={500} />);
+    expect(screen.getByText(/2 geladen \(von 500\)/)).toBeTruthy();
   });
 });
 
