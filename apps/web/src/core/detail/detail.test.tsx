@@ -9,6 +9,7 @@ import { DetailNavProvider, DetailScroll } from './DetailNav';
 import { DetailTabs } from './DetailTabs';
 import { InlineEditSelect, InlineEditText } from './InlineEdit';
 import { RelationList } from './RelationList';
+import { RelationListTab } from './RelationListTab';
 import { RelationListView } from './RelationListView';
 import { DetailOverlay } from './DetailOverlay';
 
@@ -53,7 +54,9 @@ describe('RelationList', () => {
 
   it('zeigt nur die Vorschau (previewCount) + „alle N öffnen" bei Überhang', () => {
     const onOpen = vi.fn();
-    render(<RelationList items={items} total={47} onOpenList={onOpen} previewCount={4} />);
+    render(
+      <RelationList items={items} total={47} onOpenList={onOpen} previewCount={4} />,
+    );
     // 4 Vorschau-Zeilen sichtbar, die 5. nicht
     expect(screen.getByText('#1037 Aufzug')).toBeTruthy();
     expect(screen.queryByText('#1031 Licht')).toBeNull();
@@ -63,13 +66,17 @@ describe('RelationList', () => {
   });
 
   it('zeigt leeren Zustand', () => {
-    render(<RelationList items={[]} total={0} onOpenList={() => {}} emptyLabel="nix da" />);
+    render(
+      <RelationList items={[]} total={0} onOpenList={() => {}} emptyLabel="nix da" />,
+    );
     expect(screen.getByText('nix da')).toBeTruthy();
   });
 
   it('feuert onItemClick beim Klick auf eine Vorschau-Zeile', () => {
     const onItem = vi.fn();
-    render(<RelationList items={items} total={5} onOpenList={() => {}} onItemClick={onItem} />);
+    render(
+      <RelationList items={items} total={5} onOpenList={() => {}} onItemClick={onItem} />,
+    );
     fireEvent.click(screen.getByText('#1042 Heizung'));
     expect(onItem).toHaveBeenCalledWith('1');
   });
@@ -100,10 +107,14 @@ describe('Detail-Navigation (Sprung-Chips)', () => {
   }
 
   it('Chip-Klick klappt den Zielblock auf, blitzt ihn an und markiert den Chip aktiv', () => {
-    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const scrollSpy = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
     render(<Harness />);
     const chip = screen.getByRole('button', { name: 'Stammdaten' });
-    const block = document.querySelector('[data-block="stammdaten"]') as HTMLDetailsElement;
+    const block = document.querySelector(
+      '[data-block="stammdaten"]',
+    ) as HTMLDetailsElement;
     expect(block.open).toBe(false);
 
     fireEvent.click(chip);
@@ -140,8 +151,14 @@ describe('Detail-Navigation (Sprung-Chips)', () => {
     const tm = document.querySelector('[data-block="termine"]') as HTMLElement;
     // Termine (rechte Spalte) minimal höher, aber im selben 48px-Band → linke
     // Spalte (Stammdaten, left=0) muss gewinnen.
-    vi.spyOn(sd, 'getBoundingClientRect').mockReturnValue({ top: 100, left: 0 } as DOMRect);
-    vi.spyOn(tm, 'getBoundingClientRect').mockReturnValue({ top: 90, left: 500 } as DOMRect);
+    vi.spyOn(sd, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      left: 0,
+    } as DOMRect);
+    vi.spyOn(tm, 'getBoundingClientRect').mockReturnValue({
+      top: 90,
+      left: 500,
+    } as DOMRect);
 
     expect(callbacks).toHaveLength(1);
     const fire = callbacks[0]!;
@@ -159,7 +176,9 @@ describe('Detail-Navigation (Sprung-Chips)', () => {
       'aria-current',
       'true',
     );
-    expect(screen.getByRole('button', { name: 'Termine' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('button', { name: 'Termine' })).not.toHaveAttribute(
+      'aria-current',
+    );
 
     vi.unstubAllGlobals();
   });
@@ -181,15 +200,24 @@ describe('DetailTabs', () => {
     expect(screen.getByText('Inhalt A')).toBeTruthy();
     expect(screen.queryByText('Inhalt B')).toBeNull();
     expect(renderB).not.toHaveBeenCalled();
-    expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
 
     // Reiter „Beta" klicken → B rendert, A ist weg
     fireEvent.click(screen.getByRole('tab', { name: /Beta/ }));
     expect(screen.getByText('Inhalt B')).toBeTruthy();
     expect(screen.queryByText('Inhalt A')).toBeNull();
     expect(renderB).toHaveBeenCalled();
-    expect(screen.getByRole('tab', { name: /Beta/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: /Beta/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByRole('tab', { name: 'Alpha' })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
   });
 
   it('Pfeiltasten schalten den Reiter um (Roving-Tabindex)', () => {
@@ -206,7 +234,10 @@ describe('DetailTabs', () => {
 
     fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
 
-    expect(screen.getByRole('tab', { name: 'Beta' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Beta' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getByRole('tab', { name: 'Beta' })).toHaveAttribute('tabindex', '0');
     expect(screen.getByText('Inhalt B')).toBeTruthy();
   });
@@ -224,7 +255,9 @@ describe('RelationListView', () => {
     render(<RelationListView columns={columns} rows={rows} onRowClick={onRow} />);
     expect(screen.getByText('Wohnpark Heilbronner')).toBeTruthy();
 
-    fireEvent.change(screen.getByPlaceholderText(/suchen/i), { target: { value: 'büro' } });
+    fireEvent.change(screen.getByPlaceholderText(/suchen/i), {
+      target: { value: 'büro' },
+    });
     expect(screen.queryByText('Wohnpark Heilbronner')).toBeNull();
     expect(screen.getByText('Bürohaus Marktplatz')).toBeTruthy();
 
@@ -276,7 +309,9 @@ describe('InlineEdit', () => {
 
   it('Text required: leeren → revertiert ohne Commit', () => {
     const onCommit = vi.fn().mockResolvedValue(undefined);
-    render(<InlineEditText label="Projektname" value="alt" required onCommit={onCommit} />);
+    render(
+      <InlineEditText label="Projektname" value="alt" required onCommit={onCommit} />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /Projektname bearbeiten/ }));
     const input = screen.getByDisplayValue('alt');
     fireEvent.change(input, { target: { value: '   ' } });
@@ -304,6 +339,38 @@ describe('InlineEdit', () => {
     const aktiv = await screen.findByRole('button', { name: 'Aktiv' });
     fireEvent.click(aktiv);
     await waitFor(() => expect(onCommit).toHaveBeenCalledWith('aktiv'));
+  });
+});
+
+describe('RelationListTab', () => {
+  interface Row {
+    id: string;
+    name: string;
+  }
+  const cols = [{ id: 'name', accessorKey: 'name', header: 'Objekt' }] as never;
+  const data: Row[] = [
+    { id: '1', name: 'Alpha' },
+    { id: '2', name: 'Beta' },
+  ];
+
+  it('rendert die echte Liste und filtert per Volltextsuche', () => {
+    render(
+      <RelationListTab<Row>
+        viewKey="test-rel"
+        columns={cols}
+        data={data}
+        getSearchText={(r) => r.name}
+        searchPlaceholder="Volltextsuche …"
+      />,
+    );
+    expect(screen.getByText('Alpha')).toBeTruthy();
+    expect(screen.getByText('Beta')).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText('Volltextsuche …'), {
+      target: { value: 'alp' },
+    });
+    expect(screen.getByText('Alpha')).toBeTruthy();
+    expect(screen.queryByText('Beta')).toBeNull();
   });
 });
 
