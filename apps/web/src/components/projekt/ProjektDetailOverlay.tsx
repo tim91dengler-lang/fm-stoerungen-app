@@ -1,55 +1,40 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 
-import { projektApi } from '../../api/endpoints';
+import { auswahllistenApi, projektApi, userApi } from '../../api/endpoints';
+import type { ProjektUpdate } from '../../api/types';
+import { aktiveWerte } from '../../lib/aktiveWerte';
 import {
   DetailBlock,
   DetailHeader,
   DetailOverlay,
   DetailRegions,
   DetailTabs,
+  InlineEditDate,
+  InlineEditSelect,
+  InlineEditText,
   RelationListView,
   type DetailTab,
+  type InlineSelectOption,
 } from '../../core/detail';
 
 /**
  * Referenz-Modul (Master-Layout-Standard, Reiter-Modell ab 2026-06-02): Projekt-
  * Detail als zentriertes Overlay über der Liste. Top-Navigation = Reiter
- * (`DetailTabs`): „Übersicht" (Felder als Block-Engine) + Verknüpfungs-Reiter
+ * (`DetailTabs`): „Übersicht" (Felder, inline editierbar) + Verknüpfungs-Reiter
  * „Objekte"/„Tickets" mit voller Liste + Suche **inline** (kein gestapeltes
- * Fenster). Tickets werden **lazy** geladen (eigene Komponente, nur gemountet,
- * wenn der Reiter aktiv ist). Hinter Flag `modul_standard`.
+ * Fenster). Felder speichern **pro Feld** (Klick → ändern → Enter/Wegklicken
+ * speichert, Esc bricht ab). Tickets werden **lazy** geladen. Hinter Flag
+ * `modul_standard`.
  */
-
-// Felder sind aktuell read-only. `hover:border-zinc-600` deutet dezent an, dass
-// hier bald inline editiert wird; `title` macht das explizit, damit kein
-// Klick-Frust entsteht (kein Cursor-pointer/Stift, der „jetzt editierbar" lügt).
-const SOON = 'Bearbeiten folgt';
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   const empty = value === null || value === undefined || value === '';
   return (
     <div>
       <label className="mb-0.5 block text-[11px] uppercase tracking-wide text-zinc-500">{label}</label>
-      <div
-        title={SOON}
-        className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:border-zinc-600"
-      >
+      <div className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300">
         {empty ? <span className="text-zinc-600">—</span> : value}
-      </div>
-    </div>
-  );
-}
-
-function Area({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div className="sm:col-span-2">
-      <label className="mb-0.5 block text-[11px] uppercase tracking-wide text-zinc-500">{label}</label>
-      <div
-        title={SOON}
-        className="min-h-[2.25rem] rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm leading-relaxed text-zinc-300 transition-colors hover:border-zinc-600"
-      >
-        {value ? value : <span className="text-zinc-600">— leer —</span>}
       </div>
     </div>
   );
@@ -71,8 +56,42 @@ function useProjekt(projektId: string) {
   return useQuery({ queryKey: ['projekt', projektId], queryFn: () => projektApi.get(projektId) });
 }
 
-/** Reiter „Übersicht" — die Kernfelder als Block-Engine (zwei Regionen). */
+/** Reiter „Übersicht" — Kernfelder als Block-Engine, inline editierbar (Auto-Save pro Feld). */
 function ProjektUebersicht({ p }: { p: Projekt }) {
+  const qc = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (patch: ProjektUpdate) => projektApi.update(p.id, patch),
+    onSuccess: (updated) => {
+      qc.setQueryData(['projekt', p.id], updated); // sofortige, flicker-freie Aktualisierung
+      qc.invalidateQueries({ queryKey: ['projekte'] }); // Projekt-Listenansicht
+      // Tickets betten Projektname/-status ein → bei Änderung auffrischen.
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      qc.invalidateQueries({ queryKey: ['ticket'] });
+    },
+  });
+  const commit = (patch: ProjektUpdate) => mutation.mutateAsync(patch).then(() => undefined);
+
+  const { data: auswahllisten } = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
+  });
+  const { data: users } = useQuery({
+    queryKey: ['users-for-projekt'],
+    queryFn: () => userApi.list({ limit: 200 }),
+  });
+  const toOptions = (werte: { key: string; label: string }[]) =>
+    werte.map((w) => ({ value: w.key, label: w.label }));
+  const projekttypOptions = toOptions(
+    aktiveWerte(auswahllisten?.find((l) => l.key === 'projekttyp')?.werte, p.projekttyp.key),
+  );
+  const statusOptions = toOptions(
+    aktiveWerte(auswahllisten?.find((l) => l.key === 'projektstatus')?.werte, p.status.key),
+  );
+  const userOptions: InlineSelectOption[] = [
+    { value: '', label: '— keiner —' },
+    ...(users?.items ?? []).map((u) => ({ value: u.id, label: u.full_name })),
+  ];
+
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
       <DetailRegions
@@ -80,13 +99,32 @@ function ProjektUebersicht({ p }: { p: Projekt }) {
           <>
             <DetailBlock title="Stammdaten" blockKey="stammdaten" defaultOpen count={2}>
               <div className={grid}>
-                <Field label="Projektname" value={p.name} />
-                <Area label="Beschreibung" value={p.beschreibung} />
+                <InlineEditText
+                  label="Projektname"
+                  value={p.name}
+                  required
+                  onCommit={(v) => commit({ name: v ?? '' })}
+                />
+                <div className="sm:col-span-2">
+                  <InlineEditText
+                    label="Beschreibung"
+                    value={p.beschreibung}
+                    multiline
+                    onCommit={(v) => commit({ beschreibung: v })}
+                  />
+                </div>
               </div>
             </DetailBlock>
             <DetailBlock title="Notizen" blockKey="notizen" count={1}>
               <div className={grid}>
-                <Area label="Notizen" value={p.notizen} />
+                <div className="sm:col-span-2">
+                  <InlineEditText
+                    label="Notizen"
+                    value={p.notizen}
+                    multiline
+                    onCommit={(v) => commit({ notizen: v })}
+                  />
+                </div>
               </div>
             </DetailBlock>
           </>
@@ -95,15 +133,43 @@ function ProjektUebersicht({ p }: { p: Projekt }) {
           <>
             <DetailBlock title="Klassifizierung" blockKey="klassifizierung" defaultOpen count={2}>
               <div className={grid}>
-                <Field label="Projekttyp" value={<Badge label={p.projekttyp.label} />} />
-                <Field label="Status" value={<Badge label={p.status.label} />} />
+                <InlineEditSelect
+                  label="Projekttyp"
+                  value={p.projekttyp.key}
+                  display={<Badge label={p.projekttyp.label} />}
+                  options={projekttypOptions}
+                  onCommit={(v) => commit({ projekttyp_slug: v })}
+                />
+                <InlineEditSelect
+                  label="Status"
+                  value={p.status.key}
+                  display={<Badge label={p.status.label} />}
+                  options={statusOptions}
+                  onCommit={(v) => commit({ status_slug: v })}
+                />
               </div>
             </DetailBlock>
             <DetailBlock title="Verantwortung & Termine" blockKey="termine" defaultOpen count={3}>
               <div className={grid}>
-                <Field label="Verantwortlich" value={p.verantwortlich?.full_name} />
-                <Field label="Start am" value={fmtDate(p.start_am)} />
-                <Field label="Ende am" value={fmtDate(p.ende_am)} />
+                <InlineEditSelect
+                  label="Verantwortlich"
+                  value={p.verantwortlich?.id ?? ''}
+                  display={
+                    p.verantwortlich?.full_name ?? <span className="text-zinc-600">— keiner —</span>
+                  }
+                  options={userOptions}
+                  onCommit={(v) => commit({ verantwortlich_user_id: v || null })}
+                />
+                <InlineEditDate
+                  label="Start am"
+                  value={p.start_am}
+                  onCommit={(v) => commit({ start_am: v })}
+                />
+                <InlineEditDate
+                  label="Ende am"
+                  value={p.ende_am}
+                  onCommit={(v) => commit({ ende_am: v })}
+                />
               </div>
             </DetailBlock>
             <DetailBlock title="Historie" blockKey="historie" count={4}>

@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { DetailBlock } from './DetailBlock';
 import { DetailHeader } from './DetailHeader';
 import { DetailNavProvider, DetailScroll } from './DetailNav';
 import { DetailTabs } from './DetailTabs';
+import { InlineEditSelect, InlineEditText } from './InlineEdit';
 import { RelationList } from './RelationList';
 import { RelationListView } from './RelationListView';
 import { DetailOverlay } from './DetailOverlay';
@@ -232,6 +233,67 @@ describe('RelationListView', () => {
     // 2 geladene Zeilen, aber 500 gesamt → Suche kann nur die 2 erreichen.
     render(<RelationListView columns={columns} rows={rows} total={500} />);
     expect(screen.getByText(/2 geladen \(von 500\)/)).toBeTruthy();
+  });
+});
+
+describe('InlineEdit', () => {
+  it('Text: Klick → ändern → Enter speichert', async () => {
+    const onCommit = vi.fn().mockResolvedValue(undefined);
+    render(<InlineEditText label="Projektname" value="alt" onCommit={onCommit} />);
+    fireEvent.click(screen.getByRole('button', { name: /Projektname bearbeiten/ }));
+    const input = screen.getByDisplayValue('alt');
+    fireEvent.change(input, { target: { value: 'neu' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(onCommit).toHaveBeenCalledWith('neu'));
+  });
+
+  it('Text: Esc bricht ab (kein Commit, zurück in Leseansicht)', () => {
+    const onCommit = vi.fn().mockResolvedValue(undefined);
+    render(<InlineEditText label="Projektname" value="alt" onCommit={onCommit} />);
+    fireEvent.click(screen.getByRole('button', { name: /Projektname bearbeiten/ }));
+    const input = screen.getByDisplayValue('alt');
+    fireEvent.change(input, { target: { value: 'xyz' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Projektname bearbeiten/ })).toBeTruthy();
+  });
+
+  it('Text: keine Änderung → kein Commit beim Wegklicken', () => {
+    const onCommit = vi.fn().mockResolvedValue(undefined);
+    render(<InlineEditText label="Projektname" value="alt" onCommit={onCommit} />);
+    fireEvent.click(screen.getByRole('button', { name: /Projektname bearbeiten/ }));
+    fireEvent.blur(screen.getByDisplayValue('alt'));
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('Text required: leeren → revertiert ohne Commit', () => {
+    const onCommit = vi.fn().mockResolvedValue(undefined);
+    render(<InlineEditText label="Projektname" value="alt" required onCommit={onCommit} />);
+    fireEvent.click(screen.getByRole('button', { name: /Projektname bearbeiten/ }));
+    const input = screen.getByDisplayValue('alt');
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.blur(input);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Projektname bearbeiten/ })).toBeTruthy();
+  });
+
+  it('Select: Auswahl speichert sofort', async () => {
+    const onCommit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <InlineEditSelect
+        label="Status"
+        value="geplant"
+        display={<span>Geplant</span>}
+        options={[
+          { value: 'geplant', label: 'Geplant' },
+          { value: 'aktiv', label: 'Aktiv' },
+        ]}
+        onCommit={onCommit}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Status bearbeiten/ }));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'aktiv' } });
+    await waitFor(() => expect(onCommit).toHaveBeenCalledWith('aktiv'));
   });
 });
 

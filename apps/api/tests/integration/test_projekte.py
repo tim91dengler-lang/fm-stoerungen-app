@@ -341,3 +341,116 @@ async def test_projekte_require_auth(client) -> None:
     assert (
         await client.post("/api/v1/projekte", json={"name": "x", "projekttyp_slug": "wartung"})
     ).status_code == 401
+
+
+@pytest.mark.integration
+async def test_create_projekt_with_own_verantwortlich_ok(client, admin_user) -> None:
+    user, _ = admin_user
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+
+    res = await client.post(
+        "/api/v1/projekte",
+        headers=headers,
+        json={
+            "name": "Mit Verantwortlichem",
+            "projekttyp_slug": "wartung",
+            "verantwortlich_user_id": str(user.id),
+        },
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["verantwortlich"]["id"] == str(user.id)
+
+
+@pytest.mark.integration
+async def test_create_projekt_unknown_verantwortlich_returns_422(client, admin_user) -> None:
+    # Fremder/unbekannter User als Verantwortlicher → IDOR-Schutz greift (kein Cross-Mandant).
+    import uuid
+
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    res = await client.post(
+        "/api/v1/projekte",
+        headers=headers,
+        json={
+            "name": "Fremder Verantwortlicher",
+            "projekttyp_slug": "wartung",
+            "verantwortlich_user_id": str(uuid.uuid4()),
+        },
+    )
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.integration
+async def test_update_projekt_unknown_verantwortlich_returns_422(client, admin_user) -> None:
+    import uuid
+
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    created = await client.post(
+        "/api/v1/projekte",
+        headers=headers,
+        json={"name": "Update-Ziel", "projekttyp_slug": "wartung"},
+    )
+    assert created.status_code == 201, created.text
+    projekt_id = created.json()["id"]
+
+    res = await client.patch(
+        f"/api/v1/projekte/{projekt_id}",
+        headers=headers,
+        json={"verantwortlich_user_id": str(uuid.uuid4())},
+    )
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.integration
+async def test_foreign_mandant_verantwortlich_rejected(client, admin_user, db) -> None:
+    """Echter Cross-Mandant-Fall: aktiver User eines FREMDEN Mandanten als
+    Verantwortlicher → 422 (IDOR-Schutz), bei create UND update."""
+    from uuid import uuid4
+
+    from fm_api.core.security import hash_password
+    from fm_api.models import Mandant, User
+
+    other = Mandant(name="Fremd-Mandant", slug=f"fremd-{uuid4().hex[:8]}")
+    db.add(other)
+    await db.flush()
+    foreign_user = User(
+        mandant_id=other.id,
+        email=f"fremd-{uuid4().hex[:8]}@example.org",
+        password_hash=hash_password("x"),
+        full_name="Fremder Verantwortlicher",
+        is_active=True,
+    )
+    db.add(foreign_user)
+    await db.flush()
+    await db.commit()
+
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+
+    # create: fremder Verantwortlicher → 422
+    res = await client.post(
+        "/api/v1/projekte",
+        headers=headers,
+        json={
+            "name": "Cross-Mandant Verantwortlich",
+            "projekttyp_slug": "wartung",
+            "verantwortlich_user_id": str(foreign_user.id),
+        },
+    )
+    assert res.status_code == 422, res.text
+
+    # update: eigenes Projekt, dann fremden Verantwortlichen setzen → 422
+    created = await client.post(
+        "/api/v1/projekte",
+        headers=headers,
+        json={"name": "Update-Cross", "projekttyp_slug": "wartung"},
+    )
+    assert created.status_code == 201, created.text
+    res = await client.patch(
+        f"/api/v1/projekte/{created.json()['id']}",
+        headers=headers,
+        json={"verantwortlich_user_id": str(foreign_user.id)},
+    )
+    assert res.status_code == 422, res.text

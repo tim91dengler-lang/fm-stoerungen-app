@@ -13,6 +13,7 @@ from fm_api.models import (
     Projekt,
     ProjektObjektLink,
     Ticket,
+    User,
 )
 from fm_api.services.auswahlliste_service import (
     AuswahllistenWertNotFoundError,
@@ -30,6 +31,10 @@ class UnknownAuswahlSlugError(Exception):
 
 class ObjektNotFoundError(Exception):
     pass
+
+
+class VerantwortlichNotFoundError(Exception):
+    """Verantwortlicher gehört nicht zum Mandanten oder ist inaktiv (Cross-Mandant-Schutz)."""
 
 
 LISTE_KEY_PROJEKTTYP = "projekttyp"
@@ -85,6 +90,28 @@ async def _validate_objekte(
             f"objekte not found or not in mandant: {[str(m) for m in missing]}"
         )
     return deduped
+
+
+async def _validate_verantwortlich(
+    db: AsyncSession, user_id: UUID | None, mandant_id: UUID
+) -> None:
+    """Verantwortlicher muss ein aktiver User DESSELBEN Mandanten sein.
+
+    Schützt vor IDOR/Cross-Mandant-Zuweisung (user-gelieferter FK), analog zur
+    Assignee-Prüfung im Ticket-Service.
+    """
+    if user_id is None:
+        return
+    stmt = select(User.id).where(
+        User.id == user_id,
+        User.mandant_id == mandant_id,
+        User.deleted_at.is_(None),
+        User.is_active.is_(True),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise VerantwortlichNotFoundError(
+            f"verantwortlich user {user_id} not found or not in mandant"
+        )
 
 
 async def list_projekte(
@@ -191,6 +218,7 @@ async def create_projekt(
     projekttyp_wert = await _resolve_slug(db, mandant_id, LISTE_KEY_PROJEKTTYP, projekttyp_slug)
     status_wert = await _resolve_slug(db, mandant_id, LISTE_KEY_PROJEKTSTATUS, status_slug)
 
+    await _validate_verantwortlich(db, verantwortlich_user_id, mandant_id)
     valid_objekt_ids = await _validate_objekte(db, mandant_id, objekt_ids or [])
 
     p = Projekt(
@@ -230,6 +258,9 @@ async def update_projekt(
     updates: dict[str, Any],
 ) -> Projekt:
     p, _ = await get_projekt(db, mandant_id, projekt_id)
+
+    if "verantwortlich_user_id" in updates:
+        await _validate_verantwortlich(db, updates["verantwortlich_user_id"], mandant_id)
 
     # Direkte Felder
     for direct in (
