@@ -11,6 +11,7 @@ from fm_api.services.projekt_service import (
     ObjektNotFoundError,
     ProjektNotFoundError,
     UnknownAuswahlSlugError,
+    VerantwortlichNotFoundError,
 )
 
 router = APIRouter()
@@ -122,6 +123,10 @@ async def create_projekt(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
+    except VerantwortlichNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _serialize(p, 0)
 
 
@@ -147,6 +152,10 @@ async def update_projekt(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
     except ObjektNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except VerantwortlichNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc

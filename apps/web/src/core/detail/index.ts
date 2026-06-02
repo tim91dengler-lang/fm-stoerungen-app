@@ -13,3 +13,5 @@ export { DetailTabs } from './DetailTabs';
 export type { DetailTab } from './DetailTabs';
 export { RelationListView } from './RelationListView';
 export type { RelationColumn, RelationRow } from './RelationListView';
+export { InlineEditText, InlineEditSelect, InlineEditDate } from './InlineEdit';
+export type { InlineSelectOption } from './InlineEdit';
