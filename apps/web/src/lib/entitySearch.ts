@@ -4,6 +4,7 @@ import {
   objektApi,
   partnerApi,
   projektApi,
+  userApi,
 } from '../api/endpoints';
 import type { SearchOption } from '../components/EntitySearchSelect';
 
@@ -25,6 +26,13 @@ export function searchPartner(search: string): Promise<SearchOption[]> {
   return partnerApi
     .list({ search: search || undefined, limit: SEARCH_LIMIT })
     .then((r) => r.items.map((p) => ({ id: p.id, label: p.name })));
+}
+
+/** User-Suche (Verantwortlich, Zuweisung …) — serverseitig, skaliert bei vielen Usern. */
+export function searchUsers(search: string): Promise<SearchOption[]> {
+  return userApi
+    .list({ search: search || undefined, limit: SEARCH_LIMIT })
+    .then((r) => r.items.map((u) => ({ id: u.id, label: u.full_name })));
 }
 
 /** Projekt-Suche, optional auf bestimmte Status eingeschränkt (z. B. geplant/aktiv). */

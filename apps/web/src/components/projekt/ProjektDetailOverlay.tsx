@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
-import { auswahllistenApi, projektApi, userApi } from '../../api/endpoints';
+import { auswahllistenApi, projektApi } from '../../api/endpoints';
 import type { ProjektUpdate } from '../../api/types';
 import { aktiveWerte } from '../../lib/aktiveWerte';
+import { searchUsers } from '../../lib/entitySearch';
 import {
   DetailBlock,
   DetailHeader,
@@ -11,11 +12,11 @@ import {
   DetailRegions,
   DetailTabs,
   InlineEditDate,
+  InlineEditEntity,
   InlineEditSelect,
   InlineEditText,
   RelationListView,
   type DetailTab,
-  type InlineSelectOption,
 } from '../../core/detail';
 
 /**
@@ -75,10 +76,6 @@ function ProjektUebersicht({ p }: { p: Projekt }) {
     queryKey: ['auswahllisten'],
     queryFn: () => auswahllistenApi.list(),
   });
-  const { data: users } = useQuery({
-    queryKey: ['users-for-projekt'],
-    queryFn: () => userApi.list({ limit: 200 }),
-  });
   const toOptions = (werte: { key: string; label: string }[]) =>
     werte.map((w) => ({ value: w.key, label: w.label }));
   const projekttypOptions = toOptions(
@@ -87,10 +84,6 @@ function ProjektUebersicht({ p }: { p: Projekt }) {
   const statusOptions = toOptions(
     aktiveWerte(auswahllisten?.find((l) => l.key === 'projektstatus')?.werte, p.status.key),
   );
-  const userOptions: InlineSelectOption[] = [
-    { value: '', label: '— keiner —' },
-    ...(users?.items ?? []).map((u) => ({ value: u.id, label: u.full_name })),
-  ];
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -136,29 +129,29 @@ function ProjektUebersicht({ p }: { p: Projekt }) {
                 <InlineEditSelect
                   label="Projekttyp"
                   value={p.projekttyp.key}
-                  display={<Badge label={p.projekttyp.label} />}
                   options={projekttypOptions}
+                  queryKey="projekt-typ"
                   onCommit={(v) => commit({ projekttyp_slug: v })}
                 />
                 <InlineEditSelect
                   label="Status"
                   value={p.status.key}
-                  display={<Badge label={p.status.label} />}
                   options={statusOptions}
+                  queryKey="projekt-status"
                   onCommit={(v) => commit({ status_slug: v })}
                 />
               </div>
             </DetailBlock>
             <DetailBlock title="Verantwortung & Termine" blockKey="termine" defaultOpen count={3}>
               <div className={grid}>
-                <InlineEditSelect
+                <InlineEditEntity
                   label="Verantwortlich"
-                  value={p.verantwortlich?.id ?? ''}
-                  display={
-                    p.verantwortlich?.full_name ?? <span className="text-zinc-600">— keiner —</span>
-                  }
-                  options={userOptions}
-                  onCommit={(v) => commit({ verantwortlich_user_id: v || null })}
+                  value={p.verantwortlich?.id ?? null}
+                  displayLabel={p.verantwortlich?.full_name ?? null}
+                  fetcher={searchUsers}
+                  queryKey="projekt-verantwortlich"
+                  placeholder="Mitarbeiter suchen …"
+                  onCommit={(v) => commit({ verantwortlich_user_id: v })}
                 />
                 <InlineEditDate
                   label="Start am"

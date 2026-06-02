@@ -1,14 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+import { DatePicker } from '../../components/DatePicker';
+import { EntitySearchSelect, type SearchOption } from '../../components/EntitySearchSelect';
 
 /**
  * Inline-Bearbeiten für Detail-Felder (Master-Layout-Standard, Tim-Entscheidung
- * 2026-06-02): Klick auf ein Feld → Editor; **Enter / Wegklicken speichert**,
- * **Esc bricht ab**. Kein separates Formular, kein „Speichern"-Knopf. Pro Feld
- * eine `onCommit`-Zusage (das Modul verdrahtet sie mit seiner PATCH-Mutation);
- * der Speicher-/Fehlerzustand wird dezent am Feld angezeigt.
+ * 2026-06-02): Klick auf ein Feld → bearbeiten; Enter/Wegklicken speichert, Esc
+ * bricht ab. Auto-Save pro Feld. Kein separates Formular.
  *
- * Bewusst klein gehalten und render-agnostisch — Standard-Baustein für ALLE
- * Module. Read-Ansicht ist ein fokussierbarer Button (Tastatur: Enter öffnet).
+ * **Konsequent gestylte Controls** (kein natives <select>/<input type=date>):
+ * - Freitext → `InlineEditText`
+ * - Auswahlliste (Status/Typ) → `InlineEditSelect` (gestyltes Dropdown via `EntitySearchSelect`)
+ * - Entität mit Server-Suche (Verantwortlich/User/Partner …) → `InlineEditEntity` (tippbar)
+ * - Datum → `InlineEditDate` (gestylter Kalender via `DatePicker`)
+ *
+ * Standard-Baustein für ALLE Module — siehe Memory `detail-felder-keine-nativen-controls`.
  */
 type CommitState = 'idle' | 'saving' | 'error';
 
@@ -17,8 +23,7 @@ const READ_CLS =
 const EDIT_CLS =
   'w-full rounded-md border border-emerald-600 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500';
 
-/** Lebenszyklus-Ref, um setState nach dem Unmount (z. B. Overlay-Schließen während
- *  des Speicherns) zu vermeiden. */
+/** Lebenszyklus-Ref, um setState nach Unmount (Overlay/Tab schließt beim Speichern) zu vermeiden. */
 function useIsMounted() {
   const ref = useRef(true);
   useEffect(() => {
@@ -53,11 +58,29 @@ function FieldShell({
   );
 }
 
-function fmtDate(s?: string | null) {
-  return s ? s.slice(0, 10).split('-').reverse().join('.') : null;
+/** Commit-Lifecycle für Picker-Felder (Select/Entity/Date): saving/error + Remount-Nonce,
+ *  der bei Fehler die Anzeige auf den alten Wert zurücksetzt. */
+function usePickerCommit(onCommit: (next: string | null) => Promise<void>, current: string | null) {
+  const [state, setState] = useState<CommitState>('idle');
+  const [nonce, setNonce] = useState(0);
+  const mounted = useIsMounted();
+  async function handle(next: string | null) {
+    if (next === current) return;
+    setState('saving');
+    try {
+      await onCommit(next);
+      if (mounted.current) setState('idle');
+    } catch {
+      if (mounted.current) {
+        setState('error');
+        setNonce((n) => n + 1); // Picker remounten → Anzeige zurück auf alten Wert
+      }
+    }
+  }
+  return { state, nonce, handle };
 }
 
-/** Klickbarer Read-View; öffnet den Editor. */
+/** Klickbarer Read-View (für Freitextfelder); öffnet den Editor. */
 function ReadButton({
   label,
   onOpen,
@@ -80,7 +103,7 @@ function ReadButton({
   );
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Freitext
 
 export function InlineEditText({
   label,
@@ -126,7 +149,7 @@ export function InlineEditText({
       return;
     }
     if ((value ?? '') === draft) {
-      close(); // unverändert: schließen + evtl. altes Fehler-Label aufräumen
+      close();
       return;
     }
     inFlightRef.current = true;
@@ -194,7 +217,7 @@ export function InlineEditText({
   );
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Auswahlliste (Status/Typ)
 
 export interface InlineSelectOption {
   value: string;
@@ -204,83 +227,89 @@ export interface InlineSelectOption {
 export function InlineEditSelect({
   label,
   value,
-  display,
   options,
+  queryKey,
+  placeholder = 'Auswählen …',
   onCommit,
 }: {
   label: string;
-  /** Aktueller Schlüssel (''=leer). */
+  /** Aktueller Schlüssel. */
   value: string;
-  /** Read-Ansicht (z. B. ein Badge oder Text). */
-  display: React.ReactNode;
   options: InlineSelectOption[];
+  /** Eindeutiger Cache-Schlüssel (sonst Kollision bei gleichem Label). */
+  queryKey: string;
+  placeholder?: string;
   onCommit: (next: string) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [state, setState] = useState<CommitState>('idle');
-  const ref = useRef<HTMLSelectElement>(null);
-  const mounted = useIsMounted();
-
-  useEffect(() => {
-    if (editing) ref.current?.focus();
-  }, [editing]);
-
-  async function commit(next: string) {
-    if (next === value) {
-      setState('idle');
-      setEditing(false);
-      return;
-    }
-    setState('saving');
-    try {
-      await onCommit(next);
-      if (!mounted.current) return;
-      setState('idle');
-      setEditing(false);
-    } catch {
-      if (mounted.current) setState('error'); // bleibt offen → erneute Auswahl möglich
-    }
-  }
-
-  if (!editing) {
-    return (
-      <FieldShell label={label} state={state}>
-        <ReadButton label={label} onOpen={() => setEditing(true)}>
-          {display}
-        </ReadButton>
-      </FieldShell>
-    );
-  }
+  const { state, nonce, handle } = usePickerCommit((v) => onCommit(v ?? ''), value);
+  const fetcher = useMemo(
+    () => (q: string) =>
+      Promise.resolve(
+        options
+          .filter((o) => o.label.toLowerCase().includes(q.toLowerCase()))
+          .map<SearchOption>((o) => ({ id: o.value, label: o.label })),
+      ),
+    [options],
+  );
+  const currentLabel = options.find((o) => o.value === value)?.label ?? null;
   return (
     <FieldShell label={label} state={state}>
-      <select
-        ref={ref}
-        defaultValue={value}
+      <EntitySearchSelect
+        key={nonce}
+        value={value || null}
+        initialLabel={currentLabel}
+        fetcher={fetcher}
+        queryKey={queryKey}
+        allowClear={false}
+        placeholder={placeholder}
         disabled={state === 'saving'}
-        className={EDIT_CLS}
-        onChange={(e) => void commit(e.target.value)}
-        onBlur={() => {
-          if (state !== 'error') setEditing(false); // bei Fehler offen lassen (Retry)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            setState('idle');
-            setEditing(false);
-          }
-        }}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+        onChange={(id) => void handle(id)}
+      />
     </FieldShell>
   );
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Entität mit Server-Suche
+
+export function InlineEditEntity({
+  label,
+  value,
+  displayLabel,
+  fetcher,
+  queryKey,
+  allowClear = true,
+  placeholder = 'Suchen …',
+  onCommit,
+}: {
+  label: string;
+  value: string | null;
+  /** Label des aktuell gewählten Werts (für die Anzeige ohne Treffer-Load). */
+  displayLabel: string | null;
+  fetcher: (search: string) => Promise<SearchOption[]>;
+  queryKey: string;
+  allowClear?: boolean;
+  placeholder?: string;
+  onCommit: (next: string | null) => Promise<void>;
+}) {
+  const { state, nonce, handle } = usePickerCommit(onCommit, value);
+  return (
+    <FieldShell label={label} state={state}>
+      <EntitySearchSelect
+        key={nonce}
+        value={value}
+        initialLabel={displayLabel}
+        fetcher={fetcher}
+        queryKey={queryKey}
+        allowClear={allowClear}
+        placeholder={placeholder}
+        disabled={state === 'saving'}
+        onChange={(id) => void handle(id)}
+      />
+    </FieldShell>
+  );
+}
+
+// --------------------------------------------------------------------------- Datum
 
 export function InlineEditDate({
   label,
@@ -291,61 +320,15 @@ export function InlineEditDate({
   value?: string | null;
   onCommit: (next: string | null) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [state, setState] = useState<CommitState>('idle');
-  const ref = useRef<HTMLInputElement>(null);
-  const mounted = useIsMounted();
-  const iso = value ? value.slice(0, 10) : '';
-
-  useEffect(() => {
-    if (editing) ref.current?.focus();
-  }, [editing]);
-
-  async function commit(nextIso: string) {
-    if (nextIso === iso) {
-      setState('idle');
-      setEditing(false);
-      return;
-    }
-    setState('saving');
-    try {
-      await onCommit(nextIso || null);
-      if (!mounted.current) return;
-      setState('idle');
-      setEditing(false);
-    } catch {
-      if (mounted.current) setState('error');
-    }
-  }
-
-  if (!editing) {
-    return (
-      <FieldShell label={label} state={state}>
-        <ReadButton label={label} onOpen={() => setEditing(true)}>
-          {value ? fmtDate(value) : <span className="text-zinc-600">— leer —</span>}
-        </ReadButton>
-      </FieldShell>
-    );
-  }
+  const current = value ? value.slice(0, 10) : null;
+  const { state, nonce, handle } = usePickerCommit(onCommit, current);
   return (
     <FieldShell label={label} state={state}>
-      <input
-        ref={ref}
-        type="date"
-        defaultValue={iso}
+      <DatePicker
+        key={nonce}
+        value={current}
         disabled={state === 'saving'}
-        className={EDIT_CLS}
-        onChange={(e) => void commit(e.target.value)}
-        onBlur={() => {
-          if (state !== 'error') setEditing(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            setState('idle');
-            setEditing(false);
-          }
-        }}
+        onChange={(iso) => void handle(iso)}
       />
     </FieldShell>
   );

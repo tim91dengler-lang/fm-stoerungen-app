@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { DatePicker } from '../../components/DatePicker';
 import { DetailBlock } from './DetailBlock';
 import { DetailHeader } from './DetailHeader';
 import { DetailNavProvider, DetailScroll } from './DetailNav';
@@ -11,6 +13,12 @@ import { RelationListView } from './RelationListView';
 import { DetailOverlay } from './DetailOverlay';
 
 afterEach(cleanup);
+
+/** Wrapper für Komponenten, die `useQuery` nutzen (EntitySearchSelect-basierte Picker). */
+function renderWithQuery(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 describe('DetailBlock', () => {
   it('rendert Titel, Zähler und Kinder', () => {
@@ -277,13 +285,13 @@ describe('InlineEdit', () => {
     expect(screen.getByRole('button', { name: /Projektname bearbeiten/ })).toBeTruthy();
   });
 
-  it('Select: Auswahl speichert sofort', async () => {
+  it('Select: Auswahl über den gestylten Picker speichert', async () => {
     const onCommit = vi.fn().mockResolvedValue(undefined);
-    render(
+    renderWithQuery(
       <InlineEditSelect
         label="Status"
         value="geplant"
-        display={<span>Geplant</span>}
+        queryKey="test-status"
         options={[
           { value: 'geplant', label: 'Geplant' },
           { value: 'aktiv', label: 'Aktiv' },
@@ -291,9 +299,21 @@ describe('InlineEdit', () => {
         onCommit={onCommit}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /Status bearbeiten/ }));
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'aktiv' } });
+    // Picker zeigt aktuellen Wert; Klick öffnet das Dropdown (kein natives <select>)
+    fireEvent.click(screen.getByRole('button', { name: /Geplant/ }));
+    const aktiv = await screen.findByRole('button', { name: 'Aktiv' });
+    fireEvent.click(aktiv);
     await waitFor(() => expect(onCommit).toHaveBeenCalledWith('aktiv'));
+  });
+});
+
+describe('DatePicker', () => {
+  it('öffnet den Kalender und wählt einen Tag (ISO)', () => {
+    const onChange = vi.fn();
+    render(<DatePicker value="2026-06-15" onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: /15\.06\.2026/ }));
+    fireEvent.click(screen.getByRole('button', { name: '20' }));
+    expect(onChange).toHaveBeenCalledWith('2026-06-20');
   });
 });
 
