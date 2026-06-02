@@ -106,7 +106,7 @@ Plus **Treffer-Zähler** (`gefiltert / gesamt`) rechts oben in der Toolbar.
 
 Begründung: PR-Merge ist mechanisch (CI = technisches Gate). Tims Mensch-im-Loop bleibt da, wo er Wert stiftet: Funktional-Test auf Staging und finale Prod-Freigabe.
 
-**Migration nach Deploy:** `deploy-staging.yml` fährt KEIN `alembic upgrade` automatisch — nach Merge mit neuer Migration händisch via SSH + `docker exec` ausführen (siehe Memory `migration-manuell-anwenden`).
+**Migration nach Deploy:** `deploy-staging.yml` fährt **automatisch** `migrate.sh` (pg_dump + `alembic upgrade head`) vor dem Container-Swap — keine manuelle Migration mehr nötig. Zusätzlich provisioniert ein Deploy-Schritt die Per-Mandant-Basisdaten (`provision_vorlagen`: Auswahllisten + Default-Vorlagen, pro Mandant abgesichert). SSH auf Staging nur noch für Inspektion/Debugging.
 
 Gilt nur für dieses Repo (`fm-stoerungen-app`); andere Repos behalten klassischen PR-Workflow mit Tim-Merge.
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react';
@@ -298,8 +298,17 @@ export function VorlageDesignerPage() {
     return !areFelderEqual(felder, vorlage.felder);
   }, [form, felder, vorlage, isNew]);
 
+  // Einmal-Bypass für die absichtliche Navigation direkt nach dem Speichern
+  // (sonst fängt der unsaved-Blocker den Auto-Redirect ins /bearbeiten ab,
+  // weil `dirty` zum Navigationszeitpunkt noch true ist).
+  const bypassBlockerRef = useRef(false);
+
   // Browser-Back / Link-Navigation bei unsaved abfangen
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (bypassBlockerRef.current) {
+      bypassBlockerRef.current = false;
+      return false;
+    }
     if (!dirty) return false;
     return currentLocation.pathname !== nextLocation.pathname;
   });
@@ -372,6 +381,7 @@ export function VorlageDesignerPage() {
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['tickettypen'] });
       setInitialized(false); // damit useEffect die geladenen Felder übernimmt
+      bypassBlockerRef.current = true; // Auto-Redirect nicht vom unsaved-Blocker abfangen
       navigate(`/stammdaten/vorlagen/${created.id}/bearbeiten`, { replace: true });
     },
     onError: (err) => setSubmitError(extractErrorMessage(err)),

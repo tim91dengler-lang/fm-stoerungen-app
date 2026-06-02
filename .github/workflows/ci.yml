@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -99,7 +99,7 @@ jobs:
         # Coverage threshold is configured in pyproject.toml — currently 50% (Slice-1-Baseline)
         run: pytest --cov=src/fm_api --cov-report=xml
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         if: always()
         with:
           files: apps/api/coverage.xml
@@ -116,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -145,7 +145,7 @@ jobs:
         run: npm run build
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: apps/web/dist
@@ -158,7 +158,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: pip-audit (Backend)
@@ -167,7 +167,7 @@ jobs:
           pip install pip-audit
           pip-audit --strict || true   # don't fail build, but produce report
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'

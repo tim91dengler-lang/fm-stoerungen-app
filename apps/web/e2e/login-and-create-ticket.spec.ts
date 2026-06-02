@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * docker-compose stack via `infra/scripts/seed-dev.py`.
  */
 
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@fm-staging.local';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'admin-dev-pass-12';
 
 test('login -> create ticket -> see it in the list', async ({ page }) => {
@@ -19,7 +19,7 @@ test('login -> create ticket -> see it in the list', async ({ page }) => {
   await page.getByRole('button', { name: 'Anmelden' }).click();
 
   await expect(page).toHaveURL(/\/tickets/);
-  await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ticket-Pool' })).toBeVisible();
 
   const titel = `E2E Ticket ${Date.now()}`;
 
@@ -39,6 +39,7 @@ test('logout returns to login page', async ({ page }) => {
   await page.getByRole('button', { name: 'Anmelden' }).click();
   await expect(page).toHaveURL(/\/tickets/);
 
-  await page.getByRole('button', { name: 'Abmelden' }).click();
+  // Zwei „Abmelden"-Buttons (Sidebar + Topbar) → ersten nehmen.
+  await page.getByRole('button', { name: 'Abmelden' }).first().click();
   await expect(page).toHaveURL(/\/login/);
 });
