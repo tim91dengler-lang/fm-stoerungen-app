@@ -21,6 +21,7 @@ import { GrundrissPin } from '../GrundrissPin';
 import { PhotoGallery } from '../PhotoGallery';
 import { TicketAdresseField } from '../TicketAdresseField';
 import { TicketDokumente } from '../TicketDokumente';
+import { DatePicker } from '../DatePicker';
 import { FeldSearchSelect, FeldSelect, SelectField } from './primitives';
 
 /**
@@ -93,19 +94,11 @@ export const DETAIL_RENDERERS: Record<string, Renderer> = {
         Fällig am
         {felder.pflicht('faelligkeit_am') && <span className="text-red-400"> *</span>}
       </label>
-      <input
-        type="date"
-        value={t.faelligkeit_am ?? ''}
-        onChange={(e) => onPatch({ faelligkeit_am: e.target.value || null })}
-        // Klick aufs ganze Feld öffnet den Kalender (nativ nur übers Icon).
-        onClick={(e) => {
-          try {
-            e.currentTarget.showPicker();
-          } catch {
-            /* showPicker nicht unterstützt — natives Verhalten bleibt */
-          }
-        }}
-        className="mt-1 w-full cursor-pointer rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-200 focus:border-emerald-500/60 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+      <DatePicker
+        value={t.faelligkeit_am ?? null}
+        onChange={(iso) => onPatch({ faelligkeit_am: iso })}
+        placeholder="Fällig am wählen …"
+        className="mt-1"
       />
     </div>
   ),

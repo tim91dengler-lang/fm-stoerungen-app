@@ -60,11 +60,15 @@ describe('DETAIL_RENDERERS — Felder befüllen → Patch', () => {
     expect(onPatch).toHaveBeenCalledWith({ beschreibung: 'Neu' });
   });
 
-  it('faelligkeit_am: Datum setzen patcht', () => {
+  it('faelligkeit_am: Datum wählen patcht (DatePicker)', () => {
     const onPatch = vi.fn();
     render(<div>{renderDetailFeld('faelligkeit_am', makeCtx({ onPatch }))}</div>);
-    fireEvent.change(screen.getByDisplayValue(''), { target: { value: '2026-07-01' } });
-    expect(onPatch).toHaveBeenCalledWith({ faelligkeit_am: '2026-07-01' });
+    // DatePicker (kein natives <input type=date>): Trigger öffnen, dann „Heute" wählen.
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.click(screen.getByText('Heute'));
+    expect(onPatch).toHaveBeenCalledWith({
+      faelligkeit_am: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
   });
 
   it('wiederholung: Auswahl patcht', () => {

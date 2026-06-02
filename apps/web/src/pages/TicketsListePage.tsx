@@ -24,12 +24,9 @@ import {
   ticketApi,
   userApi,
 } from '../api/endpoints';
-import type {
-  TicketPrioritaetSlug,
-  TicketRead,
-  TicketStatusSlug,
-} from '../api/types';
+import type { TicketPrioritaetSlug, TicketRead, TicketStatusSlug } from '../api/types';
 import { PrioBadge, StatusBadge } from '../components/StatusBadge';
+import { DatePicker } from '../components/DatePicker';
 import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
 import { TicketErfassenModal } from './TicketErfassenModal';
 import {
@@ -48,11 +45,7 @@ import { iconForKategorie } from '../lib/kategorieIcon';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import {
-  SelectFilter,
-  TextFilter,
-  type SelectOption,
-} from '../core/liste/columnFilters';
+import { SelectFilter, TextFilter, type SelectOption } from '../core/liste/columnFilters';
 
 interface TicketsViewConfig {
   sorting: SortingState;
@@ -72,9 +65,7 @@ const DEFAULT_CONFIG: TicketsViewConfig = {
   // Tickets" lebt jetzt als Start-Filter auf der Status-Spalte (statt im früheren
   // separaten Top-Panel). Status/Prio werden daraus ans Backend abgeleitet
   // (siehe `filters`-useMemo); alle anderen Spalten-Filter wirken clientseitig.
-  columnFilters: [
-    { id: 'status', value: ['neu', 'pruefung', 'bearbeitung', 'wartet'] },
-  ],
+  columnFilters: [{ id: 'status', value: ['neu', 'pruefung', 'bearbeitung', 'wartet'] }],
   columnOrder: [
     'nummer',
     'titel',
@@ -181,8 +172,7 @@ function buildColumns(
         // B1.2 (Listen-Power 2.0): Titel kräftig, Beschreibungs-Snippet als
         // dezente Sekundärinfo darunter — gibt Verdichtung ohne extra Spalte.
         const desc = row.original.beschreibung?.trim() ?? '';
-        const descSnippet =
-          desc.length > 80 ? `${desc.slice(0, 80).trimEnd()}…` : desc;
+        const descSnippet = desc.length > 80 ? `${desc.slice(0, 80).trimEnd()}…` : desc;
         return (
           <button
             type="button"
@@ -195,9 +185,7 @@ function buildColumns(
                 {row.original.titel}
               </span>
               {descSnippet && (
-                <span className="truncate text-[11px] text-zinc-500">
-                  {descSnippet}
-                </span>
+                <span className="truncate text-[11px] text-zinc-500">{descSnippet}</span>
               )}
             </span>
           </button>
@@ -283,9 +271,7 @@ function buildColumns(
         return (
           <div className="flex flex-col gap-0.5">
             <span className="truncate text-zinc-200">{p.name}</span>
-            {firstTyp && (
-              <PartnerTypPill typId={firstTyp} lookup={partnerTypLookup} />
-            )}
+            {firstTyp && <PartnerTypPill typId={firstTyp} lookup={partnerTypLookup} />}
           </div>
         );
       },
@@ -304,11 +290,7 @@ function buildColumns(
       cell: ({ row }) => {
         const u = row.original.zugewiesen_an;
         if (!u)
-          return (
-            <span className="font-medium text-amber-400/90">
-              Nicht zugewiesen
-            </span>
-          );
+          return <span className="font-medium text-amber-400/90">Nicht zugewiesen</span>;
         return (
           <div className="flex items-center gap-2">
             <InitialAvatar fullName={u.full_name} size="sm" />
@@ -395,12 +377,11 @@ function DateFilter({
   onChange: (v: unknown) => void;
 }) {
   return (
-    <input
-      type="date"
-      value={typeof value === 'string' ? value : ''}
-      onChange={(e) => onChange(e.target.value || undefined)}
-      className="w-full rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-xs text-zinc-200 focus:border-emerald-500/60 focus:outline-none"
-      title="Fällig bis (≤ Datum)"
+    <DatePicker
+      value={typeof value === 'string' ? value : null}
+      onChange={(iso) => onChange(iso || undefined)}
+      placeholder="Fällig bis …"
+      className="w-full"
     />
   );
 }
@@ -426,9 +407,7 @@ export function TicketsListePage() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [showErfassen, setShowErfassen] = useState(false);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<TicketRead[] | null>(
-    null,
-  );
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<TicketRead[] | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const openTicketId = searchParams.get('ticket');
 
@@ -468,12 +447,8 @@ export function TicketsListePage() {
   });
 
   const massEditOptions = useMemo<MassEditOptions>(() => {
-    const statusListe = auswahllistenQuery.data?.find(
-      (l) => l.key === 'ticket_status',
-    );
-    const prioListe = auswahllistenQuery.data?.find(
-      (l) => l.key === 'ticket_prioritaet',
-    );
+    const statusListe = auswahllistenQuery.data?.find((l) => l.key === 'ticket_status');
+    const prioListe = auswahllistenQuery.data?.find((l) => l.key === 'ticket_prioritaet');
     const kategorieListe = auswahllistenQuery.data?.find(
       (l) => l.key === 'ticket_kategorie',
     );
@@ -501,12 +476,7 @@ export function TicketsListePage() {
       })),
       projekt: [], // belegt sobald Projekt-Spalte ergänzt wird
     };
-  }, [
-    auswahllistenQuery.data,
-    objekteQuery.data,
-    partnerQuery.data,
-    usersQuery.data,
-  ]);
+  }, [auswahllistenQuery.data, objekteQuery.data, partnerQuery.data, usersQuery.data]);
 
   const partnerTypLookup = usePartnerTypLookup();
   const columns = useMemo(
@@ -581,17 +551,14 @@ export function TicketsListePage() {
   const kpis: KpiItem[] = useMemo(() => {
     const all = kpiQuery.data?.items ?? [];
     const offen = all.filter((t) => t.status.key !== 'erledigt').length;
-    const neu = all.filter(
-      (t) => t.status.key === 'neu' && !t.zugewiesen_an,
-    ).length;
+    const neu = all.filter((t) => t.status.key === 'neu' && !t.zugewiesen_an).length;
     const kritisch = all.filter(
       (t) => t.prioritaet.key === 'kritisch' && t.status.key !== 'erledigt',
     ).length;
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const heuteErledigt = all.filter(
-      (t) =>
-        t.erledigt_am !== null && new Date(t.erledigt_am) >= startOfToday,
+      (t) => t.erledigt_am !== null && new Date(t.erledigt_am) >= startOfToday,
     ).length;
     return [
       {
@@ -683,9 +650,7 @@ export function TicketsListePage() {
         search={search}
         onSearchChange={setSearch}
         visibility={config.visibility}
-        onVisibilityChange={(v) =>
-          setConfig((prev) => ({ ...prev, visibility: v }))
-        }
+        onVisibilityChange={(v) => setConfig((prev) => ({ ...prev, visibility: v }))}
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((prev) => ({ ...prev, sorting: s }))}
         columnFilters={config.columnFilters}
@@ -693,13 +658,9 @@ export function TicketsListePage() {
           setConfig((prev) => ({ ...prev, columnFilters: f }))
         }
         columnOrder={config.columnOrder}
-        onColumnOrderChange={(o) =>
-          setConfig((prev) => ({ ...prev, columnOrder: o }))
-        }
+        onColumnOrderChange={(o) => setConfig((prev) => ({ ...prev, columnOrder: o }))}
         grouping={config.grouping}
-        onGroupingChange={(g) =>
-          setConfig((prev) => ({ ...prev, grouping: g }))
-        }
+        onGroupingChange={(g) => setConfig((prev) => ({ ...prev, grouping: g }))}
         groupableColumns={GROUPABLE_COLUMNS}
         filterRenderers={filterRenderers}
         enableRowSelection
@@ -778,9 +739,12 @@ export function TicketsListePage() {
         busy={bulkDelete.isPending}
         onConfirm={() => {
           if (!bulkDeleteConfirm) return;
-          bulkDelete.mutate(bulkDeleteConfirm.map((t) => t.id), {
-            onSuccess: () => setBulkDeleteConfirm(null),
-          });
+          bulkDelete.mutate(
+            bulkDeleteConfirm.map((t) => t.id),
+            {
+              onSuccess: () => setBulkDeleteConfirm(null),
+            },
+          );
         }}
         onCancel={() => setBulkDeleteConfirm(null)}
       />

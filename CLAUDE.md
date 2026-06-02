@@ -4,8 +4,23 @@
 >
 > Beratungs-/Konzept-spezifische Regeln (Joachim-Kommunikation, Word-Deliverables) leben woanders — siehe `08_FM_ERP_app/CLAUDE.md` im Beratungs-Workspace auf Tims Windows-Server.
 
-> **Stand:** 2026-05-27
+> **Stand:** 2026-06-02
 > **Status:** Stufe 1 — MVP-Entwicklung, Pilot-Vorbereitung läuft
+
+---
+
+## 0. Definition of Done — vor JEDER „fertig"-Meldung (Pflicht)
+
+> Diese 7 Punkte sind die am häufigsten verletzten Regeln. Sie stehen bewusst ganz oben.
+> Punkt 1 wird vom **Stop-Hook** (`scripts/verify.sh`) mechanisch erzwungen — siehe `.claude/settings.json`.
+
+1. **Lokal verifiziert = CI grün.** `scripts/verify.sh` ausgeführt, Exit 0 (spiegelt die CI-Gates 1:1). Insb. `npm run build` (= `tsc -b && vite build`) grün — nicht nur `vite build` / `typecheck` (Memory `web-build-tsc-b`).
+2. **Format/Lint grün.** Backend `ruff check` + `ruff format --check` (Memory `backend-local-verify`), Frontend `eslint --max-warnings 0`. Kein „mach ich später".
+3. **Keine nativen Controls.** Datum→`DatePicker`, Einzel-Auswahl→`EntitySearchSelect`, Multi→`MultiSelectCombobox`, Liste→`PowerListenView`. NIEMALS `<input type=date>`, `<select multiple>`, eigene `<table>`. Inventar: Skill `reuse-first` (Memory `detail-felder-keine-nativen-controls`).
+4. **Selbst E2E-getestet** (Login + CRUD + Smoke), bevor Tim klickt. Tim ist Senior-Reviewer, nicht QA (Memory `selbst-testen-vor-tim`).
+5. **Mandantentrennung geprüft.** Jeder user-gelieferte FK / jede Query gegen Cross-Mandant/IDOR abgesichert — fremde `mandant_id` ⇒ 404/403, nicht Treffer (Memory `fk-mandant-validierung`).
+6. **Keine erfundenen Felder.** Nur Reales aus dem Datenmodell; Vorschläge als „(Vorschlag)" markieren und mit Tim klären.
+7. **Modul-/Listen-/Detail-Arbeit?** Skill `modul-standard` genutzt + dessen Abnahme-Checkliste abgehakt.
 
 ---
 
@@ -26,7 +41,7 @@ Architektur und Scope: siehe **`docs/plan.md`** (fachliches Konzept v6) und **`d
 | Object-Store | Hetzner Object Storage |
 | Hosting | Hetzner Cloud DE (Falkenstein) |
 | KI | Anthropic Claude (Haiku/Sonnet, EU-Endpoint) |
-| Build-Tools | uv (Python), pnpm (Node) |
+| Build-Tools | uv (Python), npm (Node) |
 
 ## 3. Architektur-Prinzipien
 
@@ -133,7 +148,7 @@ Für dieses Repo arbeitet Claude **wie ein Senior-Entwickler**:
 
 - Docker CE + Compose v5.1.4
 - Python 3.12 + `uv` (Astral-Installer, in `~/.local/bin/`)
-- Node.js LTS + `pnpm` (via corepack)
+- Node.js LTS + `npm` (Lockfile: `apps/web/package-lock.json`; CI nutzt `npm ci`)
 - GitHub CLI (`gh`), `psql`, `make`, `direnv`, `bat`, `fd`, `eza`
 - Git-Config mit Tims Identität
 - GitHub-SSH-Key (Public-Key in GitHub-Settings hinterlegt)
