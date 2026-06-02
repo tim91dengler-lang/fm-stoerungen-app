@@ -8,16 +8,10 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import {
-  Activity,
-  Droplets,
-  Plus,
-  Thermometer,
-  Wind,
-  Wrench,
-  Zap,
-} from 'lucide-react';
+import { Activity, Droplets, Plus, Thermometer, Wind, Wrench, Zap } from 'lucide-react';
 import { anlageApi, auswahllistenApi, objektApi } from '../api/endpoints';
+import { isModulStandard } from '../core/featureFlags';
+import { AnlageDetailOverlay } from '../components/anlage/AnlageDetailOverlay';
 import type { AnlageCreate, AnlageRead, AnlageUpdate } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
@@ -60,13 +54,7 @@ interface ViewConfig {
 const DEFAULT_CONFIG: ViewConfig = {
   sorting: [{ id: 'bezeichnung', desc: false }],
   visibility: {},
-  columnOrder: [
-    'bezeichnung',
-    'kategorie',
-    'objekt',
-    'aktiv',
-    'beschreibung',
-  ],
+  columnOrder: ['bezeichnung', 'kategorie', 'objekt', 'aktiv', 'beschreibung'],
   columnFilters: [],
   grouping: [],
 };
@@ -79,6 +67,8 @@ export function AnlagenPage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const modulStandard = isModulStandard();
+  const [openAnlageId, setOpenAnlageId] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<AnlageRead[] | null>(null);
   const qc = useQueryClient();
 
@@ -209,7 +199,7 @@ export function AnlagenPage() {
           return (
             <button
               type="button"
-              onClick={() => openEdit(a)}
+              onClick={() => (modulStandard ? setOpenAnlageId(a.id) : openEdit(a))}
               className="flex items-center gap-2 text-left"
             >
               <Icon className="h-4 w-4 shrink-0 text-emerald-300" />
@@ -247,9 +237,7 @@ export function AnlagenPage() {
         header: 'Objekt',
         filterFn: 'includesString',
         cell: (ctx) =>
-          ctx.row.original.objekt?.name ?? (
-            <span className="text-zinc-500">—</span>
-          ),
+          ctx.row.original.objekt?.name ?? <span className="text-zinc-500">—</span>,
       },
       {
         id: 'aktiv',
@@ -276,13 +264,11 @@ export function AnlagenPage() {
         cell: (ctx) => {
           const b = ctx.row.original.beschreibung;
           if (!b) return <span className="text-zinc-500">—</span>;
-          return (
-            <span className="line-clamp-1 text-xs text-zinc-400">{b}</span>
-          );
+          return <span className="line-clamp-1 text-xs text-zinc-400">{b}</span>;
         },
       },
     ],
-    [kategorieOptions],
+    [kategorieOptions, modulStandard],
   );
 
   function confirmBulkDelete() {
@@ -327,9 +313,7 @@ export function AnlagenPage() {
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
         columnFilters={config.columnFilters}
-        onColumnFiltersChange={(f) =>
-          setConfig((p) => ({ ...p, columnFilters: f }))
-        }
+        onColumnFiltersChange={(f) => setConfig((p) => ({ ...p, columnFilters: f }))}
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
         grouping={config.grouping}
@@ -398,13 +382,13 @@ export function AnlagenPage() {
         message={
           bulkConfirm && bulkConfirm.length === 1 ? (
             <span>
-              Anlage <strong>{bulkConfirm[0]?.bezeichnung}</strong> wirklich
-              löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+              Anlage <strong>{bulkConfirm[0]?.bezeichnung}</strong> wirklich löschen?
+              Diese Aktion kann nicht rückgängig gemacht werden.
             </span>
           ) : (
             <span>
-              {bulkConfirm?.length ?? 0} ausgewählte Anlagen werden
-              unwiderruflich gelöscht.
+              {bulkConfirm?.length ?? 0} ausgewählte Anlagen werden unwiderruflich
+              gelöscht.
             </span>
           )
         }
@@ -429,38 +413,28 @@ export function AnlagenPage() {
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm text-zinc-300">
-                  Bezeichnung *
-                </label>
+                <label className="block text-sm text-zinc-300">Bezeichnung *</label>
                 <input
                   type="text"
                   value={form.bezeichnung}
-                  onChange={(e) =>
-                    setForm({ ...form, bezeichnung: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, bezeichnung: e.target.value })}
                   placeholder="z. B. RLT-03 oder Heizkreis Süd"
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-300">
-                  Beschreibung
-                </label>
+                <label className="block text-sm text-zinc-300">Beschreibung</label>
                 <textarea
                   rows={2}
                   value={form.beschreibung ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, beschreibung: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, beschreibung: e.target.value })}
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-300">
-                    Kategorie
-                  </label>
+                  <label className="block text-sm text-zinc-300">Kategorie</label>
                   <select
                     value={form.kategorie_wert_id ?? ''}
                     onChange={(e) =>
@@ -483,9 +457,7 @@ export function AnlagenPage() {
                   <label className="block text-sm text-zinc-300">Icon</label>
                   <select
                     value={form.icon_name ?? 'Activity'}
-                    onChange={(e) =>
-                      setForm({ ...form, icon_name: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, icon_name: e.target.value })}
                     className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   >
                     {Object.keys(ICON_MAP).map((k) => (
@@ -518,9 +490,7 @@ export function AnlagenPage() {
                   id="aktiv"
                   type="checkbox"
                   checked={form.aktiv ?? true}
-                  onChange={(e) =>
-                    setForm({ ...form, aktiv: e.target.checked })
-                  }
+                  onChange={(e) => setForm({ ...form, aktiv: e.target.checked })}
                   className="accent-emerald-500"
                 />
                 <label htmlFor="aktiv" className="text-sm text-zinc-300">
@@ -540,9 +510,7 @@ export function AnlagenPage() {
                 type="button"
                 onClick={submit}
                 disabled={
-                  !form.bezeichnung.trim() ||
-                  create.isPending ||
-                  update.isPending
+                  !form.bezeichnung.trim() || create.isPending || update.isPending
                 }
                 className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-500"
               >
@@ -551,6 +519,13 @@ export function AnlagenPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {modulStandard && openAnlageId && (
+        <AnlageDetailOverlay
+          anlageId={openAnlageId}
+          onClose={() => setOpenAnlageId(null)}
+        />
       )}
     </div>
   );
