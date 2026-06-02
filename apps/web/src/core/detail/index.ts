@@ -1,0 +1,10 @@
+export { DetailOverlay } from './DetailOverlay';
+export type { DetailOverlayProps } from './DetailOverlay';
+export { DetailHeader } from './DetailHeader';
+export type { DetailHeaderProps, DetailBadge, DetailChip } from './DetailHeader';
+export { DetailBlock } from './DetailBlock';
+export type { DetailBlockProps } from './DetailBlock';
+export { DetailRegions } from './DetailRegions';
+export type { DetailRegionsProps } from './DetailRegions';
+export { RelationList } from './RelationList';
+export type { RelationListProps, RelationItem } from './RelationList';
