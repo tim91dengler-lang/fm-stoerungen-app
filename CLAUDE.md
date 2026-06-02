@@ -52,9 +52,14 @@ Alembic. Migrationen müssen **idempotent** sein (siehe `track3-recovery`-Patter
 
 ## 4. UI-Konvention für Listen-/Übersichtsansichten (verbindlich)
 
+> **Master-Standard (ab 2026-06-02):** Der verbindliche Modul-Aufbau (Liste **und** Detail, Schichten-Modell,
+> Block-Engine, Panel-vs-Seite, Verknüpfungen-als-Listen, „Historie"-Block) steht in
+> `docs/concepts/Konzept_UIUX_MasterLayout_FINAL_2026-06-02.md`. **Bei jedem neuen/geänderten Modul den Skill
+> `modul-standard` nutzen** (Bau-Vorlage + Abnahme-Checkliste). Der Abschnitt hier ist der Listen-Teil davon.
+
 Jede Listen-/Übersichtsansicht muss diese vier Eigenschaften haben:
 
-1. **Kachel- + Listenansicht** umschaltbar über `ViewModeToggle`-Komponente (oben rechts neben Aktions-Buttons). Default je View frei wählbar.
+1. **Ausschließlich Listenansicht** (Tim 2026-06-02: keine Kachel-/Karten-Ansicht, kein ViewModeToggle).
 2. **Gesamtfilter / Volltextsuche** oberhalb der Liste, durchsucht alle relevanten Felder einschließlich verknüpfter Stammdaten.
 3. **Spaltenfilter** direkt unter Spaltenüberschriften, pro Spalte ein passender Filter (Text / Number ≥ / Select / Toggle). „Spalten-Filter zurücksetzen" nur sichtbar wenn aktiv. Im Ticket-Pool dynamisch (Filter rendert sich basierend auf sichtbaren Spalten).
 4. **Spalten ein-/ausblendbar** — Spalten-Auswahl-Menü mit Checkbox-Liste und Default-Sichtbarkeiten. Bei neuen Views: `SPALTEN_DEFINITION` mit `default: true/false` je Spalte.
