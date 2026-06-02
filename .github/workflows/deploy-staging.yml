@@ -56,6 +56,10 @@ jobs:
         with:
           context: apps/web
           push: true
+          # Neues Modul-Layout (Master-Standard) auf Staging standardmäßig AN,
+          # damit Tim das Referenz-Modul ohne Umschalten sieht. Code-Default bleibt AUS.
+          build-args: |
+            VITE_MODUL_STANDARD=1
           tags: |
             ${{ env.IMAGE_WEB }}:${{ steps.meta.outputs.tag }}
             ${{ env.IMAGE_WEB }}:staging
