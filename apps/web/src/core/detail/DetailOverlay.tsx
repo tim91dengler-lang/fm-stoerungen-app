@@ -33,13 +33,13 @@ export function DetailOverlay({
 
   if (!open) return null;
   const maxW = width === 'page' ? 'max-w-6xl' : 'max-w-3xl';
-  const z = level === 2 ? 'z-30' : 'z-20';
+  const z = level === 2 ? 'z-50' : 'z-40';
   return (
     <div
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      className={`absolute inset-0 ${z} flex items-start justify-center bg-black/60 p-4 sm:p-8`}
+      className={`fixed inset-0 ${z} flex items-start justify-center bg-black/60 p-4 sm:p-8`}
     >
       <div
         onClick={(e) => e.stopPropagation()}

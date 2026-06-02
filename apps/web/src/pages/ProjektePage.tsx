@@ -22,6 +22,8 @@ import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import { isModulStandard } from '../core/featureFlags';
+import { ProjektDetailOverlay } from '../components/projekt/ProjektDetailOverlay';
 import { ProjektModal } from '../components/ProjektModal';
 
 interface ViewConfig {
@@ -138,6 +140,10 @@ export function ProjektePage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  // Master-Layout-Standard (Slice 1, hinter Flag): Klick öffnet zentriertes
+  // Detail-Overlay statt Navigation zur Detail-Seite.
+  const modulStandard = isModulStandard();
+  const [openProjektId, setOpenProjektId] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<ProjektRead[] | null>(null);
   const [bulkStatusModal, setBulkStatusModal] = useState<{
     rows: ProjektRead[];
@@ -290,12 +296,22 @@ export function ProjektePage() {
           const p = ctx.row.original;
           return (
             <div>
-              <Link
-                to={`/projekte/${p.id}`}
-                className="font-medium text-zinc-100 hover:text-emerald-300"
-              >
-                {p.name}
-              </Link>
+              {modulStandard ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenProjektId(p.id)}
+                  className="text-left font-medium text-zinc-100 hover:text-emerald-300"
+                >
+                  {p.name}
+                </button>
+              ) : (
+                <Link
+                  to={`/projekte/${p.id}`}
+                  className="font-medium text-zinc-100 hover:text-emerald-300"
+                >
+                  {p.name}
+                </Link>
+              )}
               {p.beschreibung && (
                 <div className="text-xs text-zinc-500 line-clamp-1">
                   {p.beschreibung}
@@ -405,7 +421,7 @@ export function ProjektePage() {
         ),
       },
     ],
-    [projekttypSlugOptions, statusSlugOptions],
+    [projekttypSlugOptions, statusSlugOptions, modulStandard],
   );
 
   function confirmBulkDelete() {
@@ -635,6 +651,13 @@ export function ProjektePage() {
         onSubmit={handleModalSubmit}
         isPending={create.isPending || update.isPending}
       />
+
+      {modulStandard && openProjektId && (
+        <ProjektDetailOverlay
+          projektId={openProjektId}
+          onClose={() => setOpenProjektId(null)}
+        />
+      )}
     </div>
   );
 }
