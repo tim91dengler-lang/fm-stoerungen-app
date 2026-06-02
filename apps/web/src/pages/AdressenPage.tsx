@@ -10,6 +10,8 @@ import {
 } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
 import { adresseApi } from '../api/endpoints';
+import { isModulStandard } from '../core/featureFlags';
+import { AdresseDetailOverlay } from '../components/adresse/AdresseDetailOverlay';
 import type {
   AdresseCreate,
   AdresseRead,
@@ -57,6 +59,8 @@ export function AdressenPage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const modulStandard = isModulStandard();
+  const [openAdresseId, setOpenAdresseId] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<AdresseRead[] | null>(null);
   const qc = useQueryClient();
 
@@ -136,7 +140,9 @@ export function AdressenPage() {
       longitude: adresse.longitude,
       geocode_source: adresse.geocode_source,
     });
-    setSuggestQuery(`${adresse.strasse}${adresse.hausnummer ? ' ' + adresse.hausnummer : ''}`);
+    setSuggestQuery(
+      `${adresse.strasse}${adresse.hausnummer ? ' ' + adresse.hausnummer : ''}`,
+    );
     setShowModal(true);
   }
 
@@ -182,7 +188,7 @@ export function AdressenPage() {
           return (
             <span
               className="cursor-pointer font-medium text-zinc-100 hover:text-emerald-300"
-              onClick={() => openEdit(a)}
+              onClick={() => (modulStandard ? setOpenAdresseId(a.id) : openEdit(a))}
             >
               {a.strasse}
               {a.hausnummer ? ` ${a.hausnummer}` : ''}
@@ -227,7 +233,7 @@ export function AdressenPage() {
         },
       },
     ],
-    [],
+    [modulStandard],
   );
 
   function confirmBulkDelete() {
@@ -270,9 +276,7 @@ export function AdressenPage() {
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
         columnFilters={config.columnFilters}
-        onColumnFiltersChange={(f) =>
-          setConfig((p) => ({ ...p, columnFilters: f }))
-        }
+        onColumnFiltersChange={(f) => setConfig((p) => ({ ...p, columnFilters: f }))}
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
         grouping={config.grouping}
@@ -332,13 +336,13 @@ export function AdressenPage() {
         message={
           bulkConfirm && bulkConfirm.length === 1 ? (
             <span>
-              Adresse <strong>{bulkConfirm[0]?.strasse}</strong> wirklich
-              löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+              Adresse <strong>{bulkConfirm[0]?.strasse}</strong> wirklich löschen? Diese
+              Aktion kann nicht rückgängig gemacht werden.
             </span>
           ) : (
             <span>
-              {bulkConfirm?.length ?? 0} ausgewählte Adressen werden
-              unwiderruflich gelöscht.
+              {bulkConfirm?.length ?? 0} ausgewählte Adressen werden unwiderruflich
+              gelöscht.
             </span>
           )
         }
@@ -393,9 +397,7 @@ export function AdressenPage() {
                   <input
                     type="text"
                     value={form.strasse}
-                    onChange={(e) =>
-                      setForm({ ...form, strasse: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, strasse: e.target.value })}
                     className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
@@ -406,9 +408,7 @@ export function AdressenPage() {
                   <input
                     type="text"
                     value={form.hausnummer ?? ''}
-                    onChange={(e) =>
-                      setForm({ ...form, hausnummer: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, hausnummer: e.target.value })}
                     className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                   />
                 </div>
@@ -421,9 +421,7 @@ export function AdressenPage() {
                 <input
                   type="text"
                   value={form.adresszusatz ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, adresszusatz: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, adresszusatz: e.target.value })}
                   className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
@@ -474,15 +472,13 @@ export function AdressenPage() {
                 </label>
                 <textarea
                   value={form.bemerkung ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, bemerkung: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, bemerkung: e.target.value })}
                   rows={2}
                   className="w-full rounded-md border border-zinc-700 px-3 py-2 text-sm"
                 />
               </div>
 
-              {(form.latitude !== null && form.latitude !== undefined) && (
+              {form.latitude !== null && form.latitude !== undefined && (
                 <div className="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                   Geocodiert via {form.geocode_source ?? 'photon'} —{' '}
                   {form.latitude?.toFixed(4)}, {form.longitude?.toFixed(4)}
@@ -509,6 +505,13 @@ export function AdressenPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {modulStandard && openAdresseId && (
+        <AdresseDetailOverlay
+          adresseId={openAdresseId}
+          onClose={() => setOpenAdresseId(null)}
+        />
       )}
     </div>
   );
