@@ -27,21 +27,28 @@ Liste (Basis) → Detail (zentriertes Overlay über der Liste) → Verknüpfte L
 - **Detail:** `DetailOverlay` (zentriert) + generische **Block-Engine** (generalisiert aus der Stufe-C
   `TicketFormEngine`): Regionen → Blöcke → Felder aus Katalog + Default-Layout, Renderer-Registry je Feld,
   Auffang-Block „Weitere".
-- **Detail-Navigation:** Body in `DetailNavProvider` + `DetailScroll` wickeln (aus `core/detail`) — liefert
-  Sprung-Feedback (Block auf + Flash) + Scroll-Spy (Aktiv-Chip). Sonst springen die Chips „tot".
-- **Verknüpfungen:** `RelationList` — Vorschau (Zeilen via `onItemClick` klickbar → Ziel-Detail) +
-  „in Listenansicht öffnen" → `PowerListenView` vorgefiltert.
+- **Detail-Navigation = Reiter:** `DetailTabs` (aus `core/detail`) — Reiter-Leiste oben (immer sichtbar) +
+  Panel; rendert nur den **aktiven** Reiter (leichtes DOM). „Übersicht" + eigene Reiter nur für große
+  Feld-Kategorien + Verknüpfungs-/Chat-Reiter.
+- **Verknüpfungen = Inline-Reiter:** `RelationListView` — volle, vorgefilterte Liste + Suche **inline**,
+  **lazy** (Daten erst beim Öffnen; Zähler aus dem Datensatz). Zeilen via `onItemClick` → Ziel-Detail.
+  Kein gestapeltes Fenster, kein „zurück".
+- **Optional** für einen einzelnen sehr langen Reiter: `DetailNavProvider` + `DetailScroll` (In-Reiter-Sprung
+  mit Flash + Scroll-Spy). Nicht die Top-Navigation.
 
 ## Pflicht-Regeln
 1. **Liste** = `PowerListenView` mit ALLEM: Volltextsuche · Spaltenfilter (Typ passend) · Multi-Sort
    (Shift, 3-Klick-Reset) · Gruppierung · gespeicherte Ansichten · Bulk-Spalte · Spalten ein/aus ·
    Treffer-Zähler · Power-Layout (Drag-Reorder). **Ausschließlich Listen — keine Kachel-/Karten-Ansicht.**
 2. **Detail** = zentriertes Overlay über der sichtbaren Liste; Kopf (Identität + Status-Badges) +
-   Sprung-Chips + zwei Regionen (links primär 3/5, rechts Kontext 2/5) + Block-Accordions mit
-   progressiver Offenlegung (häufig offen, selten/Historie zu). Mobil: einspaltig.
+   **Reiter-Leiste** (`DetailTabs`, immer sichtbar). Reiter „Übersicht" = zwei Regionen (links primär 3/5,
+   rechts Kontext 2/5) + Block-Accordions mit progressiver Offenlegung (häufig offen, selten/Historie zu).
+   Mobil: Reiter horizontal scrollbar, „Übersicht" einspaltig.
 3. **Panel vs. Seite** = Overlay-Breite: flacher Datensatz → Panel (max-w-3xl); eigene Hierarchie/
-   Beziehungs-Welt → Seite (max-w-6xl, ggf. Tree-Slot links). Beide rendern denselben Block-Inhalt.
-4. **Tabs nie** zum Zerschneiden eines Formulars. Verknüpfungen = Ebene-3-Liste, nicht Tab-Mini-Liste.
+   Beziehungs-Welt → Seite (max-w-6xl, ggf. Tree-Slot links). Beide rendern denselben Reiter-/Block-Inhalt.
+4. **Reiter (Tabs) sind die Top-Navigation** (Tim 2026-06-02). Formular NICHT in viele Mini-Reiter
+   zerschneiden — eine Feld-Kategorie wird erst ein eigener Reiter, wenn sie groß genug ist; sonst bleibt
+   sie in „Übersicht". Verknüpfungen = Inline-Reiter mit voller Liste (nicht Tab-Mini-Liste, nicht gestapeltes Fenster).
 5. **„Historie"-Block** (rechts, zu) an JEDEM Datensatz: Angelegt am · Zuletzt geändert am · Interne ID.
 6. **Keine erfundenen Felder** — nur Reales aus dem Datenmodell. Vorschläge als „(Vorschlag)" markieren
    und mit Tim klären, NICHT einfach bauen.
@@ -50,13 +57,10 @@ Liste (Basis) → Detail (zentriertes Overlay über der Liste) → Verknüpfte L
 - [ ] Liste = `PowerListenView` mit allen Funktionen (Regel 1).
 - [ ] `PageShell` (richtige Variante) + `PageHeader` (Standard-Größe).
 - [ ] Detail = zentriertes Overlay über sichtbarer Liste; Esc/✕ → Liste.
-- [ ] Block-Engine: Regionen links/rechts, progressive Offenlegung.
-- [ ] Sprung-Chips (Feld → scroll, Verknüpfung → Liste); jeder Block hat stabilen `blockKey`, jeder Chip referenziert genau einen `blockKey`/`activeKey`.
-- [ ] Body in `DetailNavProvider` + `DetailScroll` → Chip-Klick gibt sichtbares Feedback (Block auf + Flash + Aktiv-Chip), auch bei 0 px Scroll.
-- [ ] Verknüpfungs-Vorschauzeilen klickbar (`onItemClick`); Block-Köpfe mit Hover.
-- [ ] Verknüpfungen → Ebene-3-`PowerListenView` vorgefiltert (keine Eigenbau-Liste).
-- [ ] „Historie"-Block vorhanden, zugeklappt.
-- [ ] Mobil einspaltig, große Touch-Ziele.
+- [ ] `DetailTabs`-Reiter oben: „Übersicht" + eigene Reiter nur für große Kategorien + Verknüpfungs-Reiter; aktiver Reiter markiert, Klick schaltet um; nur aktiver Reiter gemountet.
+- [ ] „Übersicht" = Block-Engine: Regionen links/rechts, progressive Offenlegung, inkl. zugeklapptem „Historie"-Block (Angelegt/Geändert/ID).
+- [ ] Verknüpfungen = Inline-Reiter (`RelationListView`): volle vorgefilterte Liste + Suche, lazy (Daten erst beim Öffnen, Zähler aus Datensatz), Zeilen klickbar (`onItemClick`). Kein „zurück", kein gestapeltes Fenster.
+- [ ] Mobil: Reiter-Leiste scrollbar, „Übersicht" einspaltig, große Touch-Ziele.
 - [ ] Block-Layout entspricht der Modul-Skizze im Konzept §6 (oder mit Tim abgestimmt + dort nachgezogen).
 - [ ] Smoke-Test: gespeicherte Ansichten/Spalten-State bricht nicht (Memory `tanstack-grouping-loop`).
 - [ ] Keine neuen Felder ohne Freigabe.

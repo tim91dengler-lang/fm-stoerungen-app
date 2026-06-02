@@ -22,12 +22,13 @@ wird mehr von Hand „anders" gebaut.
 1. **Eine Engine, je Modul nur Daten.** Liste = `PowerListenView`. Detail = generische Block-Engine.
    Ein Modul liefert: Spalten-Definition · Feld-Katalog · Default-Block-Layout. Mehr nicht.
 2. **Ebene auf Ebene.** Die **Liste ist immer die Basis**. Das Detail liegt **zentriert darüber**
-   (Liste bleibt sichtbar). Verknüpfungen öffnen die **nächste Ebene** (wieder eine Liste). Zurück =
-   Ebene schließen.
+   (Liste bleibt sichtbar). Im Detail wechselt man über **Reiter (Tabs)** zwischen „Übersicht" und den
+   Verknüpfungs-Listen — **inline im selben Overlay** (§5.2/5.4/5.5), nicht als gestapeltes Fenster.
 3. **Progressive Offenlegung.** Beim Öffnen ist nur das Wichtige offen, Seltenes/Kontext/Historie
    zugeklappt → bleibt schlank, egal wie viele Felder dazukommen.
 4. **Verknüpfungen sind echte Listen, keine Spielzeug-Listen.** Jede n:m-/1:n-Beziehung (z. B.
-   „verknüpfte Tickets") öffnet die **vollwertige** `PowerListenView` mit allen Funktionen, vorgefiltert.
+   „verknüpfte Tickets") ist ein **Reiter mit der vollwertigen** `PowerListenView` (alle Funktionen,
+   vorgefiltert), **lazy** geladen.
 5. **Keine erfundenen Felder.** Es wird nur gebaut, was im Datenmodell existiert. Vorschläge für neue
    Felder werden im Konzept als **(Vorschlag)** markiert und brauchen Tims Freigabe.
 
@@ -37,13 +38,13 @@ wird mehr von Hand „anders" gebaut.
    Ebene 1: MODUL-LISTE  (Basis — PowerListenView, volle Funktionen)
         │  Klick auf Zeile
         ▼
-   Ebene 2: DATENSATZ-DETAIL  (zentriertes Overlay über der Liste, Block-Engine)
-        │  Klick auf einen Verknüpfungs-Block / Chip „↗"
+   Ebene 2: DATENSATZ-DETAIL  (zentriertes Overlay über der Liste)
+        │  Reiter-Leiste: [Übersicht] [Objekte] [Tickets] …
+        │  Reiter „Übersicht" = Block-Engine (Felder)
+        │  Verknüpfungs-Reiter = vorgefilterte PowerListenView INLINE (lazy)
+        │  Klick auf Listenzeile → Detail dieses Datensatzes …
         ▼
-   Ebene 3: VERKNÜPFTE LISTE  (wieder PowerListenView, vorgefiltert)
-        │  Klick auf Zeile → Detail dieses Datensatzes …
-        ▼
-   (rekursiv weiter)        ✕ / Esc / „← zurück"  schließt je eine Ebene
+   (rekursiv weiter)        ✕ / Esc schließt das Overlay
 ```
 
 ## 4. Bausteine (alle in `apps/web/src/core/` — FM-frei, Plattform-Anker-konform)
@@ -55,8 +56,10 @@ wird mehr von Hand „anders" gebaut.
 | `PowerListenView` | **existiert** — bleibt die einzige Listen-Engine (s. §5.1) |
 | `useListenState` | kapselt ViewConfig/Default + Handler + Persistenz (entfernt das 9-fach-Boilerplate) |
 | `DetailOverlay` | zentriertes Overlay über der Liste (Backdrop, Esc/✕, max-h 92vh); Breite: `panel`≈max-w-3xl · `page`≈max-w-6xl |
+| `DetailTabs` | **Reiter-Leiste + Panel** (§5.2): „Übersicht" + Feld-/Verknüpfungs-Reiter; rendert nur den aktiven Reiter (leichtes DOM), a11y-Rollen, mobil scrollbar |
 | `BlockEngine` | **generalisiert aus der Stufe-C `TicketFormEngine`** — rendert Regionen→Blöcke→Felder aus Katalog+Layout, Renderer-Registry je Feld; Auffang-Block „Weitere" |
-| `RelationList` | Verknüpfungs-Block: Vorschau (3–5) + Zähler + „in Listenansicht öffnen" → öffnet Ebene 3 = `PowerListenView` vorgefiltert |
+| `RelationListView` | Verknüpfungs-**Reiter**: vorgefilterte Liste (`PowerListenView`-Funktionsumfang) + Suche, **inline**, lazy. (Optional `RelationList`-Vorschau, falls eine Beziehung als Block in „Übersicht" gezeigt wird.) |
+| `DetailNavProvider`/`DetailScroll` | optionaler **In-Reiter-Sprung** (Chips + Flash + Scroll-Spy) für einen einzelnen sehr langen Reiter |
 
 ## 5. Verbindliche Regeln
 
@@ -67,15 +70,37 @@ Power-Layout): **Volltextsuche · Spaltenfilter (Typ passend zum Feld) · Sortie
 ein/ausblenden (SPALTEN_DEFINITION) · Treffer-Zähler (gefiltert/gesamt) · Power-Layout (Drag-Reorder)**.
 **Keine Kachel-/Karten-Ansicht — ausschließlich Listen (Tim 2026-06-02).** Kein ViewModeToggle.
 
-### 5.2 Detail (Ebene 2) — Aufbau
+### 5.2 Detail (Ebene 2) — Aufbau — **Reiter-Modell** (verbindlich ab 2026-06-02, Tim-Entscheidung)
+
+> **Wechsel zum Reiter-Modell (Tim, 2026-06-02):** Die Sprung-Chips (nur Scroll/Highlight) wurden als
+> „überflüssig, sobald der Bereich eh sichtbar ist" empfunden. Stattdessen sind die obersten Bereiche
+> jetzt **echte Reiter (Tabs)**, zwischen denen man umschaltet — einheitlich, mobil-tauglich, skaliert
+> mit dem Wachstum. Das ersetzt die alte Regel „keine Tabs" (§5.4 neu).
+
 - Öffnet als **zentriertes Overlay** über der sichtbaren Liste. ✕ / Esc → zurück zur Liste.
 - **Kopf:** Identität (Name/Nummer + Status-Badges) + Aktion „schließen".
-- **Sprung-Chips** unter dem Kopf: Feld-Block → scrollt zur Sektion; Verknüpfungs-Block → öffnet Liste (Ebene 3).
-  - **Pflicht-Verhalten (verbindlich, ergänzt 2026-06-02 nach Tim-Feedback):** Jeder Chip-Klick muss **sichtbares Feedback** geben — auch wenn der Inhalt komplett ins Fenster passt und physisch 0 px gescrollt wird. Mechanik in `core/detail` (`DetailNavProvider`/`DetailScroll`): (a) Zielblock **aufklappen** + **kurzer Flash** (`animate-detail-flash`), (b) **Scroll-Spy** (IntersectionObserver, root = innerer Scroll-Container) markiert den Chip des sichtbaren Blocks (`aria-current`). Der Scroll läuft gegen den **inneren Container-Ref**, nie gegen das Fenster. Verknüpfungs-Chips öffnen weiter die Liste, leuchten aber via `activeKey` mit.
-  - **Klickbarkeit:** Verknüpfungs-Vorschauzeilen sind **klickbar** (`onItemClick` → Ziel-Detail), Block-Köpfe haben flächigen Hover. Read-only-Felder (bis Inline-Editing live ist) zeigen dezenten Border-Hover + `title="Bearbeiten folgt"` — **kein** Cursor-pointer/Stift, der „jetzt editierbar" verspricht.
-- **Zwei Regionen:** **links = primär/handlungsrelevant (3/5)** · **rechts = Kontext/Status/Verknüpfungen/Chat (2/5)**.
-- **Blöcke = Accordions** mit `default_offen`: häufig offen, selten/Historie zu (progressive Offenlegung).
-- **Mobil:** einspaltiger Stapel (`singleColumn`), Links/Rechts fällt weg, große Touch-Ziele.
+- **Reiter-Leiste** unter dem Kopf, **immer sichtbar**. Klick auf einen Reiter **schaltet den Inhalt um**
+  (eigene „Maske" in derselben Overlay-Fläche), aktiver Reiter ist markiert. Mobil: horizontal scrollbar
+  (durchtippen). Mechanik einmal in `core/detail` (`DetailTabs`), Module liefern nur die Reiter-Definition.
+- **Reiter-Arten:**
+  1. **„Übersicht"** (immer erster Reiter): die Kernfelder als Block-Sektionen in **zwei Regionen**
+     (links primär 3/5, rechts Kontext 2/5; mobil einspaltig), Accordions mit progressiver Offenlegung
+     (häufig offen, selten/Historie zu). **„Historie"** bleibt hier ein zugeklappter Block.
+  2. **Feld-Reiter** für eine Kategorie **nur, wenn sie groß genug ist** (Tim 2026-06-02). Dünne
+     Kategorien bleiben in „Übersicht" bzw. werden ausgeblendet — **kein** Zerschneiden des Formulars in
+     viele Mini-Reiter.
+  3. **Verknüpfungs-/Chat-Reiter** (Objekte, Tickets, Dokumente, Chat …): volle, vorgefilterte Liste
+     **inline** (§5.5).
+- **Lazy + leichtes DOM (verbindlich):** Nur der **aktive** Reiter ist gemountet; ein Verknüpfungs-Reiter
+  lädt seine Daten **erst beim ersten Öffnen** (React-Query gecached, Re-Open sofort). Zähler am Reiter
+  kommen aus dem Datensatz (z. B. `ticket_count`), ohne die Liste vorab zu laden.
+- **Optionaler In-Reiter-Sprung:** Für einen **einzelnen, sehr langen** Reiter (z. B. eine riesige
+  „Übersicht") können die Sprung-Chips aus `core/detail` (`DetailNavProvider`/`DetailScroll`:
+  Aufklappen + Flash + Scroll-Spy `aria-current`) **innerhalb** des Reiters genutzt werden. Das ist
+  ein Hilfsmittel im Reiter, nicht die Top-Navigation.
+- **Klickbarkeit:** Verknüpfungs-Listenzeilen sind **klickbar** (`onItemClick` → Ziel-Detail), Block-Köpfe
+  haben flächigen Hover. Read-only-Felder (bis Inline-Editing live ist) zeigen dezenten Border-Hover +
+  `title="Bearbeiten folgt"` — **kein** Cursor-pointer/Stift, der „jetzt editierbar" verspricht.
 
 ### 5.3 Panel vs. eigene Seite (= Overlay-Breite)
 **Eine Frage:** „Hat der Datensatz eine eigene Navigations-/Hierarchie-Innenwelt?"
@@ -83,13 +108,22 @@ ein/ausblenden (SPALTEN_DEFINITION) · Treffer-Zähler (gefiltert/gesamt) · Pow
 - **Ja** (Baum / viele Beziehungs-Listen) → **Seite** (breites Overlay, ggf. mit Tree links). → Objekt, Geschäftspartner.
 - **Beide rendern denselben Block-Engine-Inhalt** — der Unterschied ist nur die Breite + ggf. ein Tree-Slot.
 
-### 5.4 Tab vs. Sektion
-- **Default = scrollende Block-Sektionen** (Accordion). Niemals ein Formular mit Tabs zerschneiden.
-- **Echte Tabs/Listen-Ebene** nur für **eigenständige Verknüpfungs-Listen** (Partner→Objekte/Projekte/Tickets) oder einen eigenen Modus (Chat) — realisiert als Ebene-3-Liste bzw. fester Slot.
+### 5.4 Reiter (Tabs) vs. Sektion — **neu (Tim 2026-06-02)**
+- **Reiter (Tabs) sind das Top-Level-Navigationsmuster** des Details: „Übersicht" + eigene Reiter für
+  **große** Feld-Kategorien + **Verknüpfungs-/Chat-Reiter**. Immer alle oben sichtbar, Wechsel = klicken.
+  Begründung: einheitlich (Felder wie Verknüpfungen gleich erreichbar), mobil-tauglich, skaliert mit Wachstum.
+- **Innerhalb** der „Übersicht" bleiben **scrollende Block-Sektionen** (Accordion). Ein Formular wird
+  **nicht** in viele Mini-Reiter zerschnitten — eine Kategorie wird **erst dann** ein eigener Reiter, wenn
+  sie für sich genommen groß/eigenständig genug ist; sonst bleibt sie in „Übersicht" oder ausgeblendet.
 
-### 5.5 Verknüpfungen
-Relations-Block zeigt **Vorschau + Zähler**; „in Listenansicht öffnen" → **Ebene-3-`PowerListenView`**,
-vorgefiltert auf den Datensatz, mit **vollem** Funktionsumfang (§5.1). Skaliert auf beliebig viele Beziehungen.
+### 5.5 Verknüpfungen — **Inline-Reiter (neu)**
+Jede n:m-/1:n-Beziehung (Objekte, Tickets, Dokumente …) ist ein **eigener Reiter** mit der **vollwertigen,
+vorgefilterten Liste** (`PowerListenView`-Funktionsumfang §5.1) **inline im selben Overlay** — kein
+gestapeltes Fenster, kein „zurück zum Detail" (man wechselt über die oben sichtbaren Reiter). Skaliert auf
+beliebig viele Beziehungen. **Performance** ist dabei **kein** Argument gegen „inline": Reiter vs. Fenster
+rendern dieselbe Liste — die Last hängt allein an der **Lade-Strategie** (§5.2 Lazy: nur aktiver Reiter
+gemountet, Daten erst beim Öffnen, server-/seitenweises Laden, Virtualisierung nur falls je nötig). Verknüpfungen
+sind zudem auf den Datensatz **vorgefiltert** (= naturgemäß kleine Teilmenge).
 
 ### 5.6 „Historie"-Block (Pflicht je Datensatz)
 Jeder Datensatz hat **rechts, zugeklappt** den Block **„Historie"**: `Angelegt am` · `Zuletzt geändert am`
@@ -142,17 +176,19 @@ R (zu)    Verknüpft 🔗           Objekte · Projekte · Tickets · Dokumente 
 R (zu)    Historie               Erstellt · Geändert · ID
 ```
 
-### 6.4 Projekt — **Panel**
+### 6.4 Projekt — **Panel** · Reiter: **[Übersicht] [Objekte·N] [Tickets·N]**
 Identität: Projektname · Projekttyp-Badge · Status-Badge
 ```
-L (offen) Stammdaten             Projektname · Beschreibung
-L (offen) Objekte 🔗             → Objekt-Liste
-L (offen) Tickets im Projekt 🔗  → vorgefilterte Ticket-Liste
-L (zu)    Notizen                Notiz
-R (offen) Klassifizierung        Projekttyp · Status
-R (offen) Verantwortung & Termine Verantwortlich · Start · Ende
-R (zu)    Historie               Ticket-Anzahl · Erstellt · Geändert · ID
+Reiter „Übersicht" (zwei Regionen):
+  L (offen) Stammdaten             Projektname · Beschreibung
+  L (zu)    Notizen                Notiz
+  R (offen) Klassifizierung        Projekttyp · Status
+  R (offen) Verantwortung & Termine Verantwortlich · Start · Ende
+  R (zu)    Historie               Ticket-Anzahl · Erstellt · Geändert · ID
+Reiter „Objekte" 🔗   → vorgefilterte Objekt-Liste, inline, lazy (Zähler aus objekte.length)
+Reiter „Tickets" 🔗   → vorgefilterte Ticket-Liste, inline, lazy (Zähler aus ticket_count)
 ```
+(Keine eigenen Feld-Reiter für Klassifizierung/Termine — zu dünn, bleiben in „Übersicht"; §5.2/2.)
 
 ### 6.5 Adresse — **Panel, bewusst schlank** *(Tim: „nur die Anschrift")*
 Identität: einzeilige Anschrift
@@ -194,13 +230,11 @@ R (zu)    Historie                  Erstellt · Geändert · ID
 - [ ] Liste über `PowerListenView` mit **allen** Funktionen aus §5.1.
 - [ ] Seite mit `PageShell` (richtige Variante) + `PageHeader` (Standard-Größe).
 - [ ] Detail = **zentriertes Overlay** über sichtbarer Liste; Esc/✕ → Liste.
-- [ ] Detail via **Block-Engine**: Regionen links/rechts, progressive Offenlegung (häufig offen, selten zu).
-- [ ] **Sprung-Chips** vorhanden (Feld=scroll, Verknüpfung=Liste); **jeder Block hat stabilen `blockKey`, jeder Chip referenziert genau einen `blockKey`/`activeKey`**.
-- [ ] **Chip-Klick gibt sichtbares Feedback** (Block auf + Flash + Aktiv-Chip) — **auch wenn 0 px gescrollt wird**. Detail-Body in `DetailNavProvider` + `DetailScroll` gewickelt.
-- [ ] **Verknüpfungs-Vorschauzeilen klickbar** (`onItemClick` → Ziel-Detail); Block-Köpfe mit Hover.
-- [ ] **Verknüpfungen** öffnen Ebene-3-`PowerListenView` (vorgefiltert, volle Funktionen) — keine Eigenbau-Liste.
-- [ ] **„Historie"-Block** vorhanden (Angelegt/Geändert/ID), zugeklappt.
-- [ ] **Mobil**: einspaltig, große Touch-Ziele, kein horizontaler Tab-Stress.
+- [ ] **Reiter-Leiste** (`DetailTabs`) oben, immer sichtbar: **„Übersicht"** + eigene Reiter nur für große Feld-Kategorien + **Verknüpfungs-/Chat-Reiter**. Aktiver Reiter markiert, Klick schaltet um.
+- [ ] **„Übersicht"** via **Block-Engine**: Regionen links/rechts, progressive Offenlegung (häufig offen, selten zu), inkl. zugeklapptem **„Historie"**-Block (Angelegt/Geändert/ID).
+- [ ] **Verknüpfungen = Inline-Reiter** mit voller, vorgefilterter Liste (`PowerListenView`-Funktionsumfang) + Suche — **kein** gestapeltes Fenster, **kein** „zurück". Listenzeilen klickbar (`onItemClick` → Ziel-Detail).
+- [ ] **Lazy:** nur aktiver Reiter gemountet; Verknüpfungs-Reiter lädt erst beim Öffnen; Reiter-Zähler aus dem Datensatz (nicht die ganze Liste vorab laden).
+- [ ] **Mobil**: Reiter-Leiste horizontal scrollbar, „Übersicht" einspaltig, große Touch-Ziele.
 - [ ] **Panel-vs-Seite** nach §5.3 korrekt gewählt.
 - [ ] **Keine neuen Felder** ohne Freigabe (real vs. (Vorschlag) sauber getrennt).
 - [ ] Smoke-Test je Seite (gespeicherte Ansichten/Spalten-State bricht nicht — Memory `tanstack-grouping-loop`).

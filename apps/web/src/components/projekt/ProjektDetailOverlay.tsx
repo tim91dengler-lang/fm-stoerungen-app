@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
@@ -6,19 +5,20 @@ import { projektApi } from '../../api/endpoints';
 import {
   DetailBlock,
   DetailHeader,
-  DetailNavProvider,
   DetailOverlay,
   DetailRegions,
-  DetailScroll,
-  RelationList,
-  type DetailChip,
+  DetailTabs,
+  RelationListView,
+  type DetailTab,
 } from '../../core/detail';
 
 /**
- * Referenz-Modul (Master-Layout-Standard, Slice 1 PR 2): Projekt-Detail als
- * zentriertes Overlay über der Liste, datengetrieben in Blöcke/Regionen nach
- * Konzept §6.4. Verknüpfungen (Objekte, Tickets) öffnen Ebene 3 = eine
- * vorgefilterte Liste. Hinter Flag `modul_standard`.
+ * Referenz-Modul (Master-Layout-Standard, Reiter-Modell ab 2026-06-02): Projekt-
+ * Detail als zentriertes Overlay über der Liste. Top-Navigation = Reiter
+ * (`DetailTabs`): „Übersicht" (Felder als Block-Engine) + Verknüpfungs-Reiter
+ * „Objekte"/„Tickets" mit voller Liste + Suche **inline** (kein gestapeltes
+ * Fenster). Tickets werden **lazy** geladen (eigene Komponente, nur gemountet,
+ * wenn der Reiter aktiv ist). Hinter Flag `modul_standard`.
  */
 
 // Felder sind aktuell read-only. `hover:border-zinc-600` deutet dezent an, dass
@@ -66,88 +66,101 @@ function Badge({ label }: { label: string }) {
 const grid = 'grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2';
 const fmtDate = (s?: string | null) => (s ? s.slice(0, 10).split('-').reverse().join('.') : null);
 
-/** Ebene-3-Liste (vorgefilterte Verknüpfungs-Liste, durchsuchbar). */
-interface RelRow {
-  id: string;
-  search: string;
-  cells: React.ReactNode[];
+type Projekt = NonNullable<ReturnType<typeof useProjekt>['data']>;
+function useProjekt(projektId: string) {
+  return useQuery({ queryKey: ['projekt', projektId], queryFn: () => projektApi.get(projektId) });
 }
-function RelationOverlayList({
-  title,
-  subtitle,
-  columns,
-  rows,
-  onClose,
-}: {
-  title: string;
-  subtitle: string;
-  columns: string[];
-  rows: RelRow[];
-  onClose: () => void;
-}) {
-  const [q, setQ] = useState('');
-  const filtered = useMemo(
-    () => (q ? rows.filter((r) => r.search.toLowerCase().includes(q.toLowerCase())) : rows),
-    [rows, q],
-  );
+
+/** Reiter „Übersicht" — die Kernfelder als Block-Engine (zwei Regionen). */
+function ProjektUebersicht({ p }: { p: Projekt }) {
   return (
-    <DetailOverlay open onClose={onClose} width="page" level={2}>
-      <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
-        <div>
-          <div className="text-sm font-semibold text-zinc-100">{title}</div>
-          <div className="text-xs text-zinc-500">{subtitle}</div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md px-2 py-1 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          ← zurück zum Detail
-        </button>
-      </div>
-      <div className="flex items-center gap-2 border-b border-zinc-800 px-5 py-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={`🔎 In ${rows.length} Einträgen suchen …`}
-          className="w-full max-w-sm rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300 placeholder-zinc-600"
-        />
-        <span className="ml-auto text-xs text-zinc-500">
-          {filtered.length} / {rows.length}
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-zinc-950 text-left text-[11px] uppercase tracking-wider text-zinc-500">
-            <tr>
-              {columns.map((c) => (
-                <th key={c} className="px-4 py-2 font-medium">
-                  {c}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-zinc-800/60 hover:bg-zinc-800/40">
-                {r.cells.map((cell, i) => (
-                  <td key={i} className="px-4 py-2.5 text-zinc-300">
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-6 text-center text-sm text-zinc-600">
-                  Keine Treffer.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </DetailOverlay>
+    <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <DetailRegions
+        left={
+          <>
+            <DetailBlock title="Stammdaten" blockKey="stammdaten" defaultOpen count={2}>
+              <div className={grid}>
+                <Field label="Projektname" value={p.name} />
+                <Area label="Beschreibung" value={p.beschreibung} />
+              </div>
+            </DetailBlock>
+            <DetailBlock title="Notizen" blockKey="notizen" count={1}>
+              <div className={grid}>
+                <Area label="Notizen" value={p.notizen} />
+              </div>
+            </DetailBlock>
+          </>
+        }
+        right={
+          <>
+            <DetailBlock title="Klassifizierung" blockKey="klassifizierung" defaultOpen count={2}>
+              <div className={grid}>
+                <Field label="Projekttyp" value={<Badge label={p.projekttyp.label} />} />
+                <Field label="Status" value={<Badge label={p.status.label} />} />
+              </div>
+            </DetailBlock>
+            <DetailBlock title="Verantwortung & Termine" blockKey="termine" defaultOpen count={3}>
+              <div className={grid}>
+                <Field label="Verantwortlich" value={p.verantwortlich?.full_name} />
+                <Field label="Start am" value={fmtDate(p.start_am)} />
+                <Field label="Ende am" value={fmtDate(p.ende_am)} />
+              </div>
+            </DetailBlock>
+            <DetailBlock title="Historie" blockKey="historie" count={4}>
+              <div className={grid}>
+                <Field label="Ticket-Anzahl" value={p.ticket_count} />
+                <Field label="Angelegt am" value={fmtDate(p.created_at)} />
+                <Field label="Zuletzt geändert am" value={fmtDate(p.updated_at)} />
+                <Field label="Interne ID" value={p.id} />
+              </div>
+            </DetailBlock>
+          </>
+        }
+      />
+    </div>
+  );
+}
+
+/** Reiter „Tickets" — lazy: lädt erst, wenn der Reiter aktiv (= diese Komponente gemountet) ist. */
+function ProjektTicketsTab({
+  projektId,
+  onRowClick,
+}: {
+  projektId: string;
+  onRowClick: (id: string) => void;
+}) {
+  const ticketsQuery = useQuery({
+    queryKey: ['projekt-tickets', projektId],
+    queryFn: () => projektApi.getTickets(projektId, { limit: 200 }),
+  });
+  const tickets = ticketsQuery.data?.items ?? [];
+  const total = ticketsQuery.data?.total ?? tickets.length;
+  return (
+    <RelationListView
+      loading={ticketsQuery.isLoading}
+      columns={[
+        { key: 'nr', label: 'Nr.' },
+        { key: 'titel', label: 'Titel' },
+        { key: 'status', label: 'Status' },
+        { key: 'prio', label: 'Priorität' },
+      ]}
+      rows={tickets.map((t) => ({
+        id: t.id,
+        search: `${t.nummer} ${t.titel} ${t.status.label}`,
+        cells: [
+          <span key="nr" className="font-medium text-zinc-100">
+            #{t.nummer}
+          </span>,
+          t.titel,
+          <Badge key="status" label={t.status.label} />,
+          <Badge key="prio" label={t.prioritaet.label} />,
+        ],
+      }))}
+      total={total}
+      searchPlaceholder={`🔎 in ${total} Tickets suchen …`}
+      onRowClick={onRowClick}
+      emptyLabel="— keine Tickets im Projekt —"
+    />
   );
 }
 
@@ -159,156 +172,59 @@ export function ProjektDetailOverlay({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const projektQuery = useQuery({
-    queryKey: ['projekt', projektId],
-    queryFn: () => projektApi.get(projektId),
-  });
-  const ticketsQuery = useQuery({
-    queryKey: ['projekt-tickets', projektId],
-    queryFn: () => projektApi.getTickets(projektId, { limit: 200 }),
-  });
-  const [rel, setRel] = useState<null | 'tickets' | 'objekte'>(null);
-
+  const projektQuery = useProjekt(projektId);
   const p = projektQuery.data;
-  const tickets = ticketsQuery.data?.items ?? [];
-  const ticketTotal = ticketsQuery.data?.total ?? tickets.length;
 
-  // Verknüpfungs-Chips öffnen standardkonform die Ebene-3-Liste (§5.2), leuchten
-  // per `activeKey` aber mit, wenn ihr Block im Body sichtbar ist.
-  const chips: DetailChip[] = [
-    { label: 'Stammdaten', blockKey: 'stammdaten' },
-    { label: 'Objekte', isRelation: true, activeKey: 'objekte', onClick: () => setRel('objekte') },
-    { label: 'Tickets', isRelation: true, activeKey: 'tickets', onClick: () => setRel('tickets') },
-    { label: 'Klassifizierung', blockKey: 'klassifizierung' },
-    { label: 'Termine', blockKey: 'termine' },
-  ];
+  const tabs: DetailTab[] = p
+    ? [
+        { key: 'uebersicht', label: 'Übersicht', render: () => <ProjektUebersicht p={p} /> },
+        {
+          key: 'objekte',
+          label: 'Objekte',
+          count: p.objekte.length,
+          isRelation: true,
+          render: () => (
+            <RelationListView
+              columns={[{ key: 'name', label: 'Objekt' }]}
+              rows={p.objekte.map((o) => ({ id: o.id, search: o.name, cells: [o.name] }))}
+              total={p.objekte.length}
+              searchPlaceholder={`🔎 in ${p.objekte.length} Objekten suchen …`}
+              onRowClick={(id) => navigate(`/stammdaten/objekte/${id}`)}
+              emptyLabel="— keine Objekte verknüpft —"
+            />
+          ),
+        },
+        {
+          key: 'tickets',
+          label: 'Tickets',
+          count: p.ticket_count,
+          isRelation: true,
+          render: () => (
+            <ProjektTicketsTab
+              projektId={projektId}
+              onRowClick={(id) => navigate(`/tickets/${id}`)}
+            />
+          ),
+        },
+      ]
+    : [];
 
   return (
-    <DetailOverlay open onClose={onClose} width="panel">
+    <DetailOverlay open onClose={onClose} width="panel" fixedHeight>
       {projektQuery.isLoading || !p ? (
         <div className="p-8 text-sm text-zinc-500">
           {projektQuery.isError ? 'Projekt konnte nicht geladen werden.' : 'Lade Projekt …'}
         </div>
       ) : (
-        <DetailNavProvider>
+        <>
           <DetailHeader
             title={p.name}
             subtitle={`Projekt · ${[fmtDate(p.start_am), fmtDate(p.ende_am)].filter(Boolean).join(' – ') || 'ohne Zeitraum'}`}
             badges={[{ label: p.status.label }, { label: p.projekttyp.label }]}
-            chips={chips}
             onClose={onClose}
           />
-          <DetailScroll ready={!projektQuery.isLoading}>
-            <DetailRegions
-              left={
-                <>
-                  <DetailBlock title="Stammdaten" blockKey="stammdaten" defaultOpen count={2}>
-                    <div className={grid}>
-                      <Field label="Projektname" value={p.name} />
-                      <div className="sm:col-span-2">
-                        <Area label="Beschreibung" value={p.beschreibung} />
-                      </div>
-                    </div>
-                  </DetailBlock>
-                  <DetailBlock
-                    title="Objekte"
-                    blockKey="objekte"
-                    isRelation
-                    defaultOpen
-                    count={p.objekte.length}
-                  >
-                    <RelationList
-                      items={p.objekte.map((o) => ({ id: o.id, label: o.name }))}
-                      total={p.objekte.length}
-                      onOpenList={() => setRel('objekte')}
-                      onItemClick={(id) => navigate(`/stammdaten/objekte/${id}`)}
-                      emptyLabel="— keine Objekte verknüpft —"
-                    />
-                  </DetailBlock>
-                  <DetailBlock
-                    title="Tickets im Projekt"
-                    blockKey="tickets"
-                    isRelation
-                    defaultOpen
-                    count={ticketTotal}
-                  >
-                    <RelationList
-                      items={tickets.map((t) => ({
-                        id: t.id,
-                        label: `#${t.nummer} ${t.titel}`,
-                        trailing: <Badge label={t.status.label} />,
-                      }))}
-                      total={ticketTotal}
-                      onOpenList={() => setRel('tickets')}
-                      onItemClick={(id) => navigate(`/tickets/${id}`)}
-                      emptyLabel="— keine Tickets im Projekt —"
-                    />
-                  </DetailBlock>
-                  <DetailBlock title="Notizen" blockKey="notizen" count={1}>
-                    <div className={grid}>
-                      <Area label="Notizen" value={p.notizen} />
-                    </div>
-                  </DetailBlock>
-                </>
-              }
-              right={
-                <>
-                  <DetailBlock title="Klassifizierung" blockKey="klassifizierung" defaultOpen count={2}>
-                    <div className={grid}>
-                      <Field label="Projekttyp" value={<Badge label={p.projekttyp.label} />} />
-                      <Field label="Status" value={<Badge label={p.status.label} />} />
-                    </div>
-                  </DetailBlock>
-                  <DetailBlock title="Verantwortung & Termine" blockKey="termine" defaultOpen count={3}>
-                    <div className={grid}>
-                      <Field label="Verantwortlich" value={p.verantwortlich?.full_name} />
-                      <Field label="Start am" value={fmtDate(p.start_am)} />
-                      <Field label="Ende am" value={fmtDate(p.ende_am)} />
-                    </div>
-                  </DetailBlock>
-                  <DetailBlock title="Historie" blockKey="historie" count={4}>
-                    <div className={grid}>
-                      <Field label="Ticket-Anzahl" value={p.ticket_count} />
-                      <Field label="Angelegt am" value={fmtDate(p.created_at)} />
-                      <Field label="Zuletzt geändert am" value={fmtDate(p.updated_at)} />
-                      <Field label="Interne ID" value={p.id} />
-                    </div>
-                  </DetailBlock>
-                </>
-              }
-            />
-          </DetailScroll>
-        </DetailNavProvider>
-      )}
-
-      {rel === 'objekte' && p && (
-        <RelationOverlayList
-          title="Verknüpfte Objekte"
-          subtitle={`vorgefiltert auf „${p.name}" · ${p.objekte.length} Einträge`}
-          columns={['Objekt']}
-          rows={p.objekte.map((o) => ({ id: o.id, search: o.name, cells: [o.name] }))}
-          onClose={() => setRel(null)}
-        />
-      )}
-      {rel === 'tickets' && p && (
-        <RelationOverlayList
-          title="Tickets im Projekt"
-          subtitle={`vorgefiltert auf „${p.name}" · ${ticketTotal} Einträge`}
-          columns={['Nr.', 'Titel', 'Status', 'Priorität']}
-          rows={tickets.map((t) => ({
-            id: t.id,
-            search: `${t.nummer} ${t.titel} ${t.status.label}`,
-            cells: [
-              <span key="nr" className="font-medium text-zinc-100">
-                #{t.nummer}
-              </span>,
-              t.titel,
-              <Badge key="status" label={t.status.label} />,
-              <Badge key="prio" label={t.prioritaet.label} />,
-            ],
-          }))}
-          onClose={() => setRel(null)}
-        />
+          <DetailTabs tabs={tabs} />
+        </>
       )}
     </DetailOverlay>
   );

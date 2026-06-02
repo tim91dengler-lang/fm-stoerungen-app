@@ -12,6 +12,12 @@ export interface DetailOverlayProps {
   width?: 'panel' | 'page';
   /** z-Index-Stufe — höhere Werte für verschachtelte Overlays (Ebene 3). */
   level?: 1 | 2;
+  /**
+   * Stabile Höhe statt shrink-to-fit. Für Reiter-Module (`DetailTabs`) sinnvoll,
+   * damit die Box-Höhe beim Reiter-Wechsel nicht springt; Default aus (z. B.
+   * schlanke Panels wie Adresse bleiben content-hoch).
+   */
+  fixedHeight?: boolean;
   children: React.ReactNode;
 }
 
@@ -20,6 +26,7 @@ export function DetailOverlay({
   onClose,
   width = 'panel',
   level = 1,
+  fixedHeight = false,
   children,
 }: DetailOverlayProps) {
   useEffect(() => {
@@ -44,7 +51,7 @@ export function DetailOverlay({
       <div
         onClick={(e) => e.stopPropagation()}
         className={`flex w-full ${maxW} flex-col overflow-hidden rounded-xl bg-zinc-900 shadow-2xl`}
-        style={{ maxHeight: '92vh' }}
+        style={fixedHeight ? { height: '85vh' } : { maxHeight: '92vh' }}
       >
         {children}
       </div>

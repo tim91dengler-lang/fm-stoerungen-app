@@ -9,3 +9,7 @@ export type { DetailRegionsProps } from './DetailRegions';
 export { RelationList } from './RelationList';
 export type { RelationListProps, RelationItem } from './RelationList';
 export { DetailNavProvider, DetailScroll, useDetailNav } from './DetailNav';
+export { DetailTabs } from './DetailTabs';
+export type { DetailTab } from './DetailTabs';
+export { RelationListView } from './RelationListView';
+export type { RelationColumn, RelationRow } from './RelationListView';
