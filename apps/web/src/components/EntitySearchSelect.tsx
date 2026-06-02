@@ -97,15 +97,20 @@ export function EntitySearchSelect({
         setOpen(false);
       }
     };
+    // Escape schließt nur diesen Picker — nicht ein umgebendes Overlay/Modal.
+    // Capture + stopImmediatePropagation laufen vor dessen window-Listener.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        setOpen(false);
+      }
     };
     window.addEventListener('mousedown', onClick);
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     const focus = setTimeout(() => inputRef.current?.focus(), 0);
     return () => {
       window.removeEventListener('mousedown', onClick);
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
       clearTimeout(focus);
     };
   }, [open]);
