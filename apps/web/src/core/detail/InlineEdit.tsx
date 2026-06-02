@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { DatePicker } from '../../components/DatePicker';
-import { EntitySearchSelect, type SearchOption } from '../../components/EntitySearchSelect';
+import {
+  EntitySearchSelect,
+  type SearchOption,
+} from '../../components/EntitySearchSelect';
+import { MultiSelectCombobox } from '../../components/MultiSelectCombobox';
 
 /**
  * Inline-Bearbeiten für Detail-Felder (Master-Layout-Standard, Tim-Entscheidung
@@ -48,7 +52,9 @@ function FieldShell({
     <div>
       <div className="mb-0.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
         <span>{label}</span>
-        {state === 'saving' && <span className="normal-case text-emerald-400">· speichert …</span>}
+        {state === 'saving' && (
+          <span className="normal-case text-emerald-400">· speichert …</span>
+        )}
         {state === 'error' && (
           <span className="normal-case text-red-400">· Fehler — erneut versuchen</span>
         )}
@@ -60,7 +66,10 @@ function FieldShell({
 
 /** Commit-Lifecycle für Picker-Felder (Select/Entity/Date): saving/error + Remount-Nonce,
  *  der bei Fehler die Anzeige auf den alten Wert zurücksetzt. */
-function usePickerCommit(onCommit: (next: string | null) => Promise<void>, current: string | null) {
+function usePickerCommit(
+  onCommit: (next: string | null) => Promise<void>,
+  current: string | null,
+) {
   const [state, setState] = useState<CommitState>('idle');
   const [nonce, setNonce] = useState(0);
   const mounted = useIsMounted();
@@ -209,7 +218,10 @@ export function InlineEditText({
   return (
     <FieldShell label={label} state={state}>
       {multiline ? (
-        <textarea {...common} className={`${EDIT_CLS} min-h-[4rem] resize-y leading-relaxed`} />
+        <textarea
+          {...common}
+          className={`${EDIT_CLS} min-h-[4rem] resize-y leading-relaxed`}
+        />
       ) : (
         <input {...common} className={EDIT_CLS} />
       )}
@@ -304,6 +316,45 @@ export function InlineEditEntity({
         placeholder={placeholder}
         disabled={state === 'saving'}
         onChange={(id) => void handle(id)}
+      />
+    </FieldShell>
+  );
+}
+
+// --------------------------------------------------------------------------- Mehrfachauswahl
+
+export function InlineEditMulti({
+  label,
+  value,
+  options,
+  placeholder,
+  onCommit,
+}: {
+  label: string;
+  value: string[];
+  options: InlineSelectOption[];
+  placeholder?: string;
+  /** Speichert die komplette neue Auswahl (pro Änderung). */
+  onCommit: (next: string[]) => Promise<void>;
+}) {
+  const [state, setState] = useState<CommitState>('idle');
+  const mounted = useIsMounted();
+  async function handle(next: string[]) {
+    setState('saving');
+    try {
+      await onCommit(next);
+      if (mounted.current) setState('idle');
+    } catch {
+      if (mounted.current) setState('error');
+    }
+  }
+  return (
+    <FieldShell label={label} state={state}>
+      <MultiSelectCombobox
+        value={value}
+        onChange={(next) => void handle(next)}
+        options={options}
+        placeholder={placeholder ?? 'Auswählen …'}
       />
     </FieldShell>
   );

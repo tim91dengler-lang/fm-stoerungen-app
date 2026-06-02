@@ -18,6 +18,7 @@ export {
   InlineEditText,
   InlineEditSelect,
   InlineEditEntity,
+  InlineEditMulti,
   InlineEditDate,
 } from './InlineEdit';
 export type { InlineSelectOption } from './InlineEdit';

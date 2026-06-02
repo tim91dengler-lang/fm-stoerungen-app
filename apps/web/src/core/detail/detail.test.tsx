@@ -7,7 +7,7 @@ import { DetailBlock } from './DetailBlock';
 import { DetailHeader } from './DetailHeader';
 import { DetailNavProvider, DetailScroll } from './DetailNav';
 import { DetailTabs } from './DetailTabs';
-import { InlineEditSelect, InlineEditText } from './InlineEdit';
+import { InlineEditMulti, InlineEditSelect, InlineEditText } from './InlineEdit';
 import { RelationList } from './RelationList';
 import { RelationListTab } from './RelationListTab';
 import { RelationListView } from './RelationListView';
@@ -371,6 +371,21 @@ describe('RelationListTab', () => {
     });
     expect(screen.getByText('Alpha')).toBeTruthy();
     expect(screen.queryByText('Beta')).toBeNull();
+  });
+
+  it('Multi: zeigt die gewählten Werte als Chips', () => {
+    render(
+      <InlineEditMulti
+        label="Typen"
+        value={['a']}
+        options={[
+          { value: 'a', label: 'Eigentümer' },
+          { value: 'b', label: 'Mieter' },
+        ]}
+        onCommit={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(screen.getByText('Eigentümer')).toBeTruthy();
   });
 });
 
