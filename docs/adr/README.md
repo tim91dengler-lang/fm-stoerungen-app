@@ -13,6 +13,7 @@ Verbindliche Architektur-Entscheidungen werden hier dokumentiert. Format: kompak
 | Nr. | Titel | Status | Plattform-relevant |
 |-----|-------|--------|--------------------|
 | [0001](0001-plattform-anker-strategie.md) | Plattform-Anker-Strategie: Plattform-Ready, nicht Plattform-Aktiv | Akzeptiert | ja |
+| [0006](0006-feldtyp-registry.md) | Feldtyp-Registry als zentrale Quelle für Feld-Rendering | Akzeptiert | ja |
 
 ## Anlegen eines neuen ADR
 
