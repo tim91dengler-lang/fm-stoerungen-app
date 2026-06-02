@@ -1,9 +1,12 @@
 import { X } from 'lucide-react';
 
+import { useDetailNav } from './DetailNav';
+
 /**
  * Detail-Kopf (Master-Layout-Standard §5.2): Identität (Titel + Untertitel +
- * Status-Badges) + Schließen + Sprung-Chips. Feld-Chips scrollen zur Sektion,
- * Verknüpfungs-Chips öffnen die Liste (per `onClick`).
+ * Status-Badges) + Schließen + Sprung-Chips. Feld-Chips scrollen zur Sektion
+ * (mit Flash-Feedback), Verknüpfungs-Chips öffnen die Liste (per `onClick`).
+ * Der gerade sichtbare Block wird per Scroll-Spy am Chip markiert.
  */
 export interface DetailBadge {
   label: string;
@@ -11,10 +14,16 @@ export interface DetailBadge {
 }
 export interface DetailChip {
   label: string;
-  /** Scrollt zu `[data-block="blockKey"]` und klappt auf. */
+  /** Scrollt zu `[data-block="blockKey"]`, klappt auf und blitzt kurz. */
   blockKey?: string;
   /** Stattdessen eine Aktion (z. B. Verknüpfungs-Liste öffnen). */
   onClick?: () => void;
+  /**
+   * Block, dessen Sichtbarkeit den Aktiv-Zustand dieses Chips steuert — nötig
+   * für Verknüpfungs-Chips, die per `onClick` eine Liste öffnen, aber trotzdem
+   * mitleuchten sollen, wenn ihr Block im Body sichtbar ist.
+   */
+  activeKey?: string;
   isRelation?: boolean;
 }
 
@@ -26,15 +35,8 @@ export interface DetailHeaderProps {
   onClose: () => void;
 }
 
-function scrollToBlock(blockKey: string) {
-  const el = document.querySelector<HTMLDetailsElement>(`[data-block="${CSS.escape(blockKey)}"]`);
-  if (el) {
-    el.open = true;
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
 export function DetailHeader({ title, subtitle, badges, chips, onClose }: DetailHeaderProps) {
+  const { activeBlock, scrollToBlock } = useDetailNav();
   return (
     <div className="border-b border-zinc-800 px-5 py-3">
       <div className="flex items-start gap-3">
@@ -63,20 +65,31 @@ export function DetailHeader({ title, subtitle, badges, chips, onClose }: Detail
       </div>
       {chips && chips.length > 0 && (
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-          {chips.map((c, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={c.onClick ? c.onClick : c.blockKey ? () => scrollToBlock(c.blockKey!) : undefined}
-              className={
-                'whitespace-nowrap rounded-full border px-2.5 py-1 text-xs hover:border-emerald-500/60 ' +
-                (c.isRelation ? 'border-emerald-600/50 text-emerald-300' : 'border-zinc-700 text-zinc-300')
-              }
-            >
-              {c.label}
-              {c.isRelation && ' ↗'}
-            </button>
-          ))}
+          {chips.map((c, i) => {
+            const watchKey = c.blockKey ?? c.activeKey;
+            const active = watchKey != null && activeBlock === watchKey;
+            return (
+              <button
+                key={i}
+                type="button"
+                aria-current={active ? 'true' : undefined}
+                onClick={
+                  c.onClick ? c.onClick : c.blockKey ? () => scrollToBlock(c.blockKey!) : undefined
+                }
+                className={
+                  'whitespace-nowrap rounded-full border px-2.5 py-1 text-xs transition-colors ' +
+                  (active
+                    ? 'border-emerald-500 bg-emerald-500/15 font-medium text-emerald-200'
+                    : c.isRelation
+                      ? 'border-emerald-600/50 text-emerald-300 hover:border-emerald-500/60'
+                      : 'border-zinc-700 text-zinc-300 hover:border-emerald-500/60 hover:text-zinc-100')
+                }
+              >
+                {c.label}
+                {c.isRelation && ' ↗'}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

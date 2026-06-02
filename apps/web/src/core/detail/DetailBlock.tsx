@@ -32,9 +32,9 @@ export function DetailBlock({
     <details
       open={defaultOpen}
       data-block={blockKey ?? title}
-      className="group scroll-mt-2 rounded-lg border border-zinc-800 bg-zinc-900/40"
+      className="group scroll-mt-3 rounded-lg border border-zinc-800 bg-zinc-900/40"
     >
-      <summary className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200 lg:min-h-0">
+      <summary className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200 lg:min-h-0">
         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-600 transition-transform group-open:rotate-90" />
         <span>{title}</span>
         {isRelation && (

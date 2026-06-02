@@ -71,6 +71,8 @@ ein/ausblenden (SPALTEN_DEFINITION) · Treffer-Zähler (gefiltert/gesamt) · Pow
 - Öffnet als **zentriertes Overlay** über der sichtbaren Liste. ✕ / Esc → zurück zur Liste.
 - **Kopf:** Identität (Name/Nummer + Status-Badges) + Aktion „schließen".
 - **Sprung-Chips** unter dem Kopf: Feld-Block → scrollt zur Sektion; Verknüpfungs-Block → öffnet Liste (Ebene 3).
+  - **Pflicht-Verhalten (verbindlich, ergänzt 2026-06-02 nach Tim-Feedback):** Jeder Chip-Klick muss **sichtbares Feedback** geben — auch wenn der Inhalt komplett ins Fenster passt und physisch 0 px gescrollt wird. Mechanik in `core/detail` (`DetailNavProvider`/`DetailScroll`): (a) Zielblock **aufklappen** + **kurzer Flash** (`animate-detail-flash`), (b) **Scroll-Spy** (IntersectionObserver, root = innerer Scroll-Container) markiert den Chip des sichtbaren Blocks (`aria-current`). Der Scroll läuft gegen den **inneren Container-Ref**, nie gegen das Fenster. Verknüpfungs-Chips öffnen weiter die Liste, leuchten aber via `activeKey` mit.
+  - **Klickbarkeit:** Verknüpfungs-Vorschauzeilen sind **klickbar** (`onItemClick` → Ziel-Detail), Block-Köpfe haben flächigen Hover. Read-only-Felder (bis Inline-Editing live ist) zeigen dezenten Border-Hover + `title="Bearbeiten folgt"` — **kein** Cursor-pointer/Stift, der „jetzt editierbar" verspricht.
 - **Zwei Regionen:** **links = primär/handlungsrelevant (3/5)** · **rechts = Kontext/Status/Verknüpfungen/Chat (2/5)**.
 - **Blöcke = Accordions** mit `default_offen`: häufig offen, selten/Historie zu (progressive Offenlegung).
 - **Mobil:** einspaltiger Stapel (`singleColumn`), Links/Rechts fällt weg, große Touch-Ziele.
@@ -193,7 +195,9 @@ R (zu)    Historie                  Erstellt · Geändert · ID
 - [ ] Seite mit `PageShell` (richtige Variante) + `PageHeader` (Standard-Größe).
 - [ ] Detail = **zentriertes Overlay** über sichtbarer Liste; Esc/✕ → Liste.
 - [ ] Detail via **Block-Engine**: Regionen links/rechts, progressive Offenlegung (häufig offen, selten zu).
-- [ ] **Sprung-Chips** vorhanden (Feld=scroll, Verknüpfung=Liste).
+- [ ] **Sprung-Chips** vorhanden (Feld=scroll, Verknüpfung=Liste); **jeder Block hat stabilen `blockKey`, jeder Chip referenziert genau einen `blockKey`/`activeKey`**.
+- [ ] **Chip-Klick gibt sichtbares Feedback** (Block auf + Flash + Aktiv-Chip) — **auch wenn 0 px gescrollt wird**. Detail-Body in `DetailNavProvider` + `DetailScroll` gewickelt.
+- [ ] **Verknüpfungs-Vorschauzeilen klickbar** (`onItemClick` → Ziel-Detail); Block-Köpfe mit Hover.
 - [ ] **Verknüpfungen** öffnen Ebene-3-`PowerListenView` (vorgefiltert, volle Funktionen) — keine Eigenbau-Liste.
 - [ ] **„Historie"-Block** vorhanden (Angelegt/Geändert/ID), zugeklappt.
 - [ ] **Mobil**: einspaltig, große Touch-Ziele, kein horizontaler Tab-Stress.

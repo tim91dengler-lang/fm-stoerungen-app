@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { projektApi } from '../../api/endpoints';
 import {
   DetailBlock,
   DetailHeader,
+  DetailNavProvider,
   DetailOverlay,
   DetailRegions,
+  DetailScroll,
   RelationList,
   type DetailChip,
 } from '../../core/detail';
@@ -18,12 +21,20 @@ import {
  * vorgefilterte Liste. Hinter Flag `modul_standard`.
  */
 
+// Felder sind aktuell read-only. `hover:border-zinc-600` deutet dezent an, dass
+// hier bald inline editiert wird; `title` macht das explizit, damit kein
+// Klick-Frust entsteht (kein Cursor-pointer/Stift, der „jetzt editierbar" lügt).
+const SOON = 'Bearbeiten folgt';
+
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   const empty = value === null || value === undefined || value === '';
   return (
     <div>
       <label className="mb-0.5 block text-[11px] uppercase tracking-wide text-zinc-500">{label}</label>
-      <div className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300">
+      <div
+        title={SOON}
+        className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:border-zinc-600"
+      >
         {empty ? <span className="text-zinc-600">—</span> : value}
       </div>
     </div>
@@ -34,7 +45,10 @@ function Area({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="sm:col-span-2">
       <label className="mb-0.5 block text-[11px] uppercase tracking-wide text-zinc-500">{label}</label>
-      <div className="min-h-[2.25rem] rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm leading-relaxed text-zinc-300">
+      <div
+        title={SOON}
+        className="min-h-[2.25rem] rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm leading-relaxed text-zinc-300 transition-colors hover:border-zinc-600"
+      >
         {value ? value : <span className="text-zinc-600">— leer —</span>}
       </div>
     </div>
@@ -144,6 +158,7 @@ export function ProjektDetailOverlay({
   projektId: string;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const projektQuery = useQuery({
     queryKey: ['projekt', projektId],
     queryFn: () => projektApi.get(projektId),
@@ -158,10 +173,12 @@ export function ProjektDetailOverlay({
   const tickets = ticketsQuery.data?.items ?? [];
   const ticketTotal = ticketsQuery.data?.total ?? tickets.length;
 
+  // Verknüpfungs-Chips öffnen standardkonform die Ebene-3-Liste (§5.2), leuchten
+  // per `activeKey` aber mit, wenn ihr Block im Body sichtbar ist.
   const chips: DetailChip[] = [
     { label: 'Stammdaten', blockKey: 'stammdaten' },
-    { label: 'Objekte', isRelation: true, onClick: () => setRel('objekte') },
-    { label: 'Tickets', isRelation: true, onClick: () => setRel('tickets') },
+    { label: 'Objekte', isRelation: true, activeKey: 'objekte', onClick: () => setRel('objekte') },
+    { label: 'Tickets', isRelation: true, activeKey: 'tickets', onClick: () => setRel('tickets') },
     { label: 'Klassifizierung', blockKey: 'klassifizierung' },
     { label: 'Termine', blockKey: 'termine' },
   ];
@@ -173,7 +190,7 @@ export function ProjektDetailOverlay({
           {projektQuery.isError ? 'Projekt konnte nicht geladen werden.' : 'Lade Projekt …'}
         </div>
       ) : (
-        <>
+        <DetailNavProvider>
           <DetailHeader
             title={p.name}
             subtitle={`Projekt · ${[fmtDate(p.start_am), fmtDate(p.ende_am)].filter(Boolean).join(' – ') || 'ohne Zeitraum'}`}
@@ -181,7 +198,7 @@ export function ProjektDetailOverlay({
             chips={chips}
             onClose={onClose}
           />
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <DetailScroll ready={!projektQuery.isLoading}>
             <DetailRegions
               left={
                 <>
@@ -204,6 +221,7 @@ export function ProjektDetailOverlay({
                       items={p.objekte.map((o) => ({ id: o.id, label: o.name }))}
                       total={p.objekte.length}
                       onOpenList={() => setRel('objekte')}
+                      onItemClick={(id) => navigate(`/stammdaten/objekte/${id}`)}
                       emptyLabel="— keine Objekte verknüpft —"
                     />
                   </DetailBlock>
@@ -222,6 +240,7 @@ export function ProjektDetailOverlay({
                       }))}
                       total={ticketTotal}
                       onOpenList={() => setRel('tickets')}
+                      onItemClick={(id) => navigate(`/tickets/${id}`)}
                       emptyLabel="— keine Tickets im Projekt —"
                     />
                   </DetailBlock>
@@ -258,8 +277,8 @@ export function ProjektDetailOverlay({
                 </>
               }
             />
-          </div>
-        </>
+          </DetailScroll>
+        </DetailNavProvider>
       )}
 
       {rel === 'objekte' && p && (

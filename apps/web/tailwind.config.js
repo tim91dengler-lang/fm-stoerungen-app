@@ -38,10 +38,17 @@ export default {
           from: { transform: 'translateX(-100%)' },
           to: { transform: 'translateX(0)' },
         },
+        // Kurzer Doppel-Puls am Zielblock nach einem Sprung-Chip-Klick —
+        // gibt sichtbares Feedback, auch wenn physisch 0 px gescrollt wird.
+        'detail-flash': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(16,185,129,0)' },
+          '20%, 65%': { boxShadow: '0 0 0 2px rgba(16,185,129,0.7)' },
+        },
       },
       animation: {
         fade: 'fade 150ms ease-out',
         'slide-in-left': 'slide-in-left 200ms ease-out',
+        'detail-flash': 'detail-flash 750ms ease-out',
       },
     },
   },
