@@ -12,13 +12,10 @@ import {
 import { Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { adresseApi, objektApi, partnerApi } from '../api/endpoints';
+import { isModulStandard } from '../core/featureFlags';
+import { ObjektDetailOverlay } from '../components/objekt/ObjektDetailOverlay';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
-import type {
-  ObjektCreate,
-  ObjektRead,
-  ObjektUpdate,
-  PartnerTyp,
-} from '../api/types';
+import type { ObjektCreate, ObjektRead, ObjektUpdate, PartnerTyp } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { TextFilter } from '../core/liste/columnFilters';
@@ -73,6 +70,8 @@ export function ObjektePage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const modulStandard = isModulStandard();
+  const [openObjektId, setOpenObjektId] = useState<string | null>(null);
   const [deaktivierenConfirm, setDeaktivierenConfirm] = useState<ObjektRead[] | null>(
     null,
   );
@@ -204,15 +203,28 @@ export function ObjektePage() {
           const o = ctx.row.original;
           return (
             <div className="flex items-center gap-2">
-              <Link
-                to={`/stammdaten/objekte/${o.id}`}
-                className={clsx(
-                  'font-medium hover:text-emerald-300',
-                  o.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
-                )}
-              >
-                {o.name}
-              </Link>
+              {modulStandard ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenObjektId(o.id)}
+                  className={clsx(
+                    'text-left font-medium hover:text-emerald-300',
+                    o.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
+                  )}
+                >
+                  {o.name}
+                </button>
+              ) : (
+                <Link
+                  to={`/stammdaten/objekte/${o.id}`}
+                  className={clsx(
+                    'font-medium hover:text-emerald-300',
+                    o.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
+                  )}
+                >
+                  {o.name}
+                </Link>
+              )}
               {o.gesperrt && (
                 <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
                   deaktiviert
@@ -257,7 +269,7 @@ export function ObjektePage() {
         },
       },
     ],
-    [],
+    [modulStandard],
   );
 
   return (
@@ -309,9 +321,7 @@ export function ObjektePage() {
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
         columnFilters={config.columnFilters}
-        onColumnFiltersChange={(f) =>
-          setConfig((p) => ({ ...p, columnFilters: f }))
-        }
+        onColumnFiltersChange={(f) => setConfig((p) => ({ ...p, columnFilters: f }))}
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
         grouping={config.grouping}
@@ -369,7 +379,6 @@ export function ObjektePage() {
         itemLabel={{ singular: 'Objekt', plural: 'Objekte' }}
       />
 
-
       <ConfirmDialog
         open={deaktivierenConfirm !== null}
         title={
@@ -380,14 +389,13 @@ export function ObjektePage() {
         message={
           deaktivierenConfirm && deaktivierenConfirm.length === 1 ? (
             <span>
-              <strong>{deaktivierenConfirm[0]?.name}</strong> wird deaktiviert
-              und ist nicht mehr für neue Verknüpfungen verfügbar. Bestehende
-              Verknüpfungen bleiben.
+              <strong>{deaktivierenConfirm[0]?.name}</strong> wird deaktiviert und ist
+              nicht mehr für neue Verknüpfungen verfügbar. Bestehende Verknüpfungen
+              bleiben.
             </span>
           ) : (
             <span>
-              {deaktivierenConfirm?.length ?? 0} ausgewählte Objekte werden
-              deaktiviert.
+              {deaktivierenConfirm?.length ?? 0} ausgewählte Objekte werden deaktiviert.
             </span>
           )
         }
@@ -462,8 +470,7 @@ export function ObjektePage() {
                       {adressenQuery.data?.items.map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.strasse}
-                          {a.hausnummer ? ` ${a.hausnummer}` : ''}, {a.plz}{' '}
-                          {a.ort}
+                          {a.hausnummer ? ` ${a.hausnummer}` : ''}, {a.plz} {a.ort}
                         </option>
                       ))}
                     </select>
@@ -476,9 +483,7 @@ export function ObjektePage() {
                     <textarea
                       rows={2}
                       value={form.notiz ?? ''}
-                      onChange={(e) =>
-                        setForm({ ...form, notiz: e.target.value })
-                      }
+                      onChange={(e) => setForm({ ...form, notiz: e.target.value })}
                       className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
@@ -521,9 +526,10 @@ export function ObjektePage() {
                     </ul>
 
                     <PartnerLinkAdder
-                      partnerOptions={(partnerQuery.data?.items ?? []).map(
-                        (p) => ({ id: p.id, name: p.name }),
-                      )}
+                      partnerOptions={(partnerQuery.data?.items ?? []).map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                      }))}
                       onAdd={addLink}
                     />
                   </div>
@@ -550,6 +556,13 @@ export function ObjektePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {modulStandard && openObjektId && (
+        <ObjektDetailOverlay
+          objektId={openObjektId}
+          onClose={() => setOpenObjektId(null)}
+        />
       )}
     </div>
   );

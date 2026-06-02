@@ -1,4 +1,5 @@
 import {
+  adresseApi,
   anlageApi,
   fehlercodeApi,
   objektApi,
@@ -35,6 +36,15 @@ export function searchUsers(search: string): Promise<SearchOption[]> {
     .then((r) => r.items.map((u) => ({ id: u.id, label: u.full_name })));
 }
 
+/** Adress-Suche (Objekt-Adresse …) — serverseitig. */
+export function searchAdressen(search: string): Promise<SearchOption[]> {
+  return adresseApi
+    .list({ search: search || undefined, limit: SEARCH_LIMIT })
+    .then((r) =>
+      r.items.map((a) => ({ id: a.id, label: `${a.strasse}, ${a.plz} ${a.ort}` })),
+    );
+}
+
 /** Projekt-Suche, optional auf bestimmte Status eingeschränkt (z. B. geplant/aktiv). */
 export function makeProjektSearch(status?: string[]) {
   return (search: string): Promise<SearchOption[]> =>
@@ -51,11 +61,18 @@ export function makeProjektSearch(status?: string[]) {
 export function makeAnlageSearch(objektId?: string | null) {
   return (search: string): Promise<SearchOption[]> =>
     anlageApi
-      .list({ search: search || undefined, aktiv_only: true, objekt_id: objektId ?? undefined, limit: SEARCH_LIMIT })
+      .list({
+        search: search || undefined,
+        aktiv_only: true,
+        objekt_id: objektId ?? undefined,
+        limit: SEARCH_LIMIT,
+      })
       .then((rows) =>
-        rows
-          .slice(0, SEARCH_LIMIT)
-          .map((a) => ({ id: a.id, label: a.bezeichnung, hint: a.kategorie?.label ?? null })),
+        rows.slice(0, SEARCH_LIMIT).map((a) => ({
+          id: a.id,
+          label: a.bezeichnung,
+          hint: a.kategorie?.label ?? null,
+        })),
       );
 }
 
@@ -63,7 +80,12 @@ export function makeAnlageSearch(objektId?: string | null) {
 export function makeFehlercodeSearch(anlageId?: string | null) {
   return (search: string): Promise<SearchOption[]> =>
     fehlercodeApi
-      .list({ search: search || undefined, aktiv_only: true, anlage_id: anlageId ?? undefined, limit: SEARCH_LIMIT })
+      .list({
+        search: search || undefined,
+        aktiv_only: true,
+        anlage_id: anlageId ?? undefined,
+        limit: SEARCH_LIMIT,
+      })
       .then((rows) =>
         rows
           .slice(0, SEARCH_LIMIT)
@@ -74,9 +96,15 @@ export function makeFehlercodeSearch(anlageId?: string | null) {
 // --- loadLabel-Helfer für Preset-Werte (id bekannt, Label nachladen) ----------
 
 export function loadObjektLabel(id: string): Promise<string | null> {
-  return objektApi.get(id).then((o) => o.name).catch(() => null);
+  return objektApi
+    .get(id)
+    .then((o) => o.name)
+    .catch(() => null);
 }
 
 export function loadProjektLabel(id: string): Promise<string | null> {
-  return projektApi.get(id).then((p) => p.name).catch(() => null);
+  return projektApi
+    .get(id)
+    .then((p) => p.name)
+    .catch(() => null);
 }
