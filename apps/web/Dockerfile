@@ -16,6 +16,11 @@ COPY . .
 ARG VITE_API_BASE=/api/v1
 ENV VITE_API_BASE=$VITE_API_BASE
 
+# Master-Layout-Standard: Default leer (= AUS). Staging-Deploy reicht =1 rein,
+# damit das neue Modul-Layout (Projekt-Referenz) dort ohne Umschalten sichtbar ist.
+ARG VITE_MODUL_STANDARD=
+ENV VITE_MODUL_STANDARD=$VITE_MODUL_STANDARD
+
 RUN npm run build
 
 # ---------- runtime ----------

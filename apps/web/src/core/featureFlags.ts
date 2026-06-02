@@ -2,13 +2,13 @@
  * Schlanke Feature-Flags für den schrittweisen Master-Layout-Roll-out.
  *
  * `modul_standard` schaltet das neue Modul-Layout (zentriertes Detail-Overlay
- * statt Detail-Seite) modulweise frei — Default AUS, Bestehendes bleibt unberührt,
- * bis Tim das Referenz-Modul abnimmt. Umschalten ohne Rebuild:
- *   per Konsole:  localStorage.setItem('ff_modul_standard','1')
- *   oder per Link: ?ff_modul_standard=1   (wird in localStorage übernommen)
+ * statt Detail-Seite) modulweise frei. Präzedenz: URL/localStorage (pro Browser)
+ * → Build-Env `VITE_MODUL_STANDARD` (auf Staging =1, damit Tim das Neue ohne
+ * Umschalten sieht; Code-Default AUS, Prod-Default bliebe aus). Umschalten ohne
+ * Rebuild: `?ff_modul_standard=1` (wird in localStorage übernommen) bzw. `…=0`.
  */
 const KEY = 'ff_modul_standard';
-const truthy = (v: string | null): boolean => v === '1' || v === 'true';
+const truthy = (v: string | null | undefined): boolean => v === '1' || v === 'true';
 
 export function isModulStandard(): boolean {
   try {
@@ -19,8 +19,10 @@ export function isModulStandard(): boolean {
         window.localStorage.setItem(KEY, next);
       }
     }
-    return truthy(window.localStorage.getItem(KEY));
+    const stored = window.localStorage.getItem(KEY);
+    if (stored !== null) return truthy(stored);
   } catch {
-    return false;
+    /* localStorage nicht verfügbar — Build-Env-Default unten */
   }
+  return truthy(import.meta.env.VITE_MODUL_STANDARD);
 }
