@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Building2, Check, FolderKanban, Search, X } from 'lucide-react';
 import clsx from 'clsx';
 import { auswahllistenApi, objektApi, userApi } from '../api/endpoints';
+import { DatePicker } from './DatePicker';
 import type {
   AuswahllistenWertRead,
   ObjektRead,
@@ -143,9 +144,7 @@ export function ProjektModal({
     const q = userSearch.trim().toLowerCase();
     if (!q) return allUsers;
     return allUsers.filter(
-      (u) =>
-        u.full_name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q),
+      (u) => u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
     );
   }, [allUsers, userSearch]);
 
@@ -257,9 +256,7 @@ export function ProjektModal({
             <textarea
               rows={2}
               value={form.beschreibung}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, beschreibung: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, beschreibung: e.target.value }))}
               className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
             />
           </div>
@@ -287,8 +284,8 @@ export function ProjektModal({
               </select>
               {projekttypOptions.length === 0 && (
                 <p className="mt-1 text-[10px] text-amber-400">
-                  Keine Projekttypen in Auswahlliste — bitte unter
-                  Stammdaten → Auswahllisten pflegen.
+                  Keine Projekttypen in Auswahlliste — bitte unter Stammdaten →
+                  Auswahllisten pflegen.
                 </p>
               )}
             </div>
@@ -298,9 +295,7 @@ export function ProjektModal({
               </label>
               <select
                 value={form.status_slug}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, status_slug: e.target.value }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, status_slug: e.target.value }))}
                 className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
               >
                 <option value="" disabled>
@@ -317,29 +312,21 @@ export function ProjektModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
-                Start
-              </label>
-              <input
-                type="date"
-                value={form.start_am ?? ''}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, start_am: e.target.value || null }))
-                }
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
+              <label className="block text-sm font-medium text-zinc-300">Start</label>
+              <DatePicker
+                value={form.start_am ?? null}
+                onChange={(iso) => setForm((f) => ({ ...f, start_am: iso }))}
+                placeholder="Start wählen …"
+                className="mt-1"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-300">
-                Ende
-              </label>
-              <input
-                type="date"
-                value={form.ende_am ?? ''}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, ende_am: e.target.value || null }))
-                }
-                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
+              <label className="block text-sm font-medium text-zinc-300">Ende</label>
+              <DatePicker
+                value={form.ende_am ?? null}
+                onChange={(iso) => setForm((f) => ({ ...f, ende_am: iso }))}
+                placeholder="Ende wählen …"
+                className="mt-1"
               />
             </div>
           </div>
@@ -351,9 +338,7 @@ export function ProjektModal({
             </label>
             {selectedUser ? (
               <div className="mt-1 flex items-center justify-between rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
-                <span className="text-sm text-emerald-300">
-                  {selectedUser.full_name}
-                </span>
+                <span className="text-sm text-emerald-300">{selectedUser.full_name}</span>
                 <button
                   type="button"
                   onClick={() => selectUser(null)}
@@ -394,9 +379,7 @@ export function ProjektModal({
                               className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
                             >
                               <span>{u.full_name}</span>
-                              <span className="text-[10px] text-zinc-500">
-                                {u.email}
-                              </span>
+                              <span className="text-[10px] text-zinc-500">{u.email}</span>
                             </button>
                           </li>
                         ))}
@@ -414,7 +397,7 @@ export function ProjektModal({
               Objekte ({selectedObjekte.length} ausgewählt)
             </label>
             {selectedObjekte.length > 0 && (
-              <div className="mt-1 mb-2 flex flex-wrap gap-1">
+              <div className="mb-2 mt-1 flex flex-wrap gap-1">
                 {selectedObjekte.map((o) => (
                   <span
                     key={o.id}
@@ -481,15 +464,11 @@ export function ProjektModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-300">
-              Notizen
-            </label>
+            <label className="block text-sm font-medium text-zinc-300">Notizen</label>
             <textarea
               rows={3}
               value={form.notizen}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, notizen: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, notizen: e.target.value }))}
               className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
             />
           </div>

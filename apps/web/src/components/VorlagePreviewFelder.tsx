@@ -21,6 +21,7 @@ import { GripVertical, Lock, Star, X } from 'lucide-react';
 import type { TickettypFeldRead, TickettypRead } from '../api/types';
 import { farbeClass } from './TickettypFarbe';
 import { iconFor } from './TickettypIcon';
+import { DatePicker } from './DatePicker';
 
 /**
  * Live-Vorschau des Erfassungsformulars für den Vorlagen-Designer.
@@ -109,8 +110,8 @@ const INPUT_RENDERERS: Record<string, FeldRenderer> = {
     </div>
   ),
   projekt: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Projekt" />,
-  faelligkeit_am: (f) => (
-    <input id={`preview-${f.feld_key}`} type="date" disabled className={INPUT_CLASS} />
+  faelligkeit_am: () => (
+    <DatePicker value={null} onChange={() => {}} disabled className="mt-1" />
   ),
   wiederholung: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Wiederholung" />,
   fehlercode: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Fehlercode" />,

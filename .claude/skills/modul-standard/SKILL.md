@@ -13,6 +13,9 @@ description: >-
 **Volle Referenz:** `docs/concepts/Konzept_UIUX_MasterLayout_FINAL_2026-06-02.md` — bei Unklarheit
 dort nachlesen. Abweichungen brauchen Tims Freigabe + ein Update des Konzepts.
 
+**Feld-/Eingabe-Elemente:** immer aus dem Inventar im Skill `reuse-first` (DatePicker,
+EntitySearchSelect, MultiSelectCombobox …) — keine nativen Controls.
+
 **Gilt für** alle Daten-Module. **Nicht für** Konfig-Editoren (Vorlagen-Designer, Auswahllisten,
 Status-Workflow) und eigene Visualisierungen (Dashboard, Kanban) — die bekommen nur `PageShell`+`PageHeader`.
 
@@ -22,8 +25,8 @@ Liste (Basis) → Detail (zentriertes Overlay über der Liste) → Verknüpfte L
 ✕/Esc/zurück schließt je eine Ebene.
 ```
 
-## Bausteine (alle aus `apps/web/src/core/`)
-- **Liste:** `PowerListenView` (die EINZIGE Listen-Engine) + `useListenState` + `PageShell`/`PageHeader`.
+## Bausteine
+- **Liste:** `PowerListenView` (die EINZIGE Listen-Engine, `apps/web/src/core/liste/`) — hält Filter-/Sort-/Spalten-/View-State intern. Seiten-Chrome über das bestehende `AppLayout` (`apps/web/src/components/AppLayout.tsx`); eigene `PageShell`/`PageHeader`-Komponenten gibt es (noch) nicht.
 - **Detail:** `DetailOverlay` (zentriert) + generische **Block-Engine** (generalisiert aus der Stufe-C
   `TicketFormEngine`): Regionen → Blöcke → Felder aus Katalog + Default-Layout, Renderer-Registry je Feld,
   Auffang-Block „Weitere".
@@ -55,7 +58,7 @@ Liste (Basis) → Detail (zentriertes Overlay über der Liste) → Verknüpfte L
 
 ## Abnahme-Checkliste (vor „fertig")
 - [ ] Liste = `PowerListenView` mit allen Funktionen (Regel 1).
-- [ ] `PageShell` (richtige Variante) + `PageHeader` (Standard-Größe).
+- [ ] Seite ins bestehende `AppLayout` eingehängt; Toolbar mit Treffer-Zähler (`gefiltert / gesamt`).
 - [ ] Detail = zentriertes Overlay über sichtbarer Liste; Esc/✕ → Liste.
 - [ ] `DetailTabs`-Reiter oben: „Übersicht" + eigene Reiter nur für große Kategorien + Verknüpfungs-Reiter; aktiver Reiter markiert, Klick schaltet um; nur aktiver Reiter gemountet.
 - [ ] „Übersicht" = Block-Engine: Regionen links/rechts, progressive Offenlegung, inkl. zugeklapptem „Historie"-Block (Angelegt/Geändert/ID).

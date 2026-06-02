@@ -50,6 +50,22 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // Reuse-First (Skill `reuse-first`, Definition of Done §0): keine nativen
+      // Eingabe-Controls — vorhandene gestylte Komponenten verwenden.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "JSXOpeningElement[name.name='input'] JSXAttribute[name.name='type'][value.value='date']",
+          message:
+            'Natives <input type="date"> ist verboten — nutze die DatePicker-Komponente (Skill `reuse-first`).',
+        },
+        {
+          selector: "JSXOpeningElement[name.name='select'] JSXAttribute[name.name='multiple']",
+          message:
+            'Natives <select multiple> ist verboten — nutze MultiSelectCombobox (Skill `reuse-first`).',
+        },
+      ],
     },
   },
   {

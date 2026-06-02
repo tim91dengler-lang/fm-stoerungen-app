@@ -17,6 +17,7 @@ import {
 } from '../../lib/entitySearch';
 import type { VorlageFelderHelfer } from '../../lib/vorlageFelder';
 import { BeteiligteCreateEditor } from '../BeteiligteCreateEditor';
+import { DatePicker } from '../DatePicker';
 import { EntitySearchSelect } from '../EntitySearchSelect';
 import { GrundrissPin } from '../GrundrissPin';
 import { TicketAdresseField } from '../TicketAdresseField';
@@ -329,19 +330,11 @@ export const CREATE_RENDERERS: Record<string, Renderer> = {
       <label className={labelCls}>
         Fälligkeit <Pflicht on={felder.pflicht('faelligkeit_am')} />
       </label>
-      <input
-        type="date"
-        value={values.faelligkeit_am ?? ''}
-        onChange={(e) => setField('faelligkeit_am', e.target.value || null)}
-        // Klick aufs ganze Feld öffnet den Kalender (nativ nur übers Icon).
-        onClick={(e) => {
-          try {
-            e.currentTarget.showPicker();
-          } catch {
-            /* showPicker nicht unterstützt — natives Verhalten bleibt */
-          }
-        }}
-        className={`${fieldCls} cursor-pointer`}
+      <DatePicker
+        value={values.faelligkeit_am ?? null}
+        onChange={(iso) => setField('faelligkeit_am', iso)}
+        placeholder="Fälligkeit wählen …"
+        className="mt-1"
       />
     </div>
   ),
