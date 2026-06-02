@@ -12,18 +12,15 @@ import {
 import { Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { partnerApi } from '../api/endpoints';
-import type {
-  PartnerCreate,
-  PartnerRead,
-  PartnerUpdate,
-  UUID,
-} from '../api/types';
+import type { PartnerCreate, PartnerRead, PartnerUpdate, UUID } from '../api/types';
 import { MultiSelectCombobox } from '../components/MultiSelectCombobox';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
+import { isModulStandard } from '../core/featureFlags';
+import { PartnerDetailOverlay } from '../components/partner/PartnerDetailOverlay';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -66,6 +63,8 @@ export function PartnerPage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const modulStandard = isModulStandard();
+  const [openPartnerId, setOpenPartnerId] = useState<string | null>(null);
   const [deaktivierenConfirm, setDeaktivierenConfirm] = useState<PartnerRead[] | null>(
     null,
   );
@@ -182,15 +181,28 @@ export function PartnerPage() {
           const p = ctx.row.original;
           return (
             <div className="flex items-center gap-2">
-              <Link
-                to={`/stammdaten/partner/${p.id}`}
-                className={clsx(
-                  'font-medium hover:text-emerald-300',
-                  p.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
-                )}
-              >
-                {p.name}
-              </Link>
+              {modulStandard ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenPartnerId(p.id)}
+                  className={clsx(
+                    'text-left font-medium hover:text-emerald-300',
+                    p.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
+                  )}
+                >
+                  {p.name}
+                </button>
+              ) : (
+                <Link
+                  to={`/stammdaten/partner/${p.id}`}
+                  className={clsx(
+                    'font-medium hover:text-emerald-300',
+                    p.gesperrt ? 'text-zinc-500 line-through' : 'text-zinc-100',
+                  )}
+                >
+                  {p.name}
+                </Link>
+              )}
               {p.gesperrt && (
                 <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">
                   deaktiviert
@@ -249,9 +261,7 @@ export function PartnerPage() {
         header: 'Hauptkontakt',
         filterFn: 'includesString',
         cell: (ctx) =>
-          ctx.row.original.ansprechpartner ?? (
-            <span className="text-zinc-500">—</span>
-          ),
+          ctx.row.original.ansprechpartner ?? <span className="text-zinc-500">—</span>,
       },
       {
         id: 'kontakt',
@@ -269,7 +279,7 @@ export function PartnerPage() {
         },
       },
     ],
-    [partnerById, partnerTypLookup, typOptions],
+    [partnerById, partnerTypLookup, typOptions, modulStandard],
   );
 
   return (
@@ -341,9 +351,7 @@ export function PartnerPage() {
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
         columnFilters={config.columnFilters}
-        onColumnFiltersChange={(f) =>
-          setConfig((p) => ({ ...p, columnFilters: f }))
-        }
+        onColumnFiltersChange={(f) => setConfig((p) => ({ ...p, columnFilters: f }))}
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
         grouping={config.grouping}
@@ -353,9 +361,7 @@ export function PartnerPage() {
           ansprechpartner: TextFilter,
           kontakt: TextFilter,
           gehoert_zu: TextFilter,
-          typen: (props) => (
-            <SelectFilter {...props} options={typOptions} />
-          ),
+          typen: (props) => <SelectFilter {...props} options={typOptions} />,
         }}
         enableRowSelection
         getRowId={(p) => p.id}
@@ -416,15 +422,14 @@ export function PartnerPage() {
         message={
           deaktivierenConfirm && deaktivierenConfirm.length === 1 ? (
             <span>
-              <strong>{deaktivierenConfirm[0]?.name}</strong> wird deaktiviert
-              und ist nicht mehr für neue Verknüpfungen verfügbar. Bestehende
-              Verknüpfungen bleiben. Du kannst jederzeit wieder aktivieren.
+              <strong>{deaktivierenConfirm[0]?.name}</strong> wird deaktiviert und ist
+              nicht mehr für neue Verknüpfungen verfügbar. Bestehende Verknüpfungen
+              bleiben. Du kannst jederzeit wieder aktivieren.
             </span>
           ) : (
             <span>
-              {deaktivierenConfirm?.length ?? 0} ausgewählte Partner werden
-              deaktiviert (inkl. ihrer Filialen). Du kannst jederzeit wieder
-              aktivieren.
+              {deaktivierenConfirm?.length ?? 0} ausgewählte Partner werden deaktiviert
+              (inkl. ihrer Filialen). Du kannst jederzeit wieder aktivieren.
             </span>
           )
         }
@@ -510,9 +515,7 @@ export function PartnerPage() {
                   <input
                     type="text"
                     value={form.telefon ?? ''}
-                    onChange={(e) =>
-                      setForm({ ...form, telefon: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, telefon: e.target.value })}
                     className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   />
                 </div>
@@ -531,8 +534,8 @@ export function PartnerPage() {
               </div>
 
               <p className="text-[10px] text-zinc-500">
-                Kontaktpersonen, Adressen, Filialen und weitere Stammdaten werden
-                in der Detail-Ansicht des Partners gepflegt (folgt in Phase 6c-Detail).
+                Kontaktpersonen, Adressen, Filialen und weitere Stammdaten werden in der
+                Detail-Ansicht des Partners gepflegt (folgt in Phase 6c-Detail).
               </p>
             </div>
 
@@ -555,6 +558,13 @@ export function PartnerPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {modulStandard && openPartnerId && (
+        <PartnerDetailOverlay
+          partnerId={openPartnerId}
+          onClose={() => setOpenPartnerId(null)}
+        />
       )}
     </div>
   );
