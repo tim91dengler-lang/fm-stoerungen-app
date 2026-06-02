@@ -27,7 +27,10 @@ Liste (Basis) → Detail (zentriertes Overlay über der Liste) → Verknüpfte L
 - **Detail:** `DetailOverlay` (zentriert) + generische **Block-Engine** (generalisiert aus der Stufe-C
   `TicketFormEngine`): Regionen → Blöcke → Felder aus Katalog + Default-Layout, Renderer-Registry je Feld,
   Auffang-Block „Weitere".
-- **Verknüpfungen:** `RelationList` — Vorschau + „in Listenansicht öffnen" → `PowerListenView` vorgefiltert.
+- **Detail-Navigation:** Body in `DetailNavProvider` + `DetailScroll` wickeln (aus `core/detail`) — liefert
+  Sprung-Feedback (Block auf + Flash) + Scroll-Spy (Aktiv-Chip). Sonst springen die Chips „tot".
+- **Verknüpfungen:** `RelationList` — Vorschau (Zeilen via `onItemClick` klickbar → Ziel-Detail) +
+  „in Listenansicht öffnen" → `PowerListenView` vorgefiltert.
 
 ## Pflicht-Regeln
 1. **Liste** = `PowerListenView` mit ALLEM: Volltextsuche · Spaltenfilter (Typ passend) · Multi-Sort
@@ -48,7 +51,9 @@ Liste (Basis) → Detail (zentriertes Overlay über der Liste) → Verknüpfte L
 - [ ] `PageShell` (richtige Variante) + `PageHeader` (Standard-Größe).
 - [ ] Detail = zentriertes Overlay über sichtbarer Liste; Esc/✕ → Liste.
 - [ ] Block-Engine: Regionen links/rechts, progressive Offenlegung.
-- [ ] Sprung-Chips (Feld → scroll, Verknüpfung → Liste).
+- [ ] Sprung-Chips (Feld → scroll, Verknüpfung → Liste); jeder Block hat stabilen `blockKey`, jeder Chip referenziert genau einen `blockKey`/`activeKey`.
+- [ ] Body in `DetailNavProvider` + `DetailScroll` → Chip-Klick gibt sichtbares Feedback (Block auf + Flash + Aktiv-Chip), auch bei 0 px Scroll.
+- [ ] Verknüpfungs-Vorschauzeilen klickbar (`onItemClick`); Block-Köpfe mit Hover.
 - [ ] Verknüpfungen → Ebene-3-`PowerListenView` vorgefiltert (keine Eigenbau-Liste).
 - [ ] „Historie"-Block vorhanden, zugeklappt.
 - [ ] Mobil einspaltig, große Touch-Ziele.

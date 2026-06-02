@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import { DetailBlock } from './DetailBlock';
+import { DetailHeader } from './DetailHeader';
+import { DetailNavProvider, DetailScroll } from './DetailNav';
 import { RelationList } from './RelationList';
 import { DetailOverlay } from './DetailOverlay';
 
@@ -52,6 +54,103 @@ describe('RelationList', () => {
   it('zeigt leeren Zustand', () => {
     render(<RelationList items={[]} total={0} onOpenList={() => {}} emptyLabel="nix da" />);
     expect(screen.getByText('nix da')).toBeTruthy();
+  });
+
+  it('feuert onItemClick beim Klick auf eine Vorschau-Zeile', () => {
+    const onItem = vi.fn();
+    render(<RelationList items={items} total={5} onOpenList={() => {}} onItemClick={onItem} />);
+    fireEvent.click(screen.getByText('#1042 Heizung'));
+    expect(onItem).toHaveBeenCalledWith('1');
+  });
+});
+
+describe('Detail-Navigation (Sprung-Chips)', () => {
+  function Harness() {
+    return (
+      <DetailNavProvider>
+        <DetailHeader
+          title="Projekt X"
+          chips={[
+            { label: 'Stammdaten', blockKey: 'stammdaten' },
+            { label: 'Termine', blockKey: 'termine' },
+          ]}
+          onClose={() => {}}
+        />
+        <DetailScroll>
+          <DetailBlock title="Stammdaten" blockKey="stammdaten">
+            <span>S-Inhalt</span>
+          </DetailBlock>
+          <DetailBlock title="Termine" blockKey="termine">
+            <span>T-Inhalt</span>
+          </DetailBlock>
+        </DetailScroll>
+      </DetailNavProvider>
+    );
+  }
+
+  it('Chip-Klick klappt den Zielblock auf, blitzt ihn an und markiert den Chip aktiv', () => {
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+    render(<Harness />);
+    const chip = screen.getByRole('button', { name: 'Stammdaten' });
+    const block = document.querySelector('[data-block="stammdaten"]') as HTMLDetailsElement;
+    expect(block.open).toBe(false);
+
+    fireEvent.click(chip);
+
+    expect(block.open).toBe(true);
+    expect(block.classList.contains('animate-detail-flash')).toBe(true);
+    expect(scrollSpy).toHaveBeenCalled();
+    expect(chip).toHaveAttribute('aria-current', 'true');
+    scrollSpy.mockRestore();
+  });
+
+  it('Scroll-Spy markiert den sichtbaren Block; im Zweispalter gewinnt die linke Spalte', () => {
+    // Aufzeichnender IntersectionObserver: hält die Callback, damit der Test
+    // Sichtbarkeit simulieren kann (jsdom feuert sonst nie).
+    const callbacks: IntersectionObserverCallback[] = [];
+    class CapturingIO {
+      root = null;
+      rootMargin = '';
+      thresholds = [];
+      constructor(cb: IntersectionObserverCallback) {
+        callbacks.push(cb);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', CapturingIO);
+
+    render(<Harness />);
+    const sd = document.querySelector('[data-block="stammdaten"]') as HTMLElement;
+    const tm = document.querySelector('[data-block="termine"]') as HTMLElement;
+    // Termine (rechte Spalte) minimal höher, aber im selben 48px-Band → linke
+    // Spalte (Stammdaten, left=0) muss gewinnen.
+    vi.spyOn(sd, 'getBoundingClientRect').mockReturnValue({ top: 100, left: 0 } as DOMRect);
+    vi.spyOn(tm, 'getBoundingClientRect').mockReturnValue({ top: 90, left: 500 } as DOMRect);
+
+    expect(callbacks).toHaveLength(1);
+    const fire = callbacks[0]!;
+    act(() => {
+      fire(
+        [
+          { target: sd, isIntersecting: true },
+          { target: tm, isIntersecting: true },
+        ] as unknown as IntersectionObserverEntry[],
+        {} as IntersectionObserver,
+      );
+    });
+
+    expect(screen.getByRole('button', { name: 'Stammdaten' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Termine' })).not.toHaveAttribute('aria-current');
+
+    vi.unstubAllGlobals();
   });
 });
 

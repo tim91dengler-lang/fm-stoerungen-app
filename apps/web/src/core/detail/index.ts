@@ -8,3 +8,4 @@ export { DetailRegions } from './DetailRegions';
 export type { DetailRegionsProps } from './DetailRegions';
 export { RelationList } from './RelationList';
 export type { RelationListProps, RelationItem } from './RelationList';
+export { DetailNavProvider, DetailScroll, useDetailNav } from './DetailNav';
