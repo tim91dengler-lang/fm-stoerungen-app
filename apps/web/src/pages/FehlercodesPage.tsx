@@ -15,11 +15,9 @@ import {
   fehlercodeApi,
   tickettypApi,
 } from '../api/endpoints';
-import type {
-  FehlercodeCreate,
-  FehlercodeRead,
-  FehlercodeUpdate,
-} from '../api/types';
+import { isModulStandard } from '../core/featureFlags';
+import { FehlercodeDetailOverlay } from '../components/fehlercode/FehlercodeDetailOverlay';
+import type { FehlercodeCreate, FehlercodeRead, FehlercodeUpdate } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
 import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
@@ -71,6 +69,8 @@ export function FehlercodesPage() {
   const [config, setConfig] = useState<ViewConfig>(DEFAULT_CONFIG);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const modulStandard = isModulStandard();
+  const [openFehlercodeId, setOpenFehlercodeId] = useState<string | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState<FehlercodeRead[] | null>(null);
   const [blockedNote, setBlockedNote] = useState<string | null>(null);
   const qc = useQueryClient();
@@ -97,9 +97,7 @@ export function FehlercodesPage() {
   const kategorienListe = auswahllistenQuery.data?.find(
     (l) => l.key === 'ticket_kategorie',
   );
-  const prioListe = auswahllistenQuery.data?.find(
-    (l) => l.key === 'ticket_prioritaet',
-  );
+  const prioListe = auswahllistenQuery.data?.find((l) => l.key === 'ticket_prioritaet');
 
   const create = useMutation({
     mutationFn: (payload: FehlercodeCreate) => fehlercodeApi.create(payload),
@@ -215,7 +213,11 @@ export function FehlercodesPage() {
         cell: (ctx) => (
           <button
             type="button"
-            onClick={() => openEdit(ctx.row.original)}
+            onClick={() =>
+              modulStandard
+                ? setOpenFehlercodeId(ctx.row.original.id)
+                : openEdit(ctx.row.original)
+            }
             className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-emerald-300 hover:bg-zinc-700"
           >
             {ctx.row.original.code}
@@ -233,9 +235,7 @@ export function FehlercodesPage() {
             <div>
               <div className="font-medium text-zinc-100">{f.titel}</div>
               {f.beschreibung && (
-                <div className="line-clamp-1 text-xs text-zinc-500">
-                  {f.beschreibung}
-                </div>
+                <div className="line-clamp-1 text-xs text-zinc-500">{f.beschreibung}</div>
               )}
             </div>
           );
@@ -322,7 +322,7 @@ export function FehlercodesPage() {
           ),
       },
     ],
-    [kategorieOptions, prioOptions],
+    [kategorieOptions, prioOptions, modulStandard],
   );
 
   function confirmBulkDelete() {
@@ -382,9 +382,7 @@ export function FehlercodesPage() {
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
         columnFilters={config.columnFilters}
-        onColumnFiltersChange={(f) =>
-          setConfig((p) => ({ ...p, columnFilters: f }))
-        }
+        onColumnFiltersChange={(f) => setConfig((p) => ({ ...p, columnFilters: f }))}
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
         grouping={config.grouping}
@@ -467,19 +465,18 @@ export function FehlercodesPage() {
           <span>
             {bulkConfirm && bulkBlockedCount() > 0 && (
               <span className="mb-2 block text-xs text-amber-400">
-                {bulkBlockedCount()} der ausgewählten Codes werden noch
-                referenziert und übersprungen (bitte stattdessen deaktivieren).
+                {bulkBlockedCount()} der ausgewählten Codes werden noch referenziert und
+                übersprungen (bitte stattdessen deaktivieren).
               </span>
             )}
             {bulkConfirm && bulkConfirm.length === 1 ? (
               <>
-                Fehlercode <strong>{bulkConfirm[0]?.code}</strong> wirklich
-                löschen?
+                Fehlercode <strong>{bulkConfirm[0]?.code}</strong> wirklich löschen?
               </>
             ) : (
               <>
-                {(bulkConfirm?.length ?? 0) - bulkBlockedCount()} Fehlercodes
-                werden unwiderruflich gelöscht.
+                {(bulkConfirm?.length ?? 0) - bulkBlockedCount()} Fehlercodes werden
+                unwiderruflich gelöscht.
               </>
             )}
           </span>
@@ -521,9 +518,7 @@ export function FehlercodesPage() {
                   <input
                     type="text"
                     value={form.code}
-                    onChange={(e) =>
-                      setForm({ ...form, code: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, code: e.target.value })}
                     placeholder="z. B. RLT-2155"
                     className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100"
                     autoFocus
@@ -534,23 +529,17 @@ export function FehlercodesPage() {
                   <input
                     type="text"
                     value={form.titel}
-                    onChange={(e) =>
-                      setForm({ ...form, titel: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, titel: e.target.value })}
                     className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-zinc-300">
-                  Beschreibung
-                </label>
+                <label className="block text-sm text-zinc-300">Beschreibung</label>
                 <textarea
                   rows={3}
                   value={form.beschreibung ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, beschreibung: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, beschreibung: e.target.value })}
                   placeholder="Wird bei Ticket-Auswahl als Beschreibung übernommen."
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                 />
@@ -562,17 +551,13 @@ export function FehlercodesPage() {
                 <textarea
                   rows={3}
                   value={form.loesung ?? ''}
-                  onChange={(e) =>
-                    setForm({ ...form, loesung: e.target.value })
-                  }
+                  onChange={(e) => setForm({ ...form, loesung: e.target.value })}
                   className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-300">
-                    Kategorie
-                  </label>
+                  <label className="block text-sm text-zinc-300">Kategorie</label>
                   <select
                     value={form.kategorie_wert_id ?? ''}
                     onChange={(e) =>
@@ -657,9 +642,7 @@ export function FehlercodesPage() {
                   <input
                     type="text"
                     value={form.quelle ?? ''}
-                    onChange={(e) =>
-                      setForm({ ...form, quelle: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, quelle: e.target.value })}
                     placeholder="z. B. Schartec, EBO"
                     className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
                   />
@@ -669,9 +652,7 @@ export function FehlercodesPage() {
                     id="aktiv"
                     type="checkbox"
                     checked={form.aktiv ?? true}
-                    onChange={(e) =>
-                      setForm({ ...form, aktiv: e.target.checked })
-                    }
+                    onChange={(e) => setForm({ ...form, aktiv: e.target.checked })}
                     className="accent-emerald-500"
                   />
                   <label htmlFor="aktiv" className="text-sm text-zinc-300">
@@ -704,6 +685,13 @@ export function FehlercodesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {modulStandard && openFehlercodeId && (
+        <FehlercodeDetailOverlay
+          fehlercodeId={openFehlercodeId}
+          onClose={() => setOpenFehlercodeId(null)}
+        />
       )}
     </div>
   );
