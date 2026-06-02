@@ -12,7 +12,7 @@ import { test, expect, type Page } from '@playwright/test';
  * dispatchEvent-Tricks zuverlässig läuft.
  */
 
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@fm-staging.local';
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'admin-dev-pass-12';
 
 async function login(page: Page): Promise<void> {
@@ -65,7 +65,7 @@ test.describe('Vorlagen-Designer', () => {
     await expect(page.getByText('Beschreibung', { exact: false }).first()).toBeVisible();
   });
 
-  test('Bestehende Vorlage öffnet als Page mit Stammdaten-Block und Vorschau', async ({ page }) => {
+  test('Bestehende Vorlage öffnet als Page mit Block-Designer (Stufe C)', async ({ page }) => {
     await login(page);
     await gotoVorlagen(page);
 
@@ -76,13 +76,9 @@ test.describe('Vorlagen-Designer', () => {
     await page.waitForURL(/\/stammdaten\/vorlagen\/[0-9a-f-]+\/bearbeiten/);
     await expect(page.getByRole('heading', { name: /Vorlage bearbeiten:/ })).toBeVisible();
 
-    // Versteckte-Felder-Sektion und Live-Vorschau müssen da sein
-    await expect(page.getByText(/Versteckte Felder/)).toBeVisible();
-    await expect(page.getByText(/LIVE-VORSCHAU/i)).toBeVisible();
-
-    // Zurück zur Liste via Link
-    await page.getByRole('link', { name: /Vorlagen/ }).first().click();
-    await page.waitForURL(/\/stammdaten\/vorlagen$/);
+    // Edit-Modus zeigt den datengetriebenen Block-Designer (Stufe C).
+    await expect(page.getByText('Block-Layout')).toBeVisible();
+    await expect(page.locator('[data-block-key="kopf"]')).toBeVisible();
   });
 
   test('Duplizieren erzeugt eine Kopie mit "(Kopie)"-Suffix', async ({ page }) => {
@@ -98,10 +94,7 @@ test.describe('Vorlagen-Designer', () => {
 
     // Zurück zur Liste, dort duplizieren
     await gotoVorlagen(page);
-    const card = page
-      .locator(`div:has-text("${baseName}")`)
-      .filter({ has: page.getByLabel('Duplizieren') })
-      .first();
+    const card = page.locator('[class*="cursor-pointer"]').filter({ hasText: baseName }).first();
     await card.hover();
     await card.getByLabel('Duplizieren').click();
 
@@ -120,10 +113,7 @@ test.describe('Vorlagen-Designer', () => {
 
     // Zurück zur Liste, deaktivieren
     await gotoVorlagen(page);
-    const card = page
-      .locator(`div:has-text("${name}")`)
-      .filter({ has: page.getByLabel('Deaktivieren') })
-      .first();
+    const card = page.locator('[class*="cursor-pointer"]').filter({ hasText: name }).first();
     await card.hover();
     await card.getByLabel('Deaktivieren').click();
 
@@ -143,34 +133,15 @@ test.describe('Vorlagen-Designer', () => {
     await gotoVorlagen(page);
 
     const systemCard = page
-      .locator(`div:has-text("System"):has(div.font-semibold)`)
+      .locator('[class*="cursor-pointer"]')
+      .filter({ hasText: 'System' })
       .first();
     await expect(systemCard).toBeVisible();
     await systemCard.hover();
     await expect(systemCard.getByLabel('Löschen')).toHaveCount(0);
   });
 
-  test('Pflicht-Toggle und Verbergen-Button funktionieren direkt in der Vorschau', async ({ page }) => {
-    await login(page);
-    await gotoVorlagen(page);
-
-    // Eigene Vorlage anlegen
-    const name = `E2E-Inline ${Date.now()}`;
-    await page.getByRole('button', { name: 'Neue Vorlage' }).click();
-    await page.getByLabel('Bezeichnung').fill(name);
-    await page.getByRole('button', { name: 'Speichern' }).click();
-    await page.waitForURL(/\/stammdaten\/vorlagen\/[0-9a-f-]+\/bearbeiten/, { timeout: 10_000 });
-
-    // Auf der Bearbeiten-Seite: ein Feld ausblenden via Verbergen-Button.
-    // Vorher sind 19 sichtbar.
-    const counterBefore = await page.getByText(/\d+ sichtbar/).first().textContent();
-
-    // Verbergen-Button am ersten sichtbaren Feld klicken
-    const firstVerbergen = page.getByLabel('Verbergen').first();
-    await firstVerbergen.click();
-
-    // Counter muss runter, Pool-Section bekommt einen +-Eintrag
-    const counterAfter = await page.getByText(/\d+ sichtbar/).first().textContent();
-    expect(counterAfter).not.toBe(counterBefore);
-  });
+  // Hinweis: Das frühere Inline-Toggle im Edit-Modus (LIVE-VORSCHAU/Verbergen) ist
+  // mit Stufe C durch den Block-Designer abgelöst — Sichtbar/Pflicht-Toggles dort
+  // sind in stufec-designer.spec.ts abgedeckt.
 });
