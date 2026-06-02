@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -8,12 +9,19 @@ import clsx from 'clsx';
  * das je Browser anders aussieht. Wert ist ein ISO-Datum `YYYY-MM-DD` (ohne
  * Zeitzone). Klick öffnet einen Monats-Kalender; Pfeiltasten navigieren, Enter
  * wählt, Esc schließt.
+ *
+ * Das Popover wird per Portal an `document.body` gerendert und `fixed`
+ * positioniert — so wird es nicht vom `overflow-hidden` des Detail-Overlays
+ * abgeschnitten und bleibt im Viewport. Escape schließt nur den Kalender (nicht
+ * das umgebende Overlay): Capture-Listener + `stopImmediatePropagation`.
  */
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONTHS = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
 ];
+const POPOVER_W = 256;
+const POPOVER_H = 330;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const toIso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -28,6 +36,7 @@ const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 /** Mo=0 … So=6 */
 const monFirstWeekday = (d: Date) => (d.getDay() + 6) % 7;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export function DatePicker({
   value,
@@ -45,35 +54,61 @@ export function DatePicker({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const selected = useMemo(() => parseIso(value), [value]);
   const today = useMemo(() => new Date(), []);
-  // Angezeigter Monat + fokussierter Tag (für Tastatur-Navigation).
   const [view, setView] = useState(() => selected ?? today);
   const [focus, setFocus] = useState(() => selected ?? today);
 
-  useEffect(() => {
-    if (open) {
-      const base = selected ?? today;
-      setView(base);
-      setFocus(base);
-    }
-  }, [open, selected, today]);
+  const reposition = useCallback(() => {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const below = r.bottom + 4 + POPOVER_H <= window.innerHeight;
+    const top = below ? r.bottom + 4 : Math.max(8, r.top - POPOVER_H - 4);
+    const left = clamp(r.left, 8, window.innerWidth - POPOVER_W - 8);
+    setCoords({ top, left });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const base = selected ?? today;
+    setView(base);
+    setFocus(base);
+    reposition();
+  }, [open, selected, today, reposition]);
 
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (!triggerRef.current?.contains(t) && !popoverRef.current?.contains(t)) setOpen(false);
     };
+    // Escape schließt NUR den Kalender, nicht das umgebende Overlay.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        setOpen(false);
+      }
+    };
+    const onScrollResize = () => reposition();
     window.addEventListener('mousedown', onClick);
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', onScrollResize);
+    window.addEventListener('scroll', onScrollResize, true);
     const t = setTimeout(() => gridRef.current?.focus(), 0);
     return () => {
       window.removeEventListener('mousedown', onClick);
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', onScrollResize);
+      window.removeEventListener('scroll', onScrollResize, true);
       clearTimeout(t);
     };
-  }, [open]);
+  }, [open, reposition]);
 
   const firstOfMonth = new Date(view.getFullYear(), view.getMonth(), 1);
   const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
@@ -96,27 +131,100 @@ export function DatePicker({
     }
   }
   function onGridKey(e: React.KeyboardEvent) {
-    const moves: Record<string, number> = {
-      ArrowLeft: -1,
-      ArrowRight: 1,
-      ArrowUp: -7,
-      ArrowDown: 7,
-    };
+    const moves: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
     if (e.key in moves) {
       e.preventDefault();
       shiftFocus(moves[e.key]!);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       pick(focus);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setOpen(false);
     }
   }
 
+  const popover = (
+    <div
+      ref={popoverRef}
+      style={{ position: 'fixed', top: coords.top, left: coords.left, width: POPOVER_W }}
+      className="z-[60] rounded-md border border-zinc-800 bg-zinc-900 p-2 shadow-xl"
+    >
+      <div className="mb-1 flex items-center justify-between">
+        <button
+          type="button"
+          aria-label="Voriger Monat"
+          onClick={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))}
+          className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="text-sm font-medium text-zinc-200">
+          {MONTHS[view.getMonth()]} {view.getFullYear()}
+        </span>
+        <button
+          type="button"
+          aria-label="Nächster Monat"
+          onClick={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))}
+          className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mb-1 grid grid-cols-7 text-center text-[10px] uppercase tracking-wide text-zinc-500">
+        {WEEKDAYS.map((w) => (
+          <span key={w}>{w}</span>
+        ))}
+      </div>
+      <div ref={gridRef} role="grid" tabIndex={0} onKeyDown={onGridKey} className="grid grid-cols-7 gap-0.5 outline-none">
+        {cells.map((d, i) =>
+          d === null ? (
+            <span key={`x${i}`} />
+          ) : (
+            <button
+              key={toIso(d)}
+              type="button"
+              onClick={() => pick(d)}
+              className={clsx(
+                'flex h-8 items-center justify-center rounded text-xs',
+                selected && sameDay(d, selected)
+                  ? 'bg-emerald-500 font-medium text-zinc-950'
+                  : sameDay(d, focus)
+                    ? 'bg-zinc-800 text-zinc-100 ring-1 ring-emerald-500/50'
+                    : 'text-zinc-300 hover:bg-zinc-800',
+                !(selected && sameDay(d, selected)) && sameDay(d, today) && 'font-semibold text-emerald-300',
+              )}
+            >
+              {d.getDate()}
+            </button>
+          ),
+        )}
+      </div>
+      <div className="mt-2 flex items-center justify-between border-t border-zinc-800 pt-2 text-xs">
+        <button
+          type="button"
+          onClick={() => pick(new Date())}
+          className="rounded px-2 py-1 text-emerald-300 hover:bg-emerald-500/10"
+        >
+          Heute
+        </button>
+        {allowClear && value && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            className="rounded px-2 py-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+          >
+            Löschen
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div ref={containerRef} className={clsx('relative', className)}>
+    <div className={clsx('relative', className)}>
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
@@ -142,90 +250,7 @@ export function DatePicker({
           </span>
         )}
       </button>
-
-      {open && (
-        <div className="absolute z-30 mt-1 w-64 rounded-md border border-zinc-800 bg-zinc-900 p-2 shadow-xl">
-          <div className="mb-1 flex items-center justify-between">
-            <button
-              type="button"
-              aria-label="Voriger Monat"
-              onClick={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))}
-              className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-medium text-zinc-200">
-              {MONTHS[view.getMonth()]} {view.getFullYear()}
-            </span>
-            <button
-              type="button"
-              aria-label="Nächster Monat"
-              onClick={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))}
-              className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="mb-1 grid grid-cols-7 text-center text-[10px] uppercase tracking-wide text-zinc-500">
-            {WEEKDAYS.map((w) => (
-              <span key={w}>{w}</span>
-            ))}
-          </div>
-          <div
-            ref={gridRef}
-            role="grid"
-            tabIndex={0}
-            onKeyDown={onGridKey}
-            className="grid grid-cols-7 gap-0.5 outline-none"
-          >
-            {cells.map((d, i) =>
-              d === null ? (
-                <span key={`x${i}`} />
-              ) : (
-                <button
-                  key={toIso(d)}
-                  type="button"
-                  onClick={() => pick(d)}
-                  className={clsx(
-                    'flex h-8 items-center justify-center rounded text-xs',
-                    selected && sameDay(d, selected)
-                      ? 'bg-emerald-500 font-medium text-zinc-950'
-                      : sameDay(d, focus)
-                        ? 'bg-zinc-800 text-zinc-100 ring-1 ring-emerald-500/50'
-                        : 'text-zinc-300 hover:bg-zinc-800',
-                    !(selected && sameDay(d, selected)) &&
-                      sameDay(d, today) &&
-                      'font-semibold text-emerald-300',
-                  )}
-                >
-                  {d.getDate()}
-                </button>
-              ),
-            )}
-          </div>
-          <div className="mt-2 flex items-center justify-between border-t border-zinc-800 pt-2 text-xs">
-            <button
-              type="button"
-              onClick={() => pick(new Date())}
-              className="rounded px-2 py-1 text-emerald-300 hover:bg-emerald-500/10"
-            >
-              Heute
-            </button>
-            {allowClear && value && (
-              <button
-                type="button"
-                onClick={() => {
-                  onChange(null);
-                  setOpen(false);
-                }}
-                className="rounded px-2 py-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              >
-                Löschen
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {open && createPortal(popover, document.body)}
     </div>
   );
 }
