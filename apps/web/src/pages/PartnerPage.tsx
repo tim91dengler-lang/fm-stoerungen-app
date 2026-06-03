@@ -16,8 +16,9 @@ import type { PartnerCreate, PartnerRead, PartnerUpdate, UUID } from '../api/typ
 import { MultiSelectCombobox } from '../components/MultiSelectCombobox';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import { selectFilter } from '../core/felder/listFields';
 import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
 import { isModulStandard } from '../core/featureFlags';
 import { PartnerDetailOverlay } from '../components/partner/PartnerDetailOverlay';
@@ -361,7 +362,7 @@ export function PartnerPage() {
           ansprechpartner: TextFilter,
           kontakt: TextFilter,
           gehoert_zu: TextFilter,
-          typen: (props) => <SelectFilter {...props} options={typOptions} />,
+          typen: selectFilter(typOptions),
         }}
         enableRowSelection
         getRowId={(p) => p.id}
