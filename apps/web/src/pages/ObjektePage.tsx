@@ -501,7 +501,7 @@ export function ObjektePage() {
                     </div>
                     {(form.partner_links ?? []).length === 0 && (
                       <div className="text-xs text-zinc-500">
-                        Noch keine Partner zugeordnet.
+                        Noch keine Geschäftspartner zugeordnet.
                       </div>
                     )}
                     <ul className="space-y-1">
@@ -592,7 +592,7 @@ function PartnerLinkAdder({
         onChange={(e) => setPartnerId(e.target.value)}
         className="rounded-md border border-zinc-700 px-2 py-1 text-sm"
       >
-        <option value="">— Partner wählen —</option>
+        <option value="">— Geschäftspartner wählen —</option>
         {partnerOptions.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}

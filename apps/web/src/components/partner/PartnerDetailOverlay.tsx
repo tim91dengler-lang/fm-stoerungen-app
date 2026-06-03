@@ -334,12 +334,12 @@ function PartnerUebersicht({ p }: { p: Partner }) {
                   />
                   <div className="sm:col-span-2">
                     <InlineEditEntity
-                      label="Übergeordneter Partner"
+                      label="Übergeordneter Geschäftspartner"
                       value={p.parent_partner_id}
                       displayLabel={null}
                       fetcher={searchPartner}
                       queryKey="partner-parent"
-                      placeholder="Partner suchen …"
+                      placeholder="Geschäftspartner suchen …"
                       onCommit={(v) => commit({ parent_partner_id: v })}
                     />
                   </div>
@@ -427,7 +427,7 @@ function PartnerUebersicht({ p }: { p: Partner }) {
             <>
               <DetailBlock title="Kennung" blockKey="status" defaultOpen count={1}>
                 <div className={grid}>
-                  <Field label="Partner-Nr" value={p.partner_nummer} />
+                  <Field label="Geschäftspartner-Nr" value={p.partner_nummer} />
                 </div>
               </DetailBlock>
               <DetailBlock
@@ -659,7 +659,7 @@ function PartnerAdressenTab({ p }: { p: Partner }) {
         title="Adresse entfernen?"
         message={
           delTarget?.adresse
-            ? `Die Adresse „${delTarget.adresse.strasse}, ${delTarget.adresse.plz} ${delTarget.adresse.ort}" wird vom Partner entfernt.`
+            ? `Die Adresse „${delTarget.adresse.strasse}, ${delTarget.adresse.plz} ${delTarget.adresse.ort}" wird vom Geschäftspartner entfernt.`
             : 'Die Adress-Verknüpfung wird entfernt.'
         }
         confirmLabel="Entfernen"
@@ -744,14 +744,14 @@ export function PartnerDetailOverlay({
       {partnerQuery.isLoading || !p ? (
         <div className="p-8 text-sm text-zinc-500">
           {partnerQuery.isError
-            ? 'Partner konnte nicht geladen werden.'
-            : 'Lade Partner …'}
+            ? 'Geschäftspartner konnte nicht geladen werden.'
+            : 'Lade Geschäftspartner …'}
         </div>
       ) : (
         <>
           <DetailHeader
             title={p.name}
-            subtitle={`Partner-Nr ${p.partner_nummer}`}
+            subtitle={`Geschäftspartner-Nr ${p.partner_nummer}`}
             badges={p.gesperrt ? [{ label: 'gesperrt' }] : []}
             onClose={onClose}
           />

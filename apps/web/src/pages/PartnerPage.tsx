@@ -289,7 +289,7 @@ export function PartnerPage() {
         <div>
           <h1 className="text-xl font-semibold text-zinc-100">Geschäftspartner</h1>
           <p className="text-sm text-zinc-500">
-            {listQuery.data ? `${listQuery.data.total} Partner` : '—'}
+            {listQuery.data ? `${listQuery.data.total} Geschäftspartner` : '—'}
           </p>
         </div>
         <button
@@ -297,7 +297,7 @@ export function PartnerPage() {
           onClick={openCreate}
           className="flex items-center gap-2 rounded-md bg-emerald-500 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
         >
-          <Plus className="h-4 w-4" /> Neuer Partner
+          <Plus className="h-4 w-4" /> Neuer Geschäftspartner
         </button>
       </div>
 
@@ -410,15 +410,15 @@ export function PartnerPage() {
         }
         searchPlaceholder="Suche in Name, Kontakt, E-Mail …"
         showFooter
-        itemLabel={{ singular: 'Partner', plural: 'Partner' }}
+        itemLabel={{ singular: 'Geschäftspartner', plural: 'Geschäftspartner' }}
       />
 
       <ConfirmDialog
         open={deaktivierenConfirm !== null}
         title={
           deaktivierenConfirm && deaktivierenConfirm.length === 1
-            ? 'Partner deaktivieren?'
-            : `${deaktivierenConfirm?.length ?? 0} Partner deaktivieren?`
+            ? 'Geschäftspartner deaktivieren?'
+            : `${deaktivierenConfirm?.length ?? 0} Geschäftspartner deaktivieren?`
         }
         message={
           deaktivierenConfirm && deaktivierenConfirm.length === 1 ? (
@@ -461,7 +461,7 @@ export function PartnerPage() {
           >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-zinc-100">
-                {editingId ? 'Partner bearbeiten' : 'Neuer Partner'}
+                {editingId ? 'Geschäftspartner bearbeiten' : 'Neuer Geschäftspartner'}
               </h2>
               <button
                 type="button"

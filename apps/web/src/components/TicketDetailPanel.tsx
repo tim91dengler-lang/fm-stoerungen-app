@@ -93,7 +93,7 @@ const FELD_NULL_CONFIG: {
   },
   {
     feldKey: 'partner',
-    label: 'Partner',
+    label: 'Geschäftspartner',
     hasValue: (t) => !!t.partner,
     patch: { partner_id: null },
   },
@@ -169,7 +169,7 @@ function buildBeteiligteMailto(t: TicketRead): string {
     ort ? `Ort: ${ort}` : '',
     t.adresse ? `Adresse: ${formatAdresse(t.adresse)}` : '',
     t.adresse ? `Karte: ${mapsUrl(t.adresse)}` : '',
-    t.partner ? `Partner: ${t.partner.name}` : '',
+    t.partner ? `Geschäftspartner: ${t.partner.name}` : '',
     t.faelligkeit_am ? `Fällig: ${t.faelligkeit_am}` : '',
     '',
     t.beschreibung || '',

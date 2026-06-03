@@ -29,7 +29,7 @@ export function PartnerBreadcrumb({ root, currentPartnerId }: Props) {
 
   return (
     <nav
-      aria-label="Partner-Pfad"
+      aria-label="Geschäftspartner-Pfad"
       className="flex flex-wrap items-center gap-1 px-4 py-2 text-xs text-zinc-400 lg:px-8"
     >
       <Link

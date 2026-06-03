@@ -226,7 +226,7 @@ export function TicketErfassenModal({
       ['haus', 'Haus', data.haus_id],
       ['stockwerk', 'Stockwerk', data.stockwerk_id],
       ['einheit', 'Einheit', data.einheit_id],
-      ['partner', 'Partner / Beteiligte', beteiligte.length > 0 ? 'ok' : null],
+      ['partner', 'Geschäftspartner / Beteiligte', beteiligte.length > 0 ? 'ok' : null],
       ['kategorie', 'Kategorie', data.kategorie],
       ['anlage', 'Anlage', data.anlage_id],
       ['fehlercode', 'Fehlercode', data.fehlercode_id],

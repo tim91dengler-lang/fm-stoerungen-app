@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   ListChecks,
   MapPinned,
-  Smartphone,
   Tags,
   Ticket,
   Users,
@@ -40,7 +39,11 @@ export interface NavGroup {
 /** Top-of-list quick access (rendered above the grouped sections). */
 export const quickAccessItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { to: '/meine-tickets', label: 'Meine Tickets', icon: <ListChecks className="h-4 w-4" /> },
+  {
+    to: '/meine-tickets',
+    label: 'Meine Tickets',
+    icon: <ListChecks className="h-4 w-4" />,
+  },
 ];
 
 export const navGroups: NavGroup[] = [
@@ -52,20 +55,51 @@ export const navGroups: NavGroup[] = [
       { to: '/wartungen', label: 'Wartungen', icon: <ListChecks className="h-4 w-4" /> },
       { to: '/projekte', label: 'Projekte', icon: <FolderKanban className="h-4 w-4" /> },
       { to: '/dokumente', label: 'Dokumente', icon: <FileStack className="h-4 w-4" /> },
-      { to: '/mobile-demo', label: 'Mobile-Vorschau', icon: <Smartphone className="h-4 w-4" /> },
     ],
   },
   {
     label: 'Stammdaten',
     items: [
-      { to: '/stammdaten/adressen', label: 'Adressen', icon: <MapPinned className="h-4 w-4" /> },
-      { to: '/stammdaten/objekte', label: 'Objekte', icon: <Building2 className="h-4 w-4" /> },
-      { to: '/stammdaten/partner', label: 'Geschäftspartner', icon: <Users2 className="h-4 w-4" /> },
-      { to: '/stammdaten/anlagen', label: 'Anlagen', icon: <Activity className="h-4 w-4" /> },
-      { to: '/stammdaten/fehlercodes', label: 'Fehlercodes', icon: <AlertOctagon className="h-4 w-4" /> },
-      { to: '/stammdaten/vorlagen', label: 'Vorlagen', icon: <Layers className="h-4 w-4" /> },
-      { to: '/stammdaten/auswahllisten', label: 'Auswahllisten', icon: <Tags className="h-4 w-4" /> },
-      { to: '/stammdaten/status-workflow', label: 'Status-Workflow', icon: <Workflow className="h-4 w-4" /> },
+      {
+        to: '/stammdaten/adressen',
+        label: 'Adressen',
+        icon: <MapPinned className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/objekte',
+        label: 'Objekte',
+        icon: <Building2 className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/partner',
+        label: 'Geschäftspartner',
+        icon: <Users2 className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/anlagen',
+        label: 'Anlagen',
+        icon: <Activity className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/fehlercodes',
+        label: 'Fehlercodes',
+        icon: <AlertOctagon className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/vorlagen',
+        label: 'Vorlagen',
+        icon: <Layers className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/auswahllisten',
+        label: 'Auswahllisten',
+        icon: <Tags className="h-4 w-4" />,
+      },
+      {
+        to: '/stammdaten/status-workflow',
+        label: 'Status-Workflow',
+        icon: <Workflow className="h-4 w-4" />,
+      },
     ],
   },
   {
@@ -91,13 +125,7 @@ export const navItemActive = 'bg-zinc-800 text-emerald-300';
 export const navItemIdle = 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100';
 
 /** A labelled group of nav links — shared by the sidebar and the drawer. */
-export function NavSection({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+export function NavSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
