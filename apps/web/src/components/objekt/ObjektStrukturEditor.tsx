@@ -8,6 +8,7 @@ import {
   DoorOpen,
   FileText,
   Image as ImageIcon,
+  Landmark,
   Layers,
   Pencil,
   Plus,
@@ -17,12 +18,19 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../../api/client';
-import { adresseApi, auswahllistenApi, objektstrukturApi } from '../../api/endpoints';
+import {
+  adresseApi,
+  auswahllistenApi,
+  objektApi,
+  objektstrukturApi,
+} from '../../api/endpoints';
 import type {
   AdresseRead,
   Ausrichtung,
   BeteiligterWrite,
   HausRead,
+  ObjektRead,
+  ObjektUpdate,
   StockwerkRead,
   EinheitRead,
 } from '../../api/types';
@@ -30,6 +38,9 @@ import { HausModal } from '../HausModal';
 import { StockwerkModal } from '../StockwerkModal';
 import { EinheitModal } from '../EinheitModal';
 import { StrukturBeteiligteBlock } from './StrukturBeteiligteBlock';
+import { MapsLink } from '../MapsLink';
+import { InlineEditEntity, InlineEditText } from '../../core/detail';
+import { searchAdressen } from '../../lib/entitySearch';
 import { aktiveWerte } from '../../lib/aktiveWerte';
 import { ConfirmDialog } from '../../core/liste/ConfirmDialog';
 
@@ -94,6 +105,7 @@ type ConfirmState =
     };
 
 type ActiveNode =
+  | { type: 'objekt' }
   | { type: 'haus'; id: string }
   | { type: 'stockwerk'; id: string }
   | { type: 'einheit'; id: string }
@@ -115,6 +127,23 @@ export function ObjektStrukturEditor({
     queryFn: () => objektstrukturApi.listHaus(objektId),
     enabled: !!objektId,
   });
+
+  // Objekt-Stammdaten (Wurzel-Knoten im Baum) — geteilter Cache mit Liste/Overlay.
+  const objektQuery = useQuery({
+    queryKey: ['objekt', objektId],
+    queryFn: () => objektApi.get(objektId),
+    enabled: !!objektId,
+  });
+  const objektMutation = useMutation({
+    mutationFn: (patch: ObjektUpdate) => objektApi.update(objektId, patch),
+    onSuccess: (updated) => {
+      qc.setQueryData(['objekt', objektId], updated);
+      qc.invalidateQueries({ queryKey: ['objekte'] });
+      qc.invalidateQueries({ queryKey: ['tickets'] }); // Tickets betten Objektname ein
+    },
+  });
+  const commitObjekt = (patch: ObjektUpdate) =>
+    objektMutation.mutateAsync(patch).then(() => undefined);
 
   // Adressen für Haus-Adress-Picker
   const adressenQuery = useQuery({
@@ -142,14 +171,15 @@ export function ObjektStrukturEditor({
   // Quick-Create-Modal im Beteiligten-Block sperrt ESC/Backdrop des Overlays.
   const [beteiligteModalOpen, setBeteiligteModalOpen] = useState(false);
 
-  // Default: open first house, select it
+  // Default: Objekt-Wurzel selektieren (zeigt die Objektdaten direkt), erstes Haus
+  // aufklappen.
   useEffect(() => {
+    if (activeNode === null) {
+      setActiveNode({ type: 'objekt' });
+    }
     const houses = treeQuery.data ?? [];
     if (houses.length > 0 && Object.keys(openHaus).length === 0) {
       setOpenHaus({ [houses[0]!.id]: true });
-      if (!activeNode) {
-        setActiveNode({ type: 'haus', id: houses[0]!.id });
-      }
     }
   }, [treeQuery.data, openHaus, activeNode]);
 
@@ -426,25 +456,44 @@ export function ObjektStrukturEditor({
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        {/* Tree (left) — pure structure, no badges */}
+        {/* Tree (left) — Objekt-Wurzel + Struktur */}
         <div className="min-h-0 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-          {treeQuery.isLoading && (
-            <div className="py-8 text-center text-sm text-zinc-500">Lade Struktur …</div>
-          )}
-          {treeQuery.data?.length === 0 && (
-            <div className="py-8 text-center">
-              <Building2 className="mx-auto mb-2 h-8 w-8 text-zinc-700" />
-              <p className="text-sm text-zinc-400">Noch keine Häuser angelegt.</p>
-              <button
-                type="button"
-                onClick={() => setHausModal({ mode: 'create' })}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20"
-              >
-                <Plus className="h-3.5 w-3.5" /> Erstes Haus anlegen
-              </button>
-            </div>
-          )}
           <div className="space-y-2">
+            {/* Objekt-Wurzel-Knoten — zeigt rechts die Objektdaten */}
+            <button
+              type="button"
+              onClick={() => setActiveNode({ type: 'objekt' })}
+              className={clsx(
+                'flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left text-sm font-semibold',
+                activeNode?.type === 'objekt'
+                  ? 'border-emerald-500/50 bg-emerald-500/5 text-zinc-100'
+                  : 'border-zinc-800 bg-zinc-950/30 text-zinc-100',
+              )}
+            >
+              <Landmark className="h-4 w-4 text-emerald-400" />
+              <span className="flex-1 truncate">
+                {objektQuery.data?.name ?? 'Objekt'}
+              </span>
+              <span className="text-[10px] font-normal text-zinc-500">Objekt</span>
+            </button>
+
+            {treeQuery.isLoading && (
+              <div className="py-6 text-center text-sm text-zinc-500">
+                Lade Struktur …
+              </div>
+            )}
+            {treeQuery.data?.length === 0 && !treeQuery.isLoading && (
+              <div className="rounded-md border border-dashed border-zinc-800 px-3 py-4 text-center">
+                <p className="text-xs text-zinc-400">Noch keine Häuser angelegt.</p>
+                <button
+                  type="button"
+                  onClick={() => setHausModal({ mode: 'create' })}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Erstes Haus anlegen
+                </button>
+              </div>
+            )}
             {treeQuery.data?.map((h) => (
               <HausNode
                 key={h.id}
@@ -468,7 +517,13 @@ export function ObjektStrukturEditor({
 
         {/* Detail panel (right) — sections */}
         <div className="min-h-0 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-          {activeEntity ? (
+          {activeNode?.type === 'objekt' ? (
+            <ObjektNodePanel
+              objekt={objektQuery.data ?? null}
+              loading={objektQuery.isLoading}
+              onCommit={commitObjekt}
+            />
+          ) : activeEntity ? (
             <DetailPanel
               entity={activeEntity}
               objektId={objektId}
@@ -830,6 +885,120 @@ function EinheitNode({ einheit, isActive, setActive }: EinheitNodeProps) {
       )}
     </button>
   );
+}
+
+// ============================================================================
+// Objekt-Wurzel-Panel — Objektdaten (Name, Adresse, Notiz) inline editierbar
+// ============================================================================
+
+function ObjektNodePanel({
+  objekt,
+  loading,
+  onCommit,
+}: {
+  objekt: ObjektRead | null;
+  loading: boolean;
+  onCommit: (patch: ObjektUpdate) => Promise<void>;
+}) {
+  const [historieOpen, setHistorieOpen] = useState(false);
+
+  if (loading || !objekt) {
+    return (
+      <div className="flex h-64 items-center justify-center text-sm text-zinc-500">
+        {loading ? 'Lade Objekt …' : 'Objekt nicht gefunden.'}
+      </div>
+    );
+  }
+
+  const adresseLabel = objekt.adresse
+    ? `${objekt.adresse.strasse}${objekt.adresse.hausnummer ? ' ' + objekt.adresse.hausnummer : ''}, ${objekt.adresse.plz} ${objekt.adresse.ort}`
+    : null;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wider text-zinc-500">Objekt</p>
+        <h2 className="mt-0.5 flex items-center gap-2 text-lg font-semibold text-zinc-100">
+          <Landmark className="h-5 w-5 text-emerald-400" />
+          {objekt.name}
+        </h2>
+      </div>
+
+      {/* Grunddaten — inline editierbar */}
+      <DetailSection title="Grunddaten">
+        <div className="grid grid-cols-1 gap-3">
+          <InlineEditText
+            label="Name"
+            value={objekt.name}
+            required
+            onCommit={(v) => onCommit({ name: v ?? '' })}
+          />
+          <div>
+            <InlineEditEntity
+              label="Adresse"
+              value={objekt.adresse_id}
+              displayLabel={adresseLabel}
+              fetcher={searchAdressen}
+              queryKey="objekt-node-adresse"
+              placeholder="Adresse suchen …"
+              onCommit={(v) => onCommit({ adresse_id: v })}
+            />
+            {objekt.adresse && (
+              <MapsLink adresse={objekt.adresse} className="mt-1 px-1" />
+            )}
+          </div>
+          <InlineEditText
+            label="Notiz"
+            value={objekt.notiz}
+            multiline
+            onCommit={(v) => onCommit({ notiz: v })}
+          />
+        </div>
+      </DetailSection>
+
+      {/* Historie — klein, eingeklappt */}
+      <section className="rounded-md border border-zinc-800 bg-zinc-950/30">
+        <button
+          type="button"
+          onClick={() => setHistorieOpen((o) => !o)}
+          className="flex w-full items-center gap-1.5 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200"
+        >
+          {historieOpen ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronRight className="h-3 w-3" />
+          )}
+          Historie
+        </button>
+        {historieOpen && (
+          <dl className="grid grid-cols-1 gap-2 px-3 pb-3 text-sm md:grid-cols-2">
+            <HistorieRow label="Angelegt am" value={fmtDateShort(objekt.created_at)} />
+            <HistorieRow
+              label="Zuletzt geändert am"
+              value={fmtDateShort(objekt.updated_at)}
+            />
+            <HistorieRow label="Interne ID" value={objekt.id} />
+          </dl>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function HistorieRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</dt>
+      <dd className="break-all text-zinc-300">
+        {value || <span className="text-zinc-600">—</span>}
+      </dd>
+    </div>
+  );
+}
+
+function fmtDateShort(s?: string | null): string | null {
+  return s ? s.slice(0, 10).split('-').reverse().join('.') : null;
 }
 
 // ============================================================================
