@@ -20,7 +20,14 @@ import { FehlercodeDetailOverlay } from '../components/fehlercode/FehlercodeDeta
 import type { FehlercodeCreate, FehlercodeRead, FehlercodeUpdate } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { TextFilter } from '../core/liste/columnFilters';
+import {
+  BOOL_STATUS_MASS_EDIT,
+  auswahllisteBadgeCell,
+  boolStatusCell,
+  boolStatusFilter,
+  boolStatusValue,
+} from '../core/felder/listFields';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 const EMPTY_FORM: FehlercodeCreate = {
@@ -249,15 +256,7 @@ export function FehlercodesPage() {
         meta: {
           massEdit: { type: 'auswahl' as const, options: kategorieOptions },
         },
-        cell: (ctx) => {
-          const k = ctx.row.original.kategorie;
-          if (!k) return <span className="text-zinc-500">—</span>;
-          return (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs">
-              {k.label}
-            </span>
-          );
-        },
+        cell: (ctx) => auswahllisteBadgeCell(ctx.row.original.kategorie?.label),
       },
       {
         id: 'prio_default',
@@ -267,15 +266,7 @@ export function FehlercodesPage() {
         meta: {
           massEdit: { type: 'auswahl' as const, options: prioOptions },
         },
-        cell: (ctx) => {
-          const p = ctx.row.original.prio_default;
-          if (!p) return <span className="text-zinc-500">—</span>;
-          return (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs">
-              {p.label}
-            </span>
-          );
-        },
+        cell: (ctx) => auswahllisteBadgeCell(ctx.row.original.prio_default?.label),
       },
       {
         id: 'anlage',
@@ -307,19 +298,11 @@ export function FehlercodesPage() {
       },
       {
         id: 'aktiv',
-        accessorFn: (row) => (row.aktiv ? 'aktiv' : 'inaktiv'),
+        accessorFn: (row) => boolStatusValue(row.aktiv),
         header: 'Status',
         filterFn: 'arrIncludesSome',
-        cell: (ctx) =>
-          ctx.row.original.aktiv ? (
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
-              aktiv
-            </span>
-          ) : (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-              inaktiv
-            </span>
-          ),
+        meta: BOOL_STATUS_MASS_EDIT,
+        cell: (ctx) => boolStatusCell(ctx.row.original.aktiv),
       },
     ],
     [kategorieOptions, prioOptions, modulStandard],
@@ -394,15 +377,7 @@ export function FehlercodesPage() {
           prio_default: TextFilter,
           anlage: TextFilter,
           quelle: TextFilter,
-          aktiv: (props) => (
-            <SelectFilter
-              {...props}
-              options={[
-                { value: 'aktiv', label: 'aktiv' },
-                { value: 'inaktiv', label: 'inaktiv' },
-              ]}
-            />
-          ),
+          aktiv: boolStatusFilter(),
         }}
         enableRowSelection
         getRowId={(f) => f.id}
