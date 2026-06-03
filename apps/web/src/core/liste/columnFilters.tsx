@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X } from 'lucide-react';
 import type { Column, Row } from '@tanstack/react-table';
 
@@ -91,9 +92,9 @@ export const comboboxFilterFn = (
 // auf. Wir setzen einen no-op `autoRemove`, damit der Filter nicht bei
 // `{ pills: [], text: '' }` automatisch entfernt wird, bevor unser onChange
 // sauber `undefined` zurückgibt — sonst flackert die Pill kurz nach.
-(comboboxFilterFn as unknown as { autoRemove?: (v: unknown) => boolean }).autoRemove =
-  (v: unknown) =>
-    !isComboboxValue(v) || (v.pills.length === 0 && v.text === '');
+(comboboxFilterFn as unknown as { autoRemove?: (v: unknown) => boolean }).autoRemove = (
+  v: unknown,
+) => !isComboboxValue(v) || (v.pills.length === 0 && v.text === '');
 
 interface ComboboxFilterProps extends RendererProps {
   /** TanStack-Column-Object (wird von PowerListenView durchgereicht).
@@ -127,7 +128,14 @@ export function ComboboxFilter({
   placeholder = 'filtern …',
 }: ComboboxFilterProps): ReactNode {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    minWidth: number;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const current: ComboboxFilterValue = isComboboxValue(value)
@@ -136,16 +144,28 @@ export function ComboboxFilter({
 
   const activeCount = current.pills.length + (current.text !== '' ? 1 : 0);
 
-  // Close on outside click
+  // Close on outside click + on scroll/resize. Das Dropdown wird per Portal mit
+  // fixed-Position gerendert (sonst schneidet der overflow-Container der Liste
+  // es ab); bei Scroll/Resize wäre die Position stale → schließen.
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (!containerRef.current?.contains(t) && !menuRef.current?.contains(t)) {
         setOpen(false);
       }
     }
+    function onScrollOrResize() {
+      setOpen(false);
+    }
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
   }, [open]);
 
   // Distinct values for the dropdown list. Prefer explicit `options` (with
@@ -186,9 +206,7 @@ export function ComboboxFilter({
 
   function togglePill(v: string) {
     const has = current.pills.includes(v);
-    const nextPills = has
-      ? current.pills.filter((p) => p !== v)
-      : [...current.pills, v];
+    const nextPills = has ? current.pills.filter((p) => p !== v) : [...current.pills, v];
     emit({ pills: nextPills, text: current.text });
   }
 
@@ -200,6 +218,19 @@ export function ComboboxFilter({
     emit({ pills: [], text: '' });
   }
 
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - 392));
+      setPos({ top: r.bottom + 4, left, minWidth: r.width });
+    }
+    setOpen(true);
+  }
+
   return (
     <div
       ref={containerRef}
@@ -207,10 +238,11 @@ export function ComboboxFilter({
       onClick={(e) => e.stopPropagation()}
     >
       <button
+        ref={btnRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((v) => !v);
+          toggle();
         }}
         className={`flex w-full items-center justify-between gap-1 rounded border px-2 py-0.5 text-xs font-normal normal-case ${
           open
@@ -223,88 +255,97 @@ export function ComboboxFilter({
         aria-expanded={open}
       >
         <span className="truncate">
-          {activeCount === 0
-            ? placeholder
-            : `${activeCount} ausgewählt`}
+          {activeCount === 0 ? placeholder : `${activeCount} ausgewählt`}
         </span>
         <ChevronDown
           className={`h-3 w-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           aria-hidden
         />
       </button>
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 w-max min-w-full max-w-sm overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-2xl">
-          <div className="border-b border-zinc-800 p-1">
-            <div className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5">
-              <Search className="h-3 w-3 shrink-0 text-zinc-600" aria-hidden />
-              <input
-                ref={inputRef}
-                type="text"
-                value={current.text}
-                onChange={(e) => setText(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="filtern oder tippen …"
-                autoFocus
-                className="min-w-0 flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
-              />
-              {activeCount > 0 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    clearAll();
-                  }}
-                  className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
-                  title="Filter löschen"
-                  aria-label="Alle Filter löschen"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: 'fixed',
+              top: pos.top,
+              left: pos.left,
+              minWidth: pos.minWidth,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="z-50 max-h-72 w-max max-w-sm overflow-hidden rounded-md border border-zinc-700 bg-zinc-900 shadow-2xl"
+          >
+            <div className="border-b border-zinc-800 p-1">
+              <div className="flex items-center gap-1 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5">
+                <Search className="h-3 w-3 shrink-0 text-zinc-600" aria-hidden />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={current.text}
+                  onChange={(e) => setText(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="filtern oder tippen …"
+                  autoFocus
+                  className="min-w-0 flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
+                />
+                {activeCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearAll();
+                    }}
+                    className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+                    title="Filter löschen"
+                    aria-label="Alle Filter löschen"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="max-h-60 overflow-y-auto py-1">
+              {dropdownItems.length === 0 ? (
+                <div className="px-2 py-1 text-[11px] text-zinc-500">
+                  {current.text !== '' ? 'Keine Treffer' : 'Keine Werte verfügbar'}
+                </div>
+              ) : (
+                dropdownItems.slice(0, 100).map((o) => {
+                  const checked = current.pills.includes(o.value);
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        togglePill(o.value);
+                      }}
+                      className={`flex w-full items-center gap-2 truncate px-2 py-1 text-left text-xs ${
+                        checked
+                          ? 'bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25'
+                          : 'text-zinc-200 hover:bg-zinc-800'
+                      }`}
+                    >
+                      <span
+                        className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
+                          checked
+                            ? 'border-emerald-400 bg-emerald-500 text-zinc-950'
+                            : 'border-zinc-600'
+                        }`}
+                        aria-hidden
+                      >
+                        {checked ? '✓' : ''}
+                      </span>
+                      <span className="truncate">{o.label}</span>
+                    </button>
+                  );
+                })
               )}
             </div>
-          </div>
-          <div className="max-h-60 overflow-y-auto py-1">
-            {dropdownItems.length === 0 ? (
-              <div className="px-2 py-1 text-[11px] text-zinc-500">
-                {current.text !== ''
-                  ? 'Keine Treffer'
-                  : 'Keine Werte verfügbar'}
-              </div>
-            ) : (
-              dropdownItems.slice(0, 100).map((o) => {
-                const checked = current.pills.includes(o.value);
-                return (
-                  <button
-                    key={o.value}
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      togglePill(o.value);
-                    }}
-                    className={`flex w-full items-center gap-2 truncate px-2 py-1 text-left text-xs ${
-                      checked
-                        ? 'bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25'
-                        : 'text-zinc-200 hover:bg-zinc-800'
-                    }`}
-                  >
-                    <span
-                      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
-                        checked
-                          ? 'border-emerald-400 bg-emerald-500 text-zinc-950'
-                          : 'border-zinc-600'
-                      }`}
-                      aria-hidden
-                    >
-                      {checked ? '✓' : ''}
-                    </span>
-                    <span className="truncate">{o.label}</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -388,9 +429,7 @@ export function ToggleFilter({ value, onChange }: RendererProps): ReactNode {
         <button
           key={s}
           type="button"
-          onClick={() =>
-            onChange(s === 'yes' ? true : s === 'no' ? false : undefined)
-          }
+          onClick={() => onChange(s === 'yes' ? true : s === 'no' ? false : undefined)}
           className={`px-1.5 py-0.5 ${
             state === s
               ? 'bg-emerald-500 text-zinc-950'
