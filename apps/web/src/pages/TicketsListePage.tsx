@@ -26,7 +26,7 @@ import {
 } from '../api/endpoints';
 import type { TicketPrioritaetSlug, TicketRead, TicketStatusSlug } from '../api/types';
 import { PrioBadge, StatusBadge } from '../components/StatusBadge';
-import { DatePicker } from '../components/DatePicker';
+import { DateFilter, dateLteFilter } from '../core/felder/listFields';
 import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
 import { TicketErfassenModal } from './TicketErfassenModal';
 import {
@@ -328,12 +328,8 @@ function buildColumns(
       accessorKey: 'faelligkeit_am',
       header: 'Fällig am',
       sortUndefined: 'last',
-      // Filter „fällig bis <Datum>": zeigt Tickets mit Fälligkeit ≤ gewähltem Datum.
-      filterFn: (row, _id, value) => {
-        if (!value) return true;
-        const d = row.original.faelligkeit_am;
-        return d ? d <= (value as string) : false;
-      },
+      // Filter „fällig bis <Datum>": Tickets mit Fälligkeit ≤ gewähltem Datum.
+      filterFn: dateLteFilter,
       cell: ({ row }) => {
         const d = row.original.faelligkeit_am;
         if (!d) return <span className="text-zinc-600">—</span>;
@@ -366,24 +362,6 @@ function columnFilterSlugs<T extends string>(
   const entry = columnFilters.find((f) => f.id === id);
   const value = entry?.value;
   return Array.isArray(value) && value.length > 0 ? (value as T[]) : undefined;
-}
-
-/** Datums-Filter „fällig bis": einfacher Date-Picker, Wert = ISO-Datum. */
-function DateFilter({
-  value,
-  onChange,
-}: {
-  value: unknown;
-  onChange: (v: unknown) => void;
-}) {
-  return (
-    <DatePicker
-      value={typeof value === 'string' ? value : null}
-      onChange={(iso) => onChange(iso || undefined)}
-      placeholder="Fällig bis …"
-      className="w-full"
-    />
-  );
 }
 
 const filterRenderers = {

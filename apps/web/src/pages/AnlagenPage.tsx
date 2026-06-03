@@ -15,7 +15,14 @@ import { AnlageDetailOverlay } from '../components/anlage/AnlageDetailOverlay';
 import type { AnlageCreate, AnlageRead, AnlageUpdate } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { TextFilter } from '../core/liste/columnFilters';
+import {
+  BOOL_STATUS_MASS_EDIT,
+  auswahllisteBadgeCell,
+  boolStatusCell,
+  boolStatusFilter,
+  boolStatusValue,
+} from '../core/felder/listFields';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 
 const ICON_MAP: Record<string, typeof Activity> = {
@@ -221,15 +228,7 @@ export function AnlagenPage() {
             options: kategorieOptions,
           },
         },
-        cell: (ctx) => {
-          const k = ctx.row.original.kategorie;
-          if (!k) return <span className="text-zinc-500">—</span>;
-          return (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
-              {k.label}
-            </span>
-          );
-        },
+        cell: (ctx) => auswahllisteBadgeCell(ctx.row.original.kategorie?.label),
       },
       {
         id: 'objekt',
@@ -241,20 +240,11 @@ export function AnlagenPage() {
       },
       {
         id: 'aktiv',
-        accessorFn: (row) => (row.aktiv ? 'aktiv' : 'inaktiv'),
+        accessorFn: (row) => boolStatusValue(row.aktiv),
         header: 'Status',
         filterFn: 'arrIncludesSome',
-        meta: { massEdit: { type: 'boolean' as const } },
-        cell: (ctx) =>
-          ctx.row.original.aktiv ? (
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
-              aktiv
-            </span>
-          ) : (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-              inaktiv
-            </span>
-          ),
+        meta: BOOL_STATUS_MASS_EDIT,
+        cell: (ctx) => boolStatusCell(ctx.row.original.aktiv),
       },
       {
         id: 'beschreibung',
@@ -323,15 +313,7 @@ export function AnlagenPage() {
           kategorie: TextFilter,
           objekt: TextFilter,
           beschreibung: TextFilter,
-          aktiv: (props) => (
-            <SelectFilter
-              {...props}
-              options={[
-                { value: 'aktiv', label: 'aktiv' },
-                { value: 'inaktiv', label: 'inaktiv' },
-              ]}
-            />
-          ),
+          aktiv: boolStatusFilter(),
         }}
         enableRowSelection
         getRowId={(a) => a.id}
