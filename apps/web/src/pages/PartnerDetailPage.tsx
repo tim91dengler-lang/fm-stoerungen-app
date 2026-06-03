@@ -88,7 +88,7 @@ export function PartnerDetailPage() {
   const [activeTab, setActiveTab] = useState<PartnerTabKey>('allgemein');
 
   if (!partnerId) {
-    return <div className="p-6 text-sm text-zinc-500">Kein Partner ausgewählt.</div>;
+    return <div className="p-6 text-sm text-zinc-500">Kein Geschäftspartner ausgewählt.</div>;
   }
   if (partnerQuery.isLoading || partnerTypLookup.isLoading) {
     return <div className="p-6 text-sm text-zinc-500">Lade …</div>;

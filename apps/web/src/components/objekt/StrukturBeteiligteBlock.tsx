@@ -338,7 +338,7 @@ function DraftBeteiligterRow({
         onClick={onQuickCreate}
         className="inline-flex items-center gap-1 text-[11px] text-emerald-300 hover:underline"
       >
-        <UserPlus className="h-3 w-3" /> Partner neu anlegen
+        <UserPlus className="h-3 w-3" /> Geschäftspartner neu anlegen
       </button>
     </div>
   );
@@ -404,7 +404,7 @@ function PartnerQuickCreateModal({
             id="partner-quickcreate-title"
             className="flex items-center gap-2 text-sm font-semibold text-zinc-100"
           >
-            <UserPlus className="h-4 w-4 text-emerald-400" /> Partner anlegen
+            <UserPlus className="h-4 w-4 text-emerald-400" /> Geschäftspartner anlegen
           </h2>
           <button
             type="button"
@@ -439,7 +439,7 @@ function PartnerQuickCreateModal({
               className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
             <p className="mt-1 text-[10px] text-zinc-500">
-              Weitere Stammdaten später im Partner-Modul ergänzbar.
+              Weitere Stammdaten später im Geschäftspartner-Modul ergänzbar.
             </p>
           </div>
           {create.isError && (

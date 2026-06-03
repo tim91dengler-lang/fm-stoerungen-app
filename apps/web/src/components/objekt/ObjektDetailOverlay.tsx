@@ -84,6 +84,10 @@ function ObjektTicketsTab({
   return (
     <RelationListTab<TicketRead>
       viewKey="objekt-tickets"
+      groupableColumns={[
+        { id: 'status', label: 'Status' },
+        { id: 'prioritaet', label: 'Priorität' },
+      ]}
       loading={q.isLoading}
       columns={ticketColumns}
       data={rows}

@@ -244,6 +244,10 @@ function ProjektTicketsTab({
   return (
     <RelationListTab<TicketRead>
       viewKey="projekt-tickets"
+      groupableColumns={[
+        { id: 'status', label: 'Status' },
+        { id: 'prioritaet', label: 'Priorität' },
+      ]}
       loading={ticketsQuery.isLoading}
       columns={ticketColumns}
       data={tickets}

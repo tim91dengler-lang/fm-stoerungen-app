@@ -103,7 +103,7 @@ function KontakteCell({ kontakte }: { kontakte: KontaktMini[] }) {
 const columns: ColumnDef<BeteiligterRow>[] = [
   { id: 'ebene', accessorKey: 'ebene', header: 'Ebene' },
   { id: 'ort', accessorKey: 'ort', header: 'Ort' },
-  { id: 'partner', accessorKey: 'partner', header: 'Partner' },
+  { id: 'partner', accessorKey: 'partner', header: 'Geschäftspartner' },
   { id: 'rolle', accessorKey: 'rolle', header: 'Rolle' },
   {
     id: 'kontakte',
@@ -147,12 +147,12 @@ export function ObjektBeteiligteTab({
         `${r.ebene} ${r.ort} ${r.partner} ${r.rolle} ${r.kontakteText}`
       }
       onRowClick={(r) => onPartner(r.partnerId)}
-      searchPlaceholder="In Beteiligten suchen … (Partner, Rolle, Ort, Ansprechpartner)"
+      searchPlaceholder="In Beteiligten suchen … (Geschäftspartner, Rolle, Ort, Ansprechpartner)"
       itemLabel={{ singular: 'Beteiligter', plural: 'Beteiligte' }}
       groupableColumns={[
         { id: 'ebene', label: 'Ebene' },
         { id: 'rolle', label: 'Rolle' },
-        { id: 'partner', label: 'Partner' },
+        { id: 'partner', label: 'Geschäftspartner' },
       ]}
     />
   );

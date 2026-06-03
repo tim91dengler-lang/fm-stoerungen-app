@@ -185,11 +185,11 @@ export function DashboardPage() {
           </ul>
         </Card>
 
-        <Card title="Top-Partner" icon={<AlertTriangle className="h-4 w-4" />}>
+        <Card title="Top-Geschäftspartner" icon={<AlertTriangle className="h-4 w-4" />}>
           <ul className="divide-y divide-zinc-800/60">
             {topPartner.length === 0 && (
               <li className="px-4 py-6 text-center text-sm text-zinc-500">
-                Noch keine Partner-Bezüge.
+                Noch keine Geschäftspartner-Bezüge.
               </li>
             )}
             {topPartner.map(({ partner, count }) => (
