@@ -17,6 +17,16 @@ class PartnerMini(BaseModel):
     name: str
 
 
+class KontaktMini(BaseModel):
+    """Ein aufgelöster Ansprechpartner (Read) mit klickbaren Kontaktdaten."""
+
+    id: UUID
+    name: str
+    email: str | None = None
+    telefon: str | None = None
+    mobil: str | None = None
+
+
 class BeteiligterRead(BaseModel):
     """Ein Beteiligter (Partner + freie Rolle) an einem Struktur-Knoten.
 
@@ -28,6 +38,7 @@ class BeteiligterRead(BaseModel):
     partner_name: str
     rolle_id: UUID | None = None
     rolle_label: str | None = None
+    kontakte: list[KontaktMini] = Field(default_factory=list)
 
 
 class BeteiligterWrite(BaseModel):
@@ -35,13 +46,14 @@ class BeteiligterWrite(BaseModel):
 
     ``id`` gesetzt + zum Knoten gehörend → bestehende Zeile aktualisieren; sonst
     neu anlegen. Fehlende bestehende Zeilen werden entfernt. ``partner_id``,
-    ``partner_kontakt_id`` und ``rolle_id`` werden serverseitig mandantengebunden
-    validiert (Rolle muss aus ``objekt_beteiligten_rolle`` stammen).
+    ``partner_kontakt_ids`` (mehrere Ansprechpartner desselben Partners) und
+    ``rolle_id`` werden serverseitig mandantengebunden validiert (Rolle muss aus
+    ``objekt_beteiligten_rolle`` stammen, jeder Kontakt muss zum Partner gehören).
     """
 
     id: UUID | None = None
     partner_id: UUID
-    partner_kontakt_id: UUID | None = None
+    partner_kontakt_ids: list[UUID] = Field(default_factory=list)
     rolle_id: UUID | None = None
     reihenfolge: int | None = None
 

@@ -678,20 +678,30 @@ export interface PartnerMini {
   name: string;
 }
 
-/** Ein Beteiligter (Partner + freie Rolle) an einem Struktur-Knoten (read). */
+/** Ein aufgelöster Ansprechpartner (read) mit klickbaren Kontaktdaten. */
+export interface KontaktMini {
+  id: UUID;
+  name: string;
+  email: string | null;
+  telefon: string | null;
+  mobil: string | null;
+}
+
+/** Ein Beteiligter (Partner + freie Rolle + Ansprechpartner) an einem Knoten (read). */
 export interface Beteiligter {
   id: UUID;
   partner_id: UUID;
   partner_name: string;
   rolle_id: UUID | null;
   rolle_label: string | null;
+  kontakte: KontaktMini[];
 }
 
 /** Eine Beteiligten-Zeile beim Schreiben (Voll-Replace der Liste). */
 export interface BeteiligterWrite {
   id?: UUID | null;
   partner_id: UUID;
-  partner_kontakt_id?: UUID | null;
+  partner_kontakt_ids?: UUID[];
   rolle_id?: UUID | null;
   reihenfolge?: number;
 }

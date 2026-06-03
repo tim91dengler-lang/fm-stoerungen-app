@@ -14,6 +14,7 @@ from fm_api.schemas.objektstruktur import (
     HausCreate,
     HausRead,
     HausUpdate,
+    KontaktMini,
     PartnerMini,
     StockwerkCreate,
     StockwerkRead,
@@ -32,8 +33,15 @@ from fm_api.services.objektstruktur_service import (
 router = APIRouter()
 
 
+def _kontakt_name(k: object) -> str:
+    parts = [getattr(k, "vorname", None), getattr(k, "nachname", None)]
+    name = " ".join(p for p in parts if p).strip()
+    return name or "Ansprechpartner"
+
+
 def _serialize_beteiligte(node: object) -> list[BeteiligterRead]:
-    """Baut die Beteiligten-Read aus dem transient angehängten ``_beteiligte``."""
+    """Baut die Beteiligten-Read aus dem transient angehängten ``_beteiligte``
+    (inkl. der aufgelösten Ansprechpartner ``_kontakte``)."""
     return [
         BeteiligterRead(
             id=b.id,
@@ -41,6 +49,16 @@ def _serialize_beteiligte(node: object) -> list[BeteiligterRead]:
             partner_name=b.partner.name,
             rolle_id=b.rolle_id,
             rolle_label=b.rolle_wert.label if b.rolle_wert else None,
+            kontakte=[
+                KontaktMini(
+                    id=k.id,
+                    name=_kontakt_name(k),
+                    email=k.email,
+                    telefon=k.telefon,
+                    mobil=k.mobil,
+                )
+                for k in getattr(b, "_kontakte", [])
+            ],
         )
         for b in getattr(node, "_beteiligte", [])
     ]

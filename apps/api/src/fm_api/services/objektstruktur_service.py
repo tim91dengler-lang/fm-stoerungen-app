@@ -4,6 +4,7 @@ Pragmatisch alles in einem Modul, weil eng gekoppelt (Tree-API liefert
 Haus → Stockwerk → Einheit zusammen).
 """
 
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -65,7 +66,8 @@ async def _load_beteiligte_map(
     db: AsyncSession, model: Any, fk_attr: str, ids: list[UUID]
 ) -> dict[UUID, list[Any]]:
     """Lädt Beteiligten-Zeilen (mit Partner + Rolle) für die FK-IDs, gruppiert je
-    Eltern-ID, sortiert nach ``reihenfolge``."""
+    Eltern-ID, sortiert nach ``reihenfolge``. Die Ansprechpartner werden aus
+    ``partner_kontakt_ids`` aufgelöst und als transientes ``_kontakte`` angehängt."""
     result: dict[UUID, list[Any]] = {}
     if not ids:
         return result
@@ -86,9 +88,33 @@ async def _load_beteiligte_map(
         .scalars()
         .all()
     )
+    await _attach_kontakte(db, rows)
     for row in rows:
         result.setdefault(getattr(row, fk_attr), []).append(row)
     return result
+
+
+async def _attach_kontakte(db: AsyncSession, rows: Sequence[Any]) -> None:
+    """Löst ``partner_kontakt_ids`` zu PartnerKontakt-Objekten auf und hängt sie als
+    ``_kontakte`` (in der gespeicherten Reihenfolge, gelöschte gefiltert) an."""
+    all_ids = {kid for row in rows for kid in (row.partner_kontakt_ids or [])}
+    by_id: dict[UUID, Any] = {}
+    if all_ids:
+        kontakte = (
+            (
+                await db.execute(
+                    select(PartnerKontakt).where(
+                        PartnerKontakt.id.in_(all_ids),
+                        PartnerKontakt.deleted_at.is_(None),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        by_id = {k.id: k for k in kontakte}
+    for row in rows:
+        row._kontakte = [by_id[kid] for kid in (row.partner_kontakt_ids or []) if kid in by_id]
 
 
 async def _attach_beteiligte(db: AsyncSession, haeuser: list[Haus]) -> None:
@@ -131,18 +157,33 @@ async def _validate_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID
         raise BeteiligterValidationError(f"partner {partner_id} not found")
 
 
-async def _validate_partner_kontakt(
-    db: AsyncSession, kontakt_id: UUID, partner_id: UUID, mandant_id: UUID
+async def _validate_partner_kontakte(
+    db: AsyncSession, kontakt_ids: list[UUID], partner_id: UUID, mandant_id: UUID
 ) -> None:
-    stmt = select(PartnerKontakt.id).where(
-        PartnerKontakt.id == kontakt_id,
-        PartnerKontakt.partner_id == partner_id,
-        PartnerKontakt.mandant_id == mandant_id,
-        PartnerKontakt.deleted_at.is_(None),
+    """Jeder Ansprechpartner muss zu DIESEM Partner + Mandanten gehören (IDOR-Schutz).
+    Prüft die ganze Liste in einer Query."""
+    if not kontakt_ids:
+        return
+    unique_ids = set(kontakt_ids)
+    rows = (
+        (
+            await db.execute(
+                select(PartnerKontakt.id).where(
+                    PartnerKontakt.id.in_(unique_ids),
+                    PartnerKontakt.partner_id == partner_id,
+                    PartnerKontakt.mandant_id == mandant_id,
+                    PartnerKontakt.deleted_at.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
     )
-    if (await db.execute(stmt)).scalar_one_or_none() is None:
+    found = set(rows)
+    missing = unique_ids - found
+    if missing:
         raise BeteiligterValidationError(
-            f"partner_kontakt {kontakt_id} not found for partner {partner_id}"
+            f"partner_kontakt(e) {sorted(str(m) for m in missing)} not found for partner {partner_id}"
         )
 
 
@@ -189,9 +230,8 @@ async def _apply_struktur_beteiligte(
     for idx, item in enumerate(items):
         partner_id = item["partner_id"]
         await _validate_partner(db, partner_id, mandant_id)
-        kontakt_id = item.get("partner_kontakt_id")
-        if kontakt_id is not None:
-            await _validate_partner_kontakt(db, kontakt_id, partner_id, mandant_id)
+        kontakt_ids = list(item.get("partner_kontakt_ids") or [])
+        await _validate_partner_kontakte(db, kontakt_ids, partner_id, mandant_id)
         rolle_id = item.get("rolle_id")
         if rolle_id is not None:
             await _validate_beteiligten_rolle(db, rolle_id, mandant_id)
@@ -202,7 +242,7 @@ async def _apply_struktur_beteiligte(
         if existing_id is not None and existing_id in existing:
             row = existing[existing_id]
             row.partner_id = partner_id
-            row.partner_kontakt_id = kontakt_id
+            row.partner_kontakt_ids = kontakt_ids
             row.rolle_id = rolle_id
             row.reihenfolge = reihenfolge
             seen_ids.add(existing_id)
@@ -212,7 +252,7 @@ async def _apply_struktur_beteiligte(
                 model(
                     mandant_id=mandant_id,
                     partner_id=partner_id,
-                    partner_kontakt_id=kontakt_id,
+                    partner_kontakt_ids=kontakt_ids,
                     rolle_id=rolle_id,
                     reihenfolge=reihenfolge,
                     **{fk_attr: fk_value},
@@ -226,9 +266,9 @@ async def _apply_struktur_beteiligte(
 
     # Bereits geladene Relationships (partner/rolle_wert) der aktualisierten Zeilen
     # expiren — sonst überschreibt das anschließende selectinload im Read die alten
-    # Werte NICHT (geänderte Rolle/Partner würde sonst stale gelesen). Nur die
-    # Relationships expiren, die _load_beteiligte_map auch nachlädt — partner_kontakt
-    # wird nicht serialisiert und nicht nachgeladen (sonst latente lazy="raise"-Falle).
+    # Werte NICHT (geänderte Rolle/Partner würde sonst stale gelesen). Die
+    # Ansprechpartner sind eine Array-Spalte (partner_kontakt_ids) und werden im Read
+    # separat aufgelöst (_attach_kontakte) — kein Relationship, kein Expire nötig.
     for row in updated_rows:
         db.expire(row, ["partner", "rolle_wert"])
 

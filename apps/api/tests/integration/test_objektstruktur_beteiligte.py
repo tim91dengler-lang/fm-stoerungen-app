@@ -28,6 +28,18 @@ async def _create_objekt(client, headers, name: str = "Objekt B") -> str:
     return res.json()["id"]
 
 
+async def _create_kontakt(
+    client, headers, partner_id: str, vorname: str, nachname: str, email: str
+) -> str:
+    res = await client.post(
+        f"/api/v1/partner/{partner_id}/kontakte",
+        headers=headers,
+        json={"vorname": vorname, "nachname": nachname, "email": email},
+    )
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
 async def _create_haus(client, headers, objekt_id: str, bez: str = "Haus 1") -> str:
     res = await client.post(
         f"/api/v1/objektstruktur/objekte/{objekt_id}/haus",
@@ -189,6 +201,97 @@ async def test_unknown_rolle_rejected(client, admin_user) -> None:
         f"/api/v1/objektstruktur/haus/{haus_id}",
         headers=headers,
         json={"beteiligte": [{"partner_id": partner_id, "rolle_id": NONEXISTENT}]},
+    )
+    assert res.status_code == 400, res.text
+
+
+@pytest.mark.integration
+async def test_beteiligter_mit_mehreren_kontakten(client, admin_user) -> None:
+    """Modell A: ein Beteiligter (Partner + Rolle) mit MEHREREN Ansprechpartnern
+    desselben Partners (z. B. Eigentümer Familie Stein → Herr + Frau)."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    objekt_id = await _create_objekt(client, headers)
+    haus_id = await _create_haus(client, headers, objekt_id)
+    partner_id = await _create_partner(client, headers, "Familie Stein")
+    k1 = await _create_kontakt(client, headers, partner_id, "Hans", "Stein", "hans@stein.de")
+    k2 = await _create_kontakt(client, headers, partner_id, "Eva", "Stein", "eva@stein.de")
+    rollen = await _rolle_ids(client, headers)
+
+    res = await client.patch(
+        f"/api/v1/objektstruktur/haus/{haus_id}",
+        headers=headers,
+        json={
+            "beteiligte": [
+                {
+                    "partner_id": partner_id,
+                    "rolle_id": rollen["eigentuemer"],
+                    "partner_kontakt_ids": [k1, k2],
+                }
+            ]
+        },
+    )
+    assert res.status_code == 200, res.text
+    bet = res.json()["beteiligte"]
+    assert len(bet) == 1
+    kontakte = bet[0]["kontakte"]
+    assert len(kontakte) == 2
+    namen = {k["name"] for k in kontakte}
+    assert namen == {"Hans Stein", "Eva Stein"}
+    emails = {k["email"] for k in kontakte}
+    assert emails == {"hans@stein.de", "eva@stein.de"}
+
+    # Tree-Read liefert die Kontakte ebenfalls
+    tree = await client.get(f"/api/v1/objektstruktur/objekte/{objekt_id}/haus", headers=headers)
+    assert len(tree.json()[0]["beteiligte"][0]["kontakte"]) == 2
+
+    # Kontakt entfernen (nur k1 behalten)
+    row_id = bet[0]["id"]
+    res = await client.patch(
+        f"/api/v1/objektstruktur/haus/{haus_id}",
+        headers=headers,
+        json={
+            "beteiligte": [
+                {
+                    "id": row_id,
+                    "partner_id": partner_id,
+                    "rolle_id": rollen["eigentuemer"],
+                    "partner_kontakt_ids": [k1],
+                }
+            ]
+        },
+    )
+    assert res.status_code == 200, res.text
+    kontakte = res.json()["beteiligte"][0]["kontakte"]
+    assert len(kontakte) == 1 and kontakte[0]["name"] == "Hans Stein"
+
+
+@pytest.mark.integration
+async def test_kontakt_fremder_partner_rejected(client, admin_user) -> None:
+    """Ein Ansprechpartner, der zu einem ANDEREN Partner gehört, darf nicht
+    zugeordnet werden → 400 (IDOR/Datenintegrität)."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    objekt_id = await _create_objekt(client, headers)
+    haus_id = await _create_haus(client, headers, objekt_id)
+    partner_a = await _create_partner(client, headers, "Partner A")
+    partner_b = await _create_partner(client, headers, "Partner B")
+    kontakt_b = await _create_kontakt(client, headers, partner_b, "Otto", "B", "otto@b.de")
+    rollen = await _rolle_ids(client, headers)
+
+    # Partner A, aber Kontakt von Partner B → 400
+    res = await client.patch(
+        f"/api/v1/objektstruktur/haus/{haus_id}",
+        headers=headers,
+        json={
+            "beteiligte": [
+                {
+                    "partner_id": partner_a,
+                    "rolle_id": rollen["mieter"],
+                    "partner_kontakt_ids": [kontakt_b],
+                }
+            ]
+        },
     )
     assert res.status_code == 400, res.text
 
