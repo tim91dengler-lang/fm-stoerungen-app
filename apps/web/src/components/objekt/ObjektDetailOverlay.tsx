@@ -6,7 +6,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { anlageApi, objektApi, ticketApi } from '../../api/endpoints';
 import { ObjektStrukturEditor } from './ObjektStrukturEditor';
 import { ObjektBeteiligteTab } from './ObjektBeteiligteTab';
-import type { AnlageRead, ObjektPartnerLinkRead, TicketRead } from '../../api/types';
+import type { AnlageRead, TicketRead } from '../../api/types';
 import {
   DetailHeader,
   DetailOverlay,
@@ -40,11 +40,6 @@ function useObjekt(objektId: string) {
 }
 
 // --- Relations-Spalten -----------------------------------------------------
-
-const partnerColumns: ColumnDef<ObjektPartnerLinkRead>[] = [
-  { id: 'partner', accessorKey: 'partner_name', header: 'Partner' },
-  { id: 'rolle', accessorKey: 'rolle', header: 'Rolle' },
-];
 
 const ticketColumns: ColumnDef<TicketRead>[] = [
   {
@@ -167,29 +162,13 @@ export function ObjektDetailOverlay({
           ),
         },
         {
-          key: 'partner',
-          label: 'Partner',
-          count: o.partner_links.length,
-          isRelation: true,
-          render: () => (
-            <RelationListTab<ObjektPartnerLinkRead>
-              viewKey="objekt-partner"
-              columns={partnerColumns}
-              data={o.partner_links}
-              getSearchText={(pl) => `${pl.partner_name} ${pl.rolle}`}
-              onRowClick={(pl) => navigate(`/stammdaten/partner/${pl.partner_id}`)}
-              searchPlaceholder="In Partnern suchen …"
-              itemLabel={{ singular: 'Partner', plural: 'Partner' }}
-            />
-          ),
-        },
-        {
           key: 'beteiligte',
           label: 'Beteiligte',
           isRelation: true,
           render: () => (
             <ObjektBeteiligteTab
               objektId={objektId}
+              objektName={o.name}
               onPartner={(pid) => navigate(`/stammdaten/partner/${pid}`)}
             />
           ),
