@@ -18,6 +18,13 @@ export interface DetailOverlayProps {
    * schlanke Panels wie Adresse bleiben content-hoch).
    */
   fixedHeight?: boolean;
+  /**
+   * Sperrt das Schließen per Esc und Backdrop-Klick. Für eingebettete Editoren
+   * mit eigenen Sub-Modals (z. B. Struktur-Editor): solange ein Sub-Modal offen
+   * ist, würde Esc sonst das Overlay schließen und das Modal verwaist offen
+   * lassen.
+   */
+  closeLocked?: boolean;
   children: React.ReactNode;
 }
 
@@ -27,16 +34,17 @@ export function DetailOverlay({
   width = 'panel',
   level = 1,
   fixedHeight = false,
+  closeLocked = false,
   children,
 }: DetailOverlayProps) {
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !closeLocked) onClose();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, closeLocked]);
 
   if (!open) return null;
   const maxW = width === 'page' ? 'max-w-6xl' : 'max-w-3xl';
@@ -45,7 +53,7 @@ export function DetailOverlay({
     <div
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
+      onClick={closeLocked ? undefined : onClose}
       className={`fixed inset-0 ${z} flex items-start justify-center bg-black/60 p-4 sm:p-8`}
     >
       <div

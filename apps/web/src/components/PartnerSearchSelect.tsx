@@ -91,10 +91,7 @@ export function PartnerSearchSelect({
     staleTime: 30_000,
   });
 
-  const selectedSet = useMemo(
-    () => new Set(selected.map((p) => p.id)),
-    [selected],
-  );
+  const selectedSet = useMemo(() => new Set(selected.map((p) => p.id)), [selected]);
 
   function add(p: PartnerMini) {
     if (selectedSet.has(p.id)) return;
@@ -168,13 +165,9 @@ export function PartnerSearchSelect({
       {(rawQuery.length > 0 || searchQuery.isFetching) && (
         <div className="mt-1 max-h-60 overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950/50 p-1">
           {!searchEnabled ? (
-            <p className="px-2 py-2 text-center text-xs text-zinc-500">
-              {emptyHint}
-            </p>
+            <p className="px-2 py-2 text-center text-xs text-zinc-500">{emptyHint}</p>
           ) : searchQuery.isFetching ? (
-            <p className="px-2 py-2 text-center text-xs text-zinc-500">
-              Suche …
-            </p>
+            <p className="px-2 py-2 text-center text-xs text-zinc-500">Suche …</p>
           ) : hits.length === 0 ? (
             <p className="px-2 py-2 text-center text-xs text-zinc-500">
               Keine Treffer für „{debouncedQuery}&ldquo;.
@@ -290,13 +283,19 @@ function PartnerBrowseModal({
   );
   const total = browseQuery.data?.pages[0]?.total ?? 0;
 
-  // Close on ESC
+  // Close on ESC — Capture + stopImmediatePropagation laufen vor dem
+  // window-Listener eines umgebenden Overlays (z. B. DetailOverlay im
+  // Struktur-Reiter), sodass Escape nur diesen Picker schließt, nicht das
+  // ganze Overlay. Gleiches Muster wie EntitySearchSelect.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        onClose();
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
 
   return (
@@ -364,9 +363,7 @@ function PartnerBrowseModal({
                       <button
                         type="button"
                         onClick={() =>
-                          isChecked
-                            ? onRemove(p.id)
-                            : onAdd({ id: p.id, name: p.name })
+                          isChecked ? onRemove(p.id) : onAdd({ id: p.id, name: p.name })
                         }
                         className={clsx(
                           'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm',
