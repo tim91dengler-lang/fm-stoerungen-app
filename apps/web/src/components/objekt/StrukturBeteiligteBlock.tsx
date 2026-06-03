@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mail, Phone, Plus, Smartphone, Trash2, UserPlus, Users2, X } from 'lucide-react';
 import { partnerApi } from '../../api/endpoints';
-import type { Beteiligter, BeteiligterWrite } from '../../api/types';
+import type { Beteiligter, BeteiligterWrite, KontaktMini } from '../../api/types';
 import { EntitySearchSelect } from '../EntitySearchSelect';
+import { MultiSelectCombobox } from '../MultiSelectCombobox';
 import { searchPartner } from '../../lib/entitySearch';
 
 interface RolleOption {
@@ -31,6 +32,7 @@ function toWrite(b: Beteiligter): BeteiligterWrite {
     id: b.id,
     partner_id: b.partner_id,
     rolle_id: b.rolle_id,
+    partner_kontakt_ids: b.kontakte.map((k) => k.id),
   };
 }
 
@@ -101,6 +103,7 @@ export function StrukturBeteiligteBlock({
           b={b}
           rolleOptions={rolleOptions}
           onRolle={(rolleId) => patchSaved(b.id, { rolle_id: rolleId })}
+          onKontakte={(ids) => patchSaved(b.id, { partner_kontakt_ids: ids })}
           onRemove={() => removeSaved(b.id)}
         />
       ))}
@@ -183,43 +186,35 @@ function RolleSelect({
   );
 }
 
-function ContactActions({
-  email,
-  telefon,
-  mobil,
-}: {
-  email: string | null;
-  telefon: string | null;
-  mobil: string | null;
-}) {
-  if (!email && !telefon && !mobil) return null;
+function KontaktLine({ k }: { k: KontaktMini }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[11px]">
-      {email && (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
+      <span className="text-zinc-300">{k.name}</span>
+      {k.email && (
         <a
-          href={`mailto:${email}`}
+          href={`mailto:${k.email}`}
           className="inline-flex items-center gap-1 text-sky-300 hover:underline"
-          title={email}
+          title={k.email}
         >
           <Mail className="h-3 w-3" /> E-Mail
         </a>
       )}
-      {telefon && (
+      {k.telefon && (
         <a
-          href={`tel:${telefon}`}
+          href={`tel:${k.telefon}`}
           className="inline-flex items-center gap-1 text-emerald-300 hover:underline"
-          title={telefon}
+          title={k.telefon}
         >
-          <Phone className="h-3 w-3" /> {telefon}
+          <Phone className="h-3 w-3" /> {k.telefon}
         </a>
       )}
-      {mobil && (
+      {k.mobil && (
         <a
-          href={`tel:${mobil}`}
+          href={`tel:${k.mobil}`}
           className="inline-flex items-center gap-1 text-emerald-300 hover:underline"
-          title={mobil}
+          title={k.mobil}
         >
-          <Smartphone className="h-3 w-3" /> {mobil}
+          <Smartphone className="h-3 w-3" /> {k.mobil}
         </a>
       )}
     </div>
@@ -230,19 +225,26 @@ function SavedBeteiligterRow({
   b,
   rolleOptions,
   onRolle,
+  onKontakte,
   onRemove,
 }: {
   b: Beteiligter;
   rolleOptions: RolleOption[];
   onRolle: (v: string | null) => void;
+  onKontakte: (ids: string[]) => void;
   onRemove: () => void;
 }) {
-  // Kontaktdaten (mailto/tel) aus dem Partner-Stamm — klickbar (Standard Tim 2026-06-03).
-  const partnerQuery = useQuery({
-    queryKey: ['partner-detail-contact', b.partner_id],
-    queryFn: () => partnerApi.get(b.partner_id),
+  // Ansprechpartner DIESES Partners als Auswahl-Optionen (mehrere zuordenbar).
+  const kontakteQuery = useQuery({
+    queryKey: ['partner-kontakte', b.partner_id],
+    queryFn: () => partnerApi.listKontakte(b.partner_id),
     staleTime: 60_000,
   });
+  const options = (kontakteQuery.data ?? []).map((k) => ({
+    value: k.id,
+    label: [k.vorname, k.nachname].filter(Boolean).join(' ') || 'Ansprechpartner',
+  }));
+  const selectedIds = b.kontakte.map((k) => k.id);
 
   return (
     <div className={ROW_CLASS}>
@@ -261,11 +263,33 @@ function SavedBeteiligterRow({
         </button>
       </div>
       <RolleSelect value={b.rolle_id} options={rolleOptions} onChange={onRolle} />
-      <ContactActions
-        email={partnerQuery.data?.email ?? null}
-        telefon={partnerQuery.data?.telefon ?? null}
-        mobil={partnerQuery.data?.mobil ?? null}
-      />
+
+      <div>
+        <label className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">
+          Ansprechpartner
+        </label>
+        {options.length > 0 ? (
+          <MultiSelectCombobox
+            value={selectedIds}
+            onChange={onKontakte}
+            options={options}
+            size="sm"
+            placeholder="Ansprechpartner wählen …"
+          />
+        ) : (
+          <p className="text-[10px] text-zinc-600">
+            Keine Ansprechpartner beim Partner hinterlegt.
+          </p>
+        )}
+      </div>
+
+      {b.kontakte.length > 0 && (
+        <div className="space-y-1 border-t border-zinc-800/60 pt-2">
+          {b.kontakte.map((k) => (
+            <KontaktLine key={k.id} k={k} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

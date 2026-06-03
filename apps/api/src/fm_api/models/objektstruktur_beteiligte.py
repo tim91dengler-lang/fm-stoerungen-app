@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, Integer
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,7 +26,7 @@ from fm_api.models.mixins import TimestampMixin, UuidPkMixin
 
 if TYPE_CHECKING:
     from fm_api.models.auswahlliste import AuswahllistenWert
-    from fm_api.models.partner import GeschaeftsPartner, PartnerKontakt
+    from fm_api.models.partner import GeschaeftsPartner
 
 
 class ObjektBeteiligter(UuidPkMixin, TimestampMixin, Base):
@@ -49,10 +50,10 @@ class ObjektBeteiligter(UuidPkMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    partner_kontakt_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("partner_kontakte.id", ondelete="SET NULL"),
-        nullable=True,
+    # Mehrere Ansprechpartner desselben Partners (z. B. Herr + Frau). Array statt
+    # FK — Element-Integrität wird im Service mandanten-/partnergebunden validiert.
+    partner_kontakt_ids: Mapped[list[UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)), nullable=False, server_default="{}"
     )
     rolle_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -62,7 +63,6 @@ class ObjektBeteiligter(UuidPkMixin, TimestampMixin, Base):
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
-    partner_kontakt: Mapped["PartnerKontakt | None"] = relationship(lazy="raise")
     rolle_wert: Mapped["AuswahllistenWert | None"] = relationship(lazy="raise")
 
 
@@ -87,10 +87,10 @@ class HausBeteiligter(UuidPkMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    partner_kontakt_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("partner_kontakte.id", ondelete="SET NULL"),
-        nullable=True,
+    # Mehrere Ansprechpartner desselben Partners (z. B. Herr + Frau). Array statt
+    # FK — Element-Integrität wird im Service mandanten-/partnergebunden validiert.
+    partner_kontakt_ids: Mapped[list[UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)), nullable=False, server_default="{}"
     )
     rolle_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -100,7 +100,6 @@ class HausBeteiligter(UuidPkMixin, TimestampMixin, Base):
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
-    partner_kontakt: Mapped["PartnerKontakt | None"] = relationship(lazy="raise")
     rolle_wert: Mapped["AuswahllistenWert | None"] = relationship(lazy="raise")
 
 
@@ -125,10 +124,10 @@ class StockwerkBeteiligter(UuidPkMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    partner_kontakt_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("partner_kontakte.id", ondelete="SET NULL"),
-        nullable=True,
+    # Mehrere Ansprechpartner desselben Partners (z. B. Herr + Frau). Array statt
+    # FK — Element-Integrität wird im Service mandanten-/partnergebunden validiert.
+    partner_kontakt_ids: Mapped[list[UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)), nullable=False, server_default="{}"
     )
     rolle_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -138,7 +137,6 @@ class StockwerkBeteiligter(UuidPkMixin, TimestampMixin, Base):
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
-    partner_kontakt: Mapped["PartnerKontakt | None"] = relationship(lazy="raise")
     rolle_wert: Mapped["AuswahllistenWert | None"] = relationship(lazy="raise")
 
 
@@ -163,10 +161,10 @@ class EinheitBeteiligter(UuidPkMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
-    partner_kontakt_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("partner_kontakte.id", ondelete="SET NULL"),
-        nullable=True,
+    # Mehrere Ansprechpartner desselben Partners (z. B. Herr + Frau). Array statt
+    # FK — Element-Integrität wird im Service mandanten-/partnergebunden validiert.
+    partner_kontakt_ids: Mapped[list[UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)), nullable=False, server_default="{}"
     )
     rolle_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -176,5 +174,4 @@ class EinheitBeteiligter(UuidPkMixin, TimestampMixin, Base):
     reihenfolge: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     partner: Mapped["GeschaeftsPartner"] = relationship(lazy="raise")
-    partner_kontakt: Mapped["PartnerKontakt | None"] = relationship(lazy="raise")
     rolle_wert: Mapped["AuswahllistenWert | None"] = relationship(lazy="raise")
