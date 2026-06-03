@@ -13,22 +13,24 @@ import {
   Plus,
   Trash2,
   Upload,
+  Users2,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../../api/client';
-import { adresseApi, objektstrukturApi } from '../../api/endpoints';
+import { adresseApi, auswahllistenApi, objektstrukturApi } from '../../api/endpoints';
 import type {
   AdresseRead,
   Ausrichtung,
+  BeteiligterWrite,
   HausRead,
   StockwerkRead,
   EinheitRead,
-  PartnerMini,
 } from '../../api/types';
 import { HausModal } from '../HausModal';
 import { StockwerkModal } from '../StockwerkModal';
 import { EinheitModal } from '../EinheitModal';
-import { PartnerSearchSelect } from '../PartnerSearchSelect';
+import { StrukturBeteiligteBlock } from './StrukturBeteiligteBlock';
+import { aktiveWerte } from '../../lib/aktiveWerte';
 import { ConfirmDialog } from '../../core/liste/ConfirmDialog';
 
 /**
@@ -137,6 +139,8 @@ export function ObjektStrukturEditor({
   // Grundriss-Lösch-Confirm liegt tief im GrundrissPanel — wird für den
   // Interaction-Lock nach oben gemeldet.
   const [grundrissConfirmOpen, setGrundrissConfirmOpen] = useState(false);
+  // Quick-Create-Modal im Beteiligten-Block sperrt ESC/Backdrop des Overlays.
+  const [beteiligteModalOpen, setBeteiligteModalOpen] = useState(false);
 
   // Default: open first house, select it
   useEffect(() => {
@@ -155,7 +159,8 @@ export function ObjektStrukturEditor({
     stockwerkModal.mode !== 'closed' ||
     einheitModal.mode !== 'closed' ||
     confirmState.mode === 'open' ||
-    grundrissConfirmOpen;
+    grundrissConfirmOpen ||
+    beteiligteModalOpen;
   useEffect(() => {
     onInteractionLockChange?.(interactionLocked);
   }, [interactionLocked, onInteractionLockChange]);
@@ -470,6 +475,7 @@ export function ObjektStrukturEditor({
               adressen={adressenQuery.data?.items ?? []}
               objektAdresseId={objektAdresseId}
               onGrundrissConfirmChange={setGrundrissConfirmOpen}
+              onBeteiligteLockChange={setBeteiligteModalOpen}
               onEditHaus={() =>
                 activeEntity.type === 'haus'
                   ? setHausModal({ mode: 'edit', haus: activeEntity.haus })
@@ -846,6 +852,7 @@ interface DetailPanelProps {
   adressen: AdresseRead[];
   objektAdresseId: string | null;
   onGrundrissConfirmChange: (open: boolean) => void;
+  onBeteiligteLockChange: (open: boolean) => void;
   onEditHaus: () => void;
   onEditStockwerk: () => void;
   onEditEinheit: () => void;
@@ -858,6 +865,7 @@ function DetailPanel({
   entity,
   objektId,
   onGrundrissConfirmChange,
+  onBeteiligteLockChange,
   onEditHaus,
   onEditStockwerk,
   onEditEinheit,
@@ -869,43 +877,52 @@ function DetailPanel({
   const invalidateTree = () =>
     qc.invalidateQueries({ queryKey: ['objekt-tree', objektId] });
 
-  // ---- mutations for partner relations (inline edit) ---------------------
-  const updateHausPartner = useMutation({
-    mutationFn: (vars: {
-      hausId: string;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
-    }) =>
-      objektstrukturApi.updateHaus(vars.hausId, {
-        eigentuemer_ids: vars.eigentuemer_ids,
-        mieter_ids: vars.mieter_ids,
-      }),
+  // Rollen für die Beteiligten-Liste (Auswahlliste `objekt_beteiligten_rolle`).
+  const auswahllistenQuery = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
+    staleTime: 60_000,
+  });
+  const rolleOptions = useMemo(() => {
+    const liste = auswahllistenQuery.data?.find(
+      (l) => l.key === 'objekt_beteiligten_rolle',
+    );
+    return aktiveWerte(liste?.werte).map((w) => ({ id: w.id, label: w.label }));
+  }, [auswahllistenQuery.data]);
+
+  // ---- Beteiligte: Voll-Replace pro Ebene (inline edit) ------------------
+  const saveHausBeteiligte = useMutation({
+    mutationFn: (vars: { hausId: string; beteiligte: BeteiligterWrite[] }) =>
+      objektstrukturApi.updateHaus(vars.hausId, { beteiligte: vars.beteiligte }),
     onSuccess: invalidateTree,
   });
-  const updateStockwerkPartner = useMutation({
-    mutationFn: (vars: {
-      swId: string;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
-    }) =>
-      objektstrukturApi.updateStockwerk(vars.swId, {
-        eigentuemer_ids: vars.eigentuemer_ids,
-        mieter_ids: vars.mieter_ids,
-      }),
+  const saveStockwerkBeteiligte = useMutation({
+    mutationFn: (vars: { swId: string; beteiligte: BeteiligterWrite[] }) =>
+      objektstrukturApi.updateStockwerk(vars.swId, { beteiligte: vars.beteiligte }),
     onSuccess: invalidateTree,
   });
-  const updateEinheitPartner = useMutation({
-    mutationFn: (vars: {
-      eId: string;
-      eigentuemer_ids: string[];
-      mieter_ids: string[];
-    }) =>
-      objektstrukturApi.updateEinheit(vars.eId, {
-        eigentuemer_ids: vars.eigentuemer_ids,
-        mieter_ids: vars.mieter_ids,
-      }),
+  const saveEinheitBeteiligte = useMutation({
+    mutationFn: (vars: { eId: string; beteiligte: BeteiligterWrite[] }) =>
+      objektstrukturApi.updateEinheit(vars.eId, { beteiligte: vars.beteiligte }),
     onSuccess: invalidateTree,
   });
+
+  function saveBeteiligte(next: BeteiligterWrite[]) {
+    if (entity.type === 'haus') {
+      saveHausBeteiligte.mutate({ hausId: entity.haus.id, beteiligte: next });
+    } else if (entity.type === 'stockwerk') {
+      saveStockwerkBeteiligte.mutate({ swId: entity.stockwerk.id, beteiligte: next });
+    } else {
+      saveEinheitBeteiligte.mutate({ eId: entity.einheit.id, beteiligte: next });
+    }
+  }
+
+  const beteiligte =
+    entity.type === 'haus'
+      ? entity.haus.beteiligte
+      : entity.type === 'stockwerk'
+        ? entity.stockwerk.beteiligte
+        : entity.einheit.beteiligte;
 
   // Determine props depending on entity type
   let title: string;
@@ -914,9 +931,6 @@ function DetailPanel({
   let iconColor: string;
   let onEdit: () => void;
   let onRemove: () => void;
-  let eigentuemer: PartnerMini[];
-  let mieter: PartnerMini[];
-  let savePartners: (eig: PartnerMini[], mie: PartnerMini[]) => void;
   let grunddaten: Array<{ label: string; value: string | null | undefined }>;
   let showGrundriss = false;
   let stockwerkForGrundriss: StockwerkRead | null = null;
@@ -929,14 +943,6 @@ function DetailPanel({
     iconColor = 'text-emerald-400';
     onEdit = onEditHaus;
     onRemove = onRemoveHaus;
-    eigentuemer = h.eigentuemer;
-    mieter = h.mieter;
-    savePartners = (eig, mie) =>
-      updateHausPartner.mutate({
-        hausId: h.id,
-        eigentuemer_ids: eig.map((p) => p.id),
-        mieter_ids: mie.map((p) => p.id),
-      });
     const adresse = h.adresse
       ? `${h.adresse.strasse}${h.adresse.hausnummer ? ' ' + h.adresse.hausnummer : ''}, ${h.adresse.plz} ${h.adresse.ort}`
       : '— (verwendet Objekt-Adresse)';
@@ -952,14 +958,6 @@ function DetailPanel({
     iconColor = 'text-sky-400';
     onEdit = onEditStockwerk;
     onRemove = onRemoveStockwerk;
-    eigentuemer = s.eigentuemer;
-    mieter = s.mieter;
-    savePartners = (eig, mie) =>
-      updateStockwerkPartner.mutate({
-        swId: s.id,
-        eigentuemer_ids: eig.map((p) => p.id),
-        mieter_ids: mie.map((p) => p.id),
-      });
     grunddaten = [
       {
         label: 'Ausrichtung',
@@ -977,14 +975,6 @@ function DetailPanel({
     iconColor = 'text-amber-400';
     onEdit = onEditEinheit;
     onRemove = onRemoveEinheit;
-    eigentuemer = e.eigentuemer;
-    mieter = e.mieter;
-    savePartners = (eig, mie) =>
-      updateEinheitPartner.mutate({
-        eId: e.id,
-        eigentuemer_ids: eig.map((p) => p.id),
-        mieter_ids: mie.map((p) => p.id),
-      });
     grunddaten = [
       {
         label: 'Größe',
@@ -1045,25 +1035,13 @@ function DetailPanel({
         </dl>
       </DetailSection>
 
-      {/* Eigentümer */}
-      <DetailSection title="Eigentümer">
-        <PartnerSearchSelect
-          selected={eigentuemer}
-          onChange={(next) => savePartners(next, mieter)}
-          roleLabel="Eigentümer"
-          tone="violet"
-          searchPlaceholder="Eigentümer suchen … (alle Partner)"
-        />
-      </DetailSection>
-
-      {/* Mieter */}
-      <DetailSection title="Mieter">
-        <PartnerSearchSelect
-          selected={mieter}
-          onChange={(next) => savePartners(eigentuemer, next)}
-          roleLabel="Mieter"
-          tone="amber"
-          searchPlaceholder="Mieter suchen … (alle Partner)"
+      {/* Beteiligte (Partner + freie Rolle) — ersetzt Eigentümer/Mieter */}
+      <DetailSection title="Beteiligte" icon={Users2}>
+        <StrukturBeteiligteBlock
+          beteiligte={beteiligte}
+          rolleOptions={rolleOptions}
+          onChange={saveBeteiligte}
+          onInteractionLockChange={onBeteiligteLockChange}
         />
       </DetailSection>
 

@@ -678,6 +678,24 @@ export interface PartnerMini {
   name: string;
 }
 
+/** Ein Beteiligter (Partner + freie Rolle) an einem Struktur-Knoten (read). */
+export interface Beteiligter {
+  id: UUID;
+  partner_id: UUID;
+  partner_name: string;
+  rolle_id: UUID | null;
+  rolle_label: string | null;
+}
+
+/** Eine Beteiligten-Zeile beim Schreiben (Voll-Replace der Liste). */
+export interface BeteiligterWrite {
+  id?: UUID | null;
+  partner_id: UUID;
+  partner_kontakt_id?: UUID | null;
+  rolle_id?: UUID | null;
+  reihenfolge?: number;
+}
+
 export interface EinheitRead {
   id: UUID;
   stockwerk_id: UUID;
@@ -686,6 +704,7 @@ export interface EinheitRead {
   reihenfolge: number;
   eigentuemer: PartnerMini[];
   mieter: PartnerMini[];
+  beteiligte: Beteiligter[];
   created_at: string;
   updated_at: string;
 }
@@ -696,6 +715,7 @@ export interface EinheitWriteBase {
   reihenfolge?: number;
   eigentuemer_ids?: UUID[];
   mieter_ids?: UUID[];
+  beteiligte?: BeteiligterWrite[];
 }
 
 export type EinheitCreate = EinheitWriteBase;
@@ -711,6 +731,7 @@ export interface StockwerkRead {
   grundriss_mime: string | null;
   eigentuemer: PartnerMini[];
   mieter: PartnerMini[];
+  beteiligte: Beteiligter[];
   einheiten: EinheitRead[];
   created_at: string;
   updated_at: string;
@@ -722,6 +743,7 @@ export interface StockwerkWriteBase {
   reihenfolge?: number;
   eigentuemer_ids?: UUID[];
   mieter_ids?: UUID[];
+  beteiligte?: BeteiligterWrite[];
 }
 
 export type StockwerkCreate = StockwerkWriteBase;
@@ -736,6 +758,7 @@ export interface HausRead {
   adresse: AdresseRead | null;
   eigentuemer: PartnerMini[];
   mieter: PartnerMini[];
+  beteiligte: Beteiligter[];
   stockwerke: StockwerkRead[];
   created_at: string;
   updated_at: string;
@@ -748,6 +771,7 @@ export interface HausWriteBase {
   reihenfolge?: number;
   eigentuemer_ids?: UUID[];
   mieter_ids?: UUID[];
+  beteiligte?: BeteiligterWrite[];
 }
 
 export type HausCreate = HausWriteBase;

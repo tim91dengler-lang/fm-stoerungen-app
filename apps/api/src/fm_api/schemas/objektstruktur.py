@@ -30,6 +30,22 @@ class BeteiligterRead(BaseModel):
     rolle_label: str | None = None
 
 
+class BeteiligterWrite(BaseModel):
+    """Eine Beteiligten-Zeile beim Schreiben (Voll-Replace der Liste).
+
+    ``id`` gesetzt + zum Knoten gehörend → bestehende Zeile aktualisieren; sonst
+    neu anlegen. Fehlende bestehende Zeilen werden entfernt. ``partner_id``,
+    ``partner_kontakt_id`` und ``rolle_id`` werden serverseitig mandantengebunden
+    validiert (Rolle muss aus ``objekt_beteiligten_rolle`` stammen).
+    """
+
+    id: UUID | None = None
+    partner_id: UUID
+    partner_kontakt_id: UUID | None = None
+    rolle_id: UUID | None = None
+    reihenfolge: int | None = None
+
+
 # -------- Einheit ----------------------------------------------------------
 
 
@@ -47,6 +63,7 @@ class EinheitUpdate(BaseModel):
     reihenfolge: int | None = None
     eigentuemer_ids: list[UUID] | None = None
     mieter_ids: list[UUID] | None = None
+    beteiligte: list[BeteiligterWrite] | None = None
 
 
 class EinheitRead(TimestampedRead):
@@ -81,6 +98,7 @@ class StockwerkUpdate(BaseModel):
     reihenfolge: int | None = None
     eigentuemer_ids: list[UUID] | None = None
     mieter_ids: list[UUID] | None = None
+    beteiligte: list[BeteiligterWrite] | None = None
 
 
 class StockwerkRead(TimestampedRead):
@@ -117,6 +135,7 @@ class HausUpdate(BaseModel):
     reihenfolge: int | None = None
     eigentuemer_ids: list[UUID] | None = None
     mieter_ids: list[UUID] | None = None
+    beteiligte: list[BeteiligterWrite] | None = None
 
 
 class HausRead(TimestampedRead):
