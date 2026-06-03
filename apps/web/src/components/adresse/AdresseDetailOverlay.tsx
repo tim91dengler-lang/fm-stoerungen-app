@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { adresseApi } from '../../api/endpoints';
 import type { AdresseUpdate } from '../../api/types';
+import { MapsLink } from '../MapsLink';
 import {
   DetailBlock,
   DetailHeader,
@@ -60,6 +61,9 @@ function AdresseUebersicht({ a }: { a: Adresse }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
       <div className="mx-auto w-full max-w-3xl">
+        <div className="mb-3">
+          <MapsLink adresse={a} />
+        </div>
         <DetailRegions
           left={
             <>

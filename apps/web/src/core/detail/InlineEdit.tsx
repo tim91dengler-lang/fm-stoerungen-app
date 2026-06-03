@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Globe, Mail, Phone } from 'lucide-react';
 
 import { DatePicker } from '../../components/DatePicker';
 import {
@@ -24,6 +25,33 @@ type CommitState = 'idle' | 'saving' | 'error';
 
 const READ_CLS =
   'w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-left text-sm text-zinc-300 transition-colors hover:border-emerald-600/60';
+
+/** Klickbare Kontakt-Felder: E-Mail (mailto), Telefon (tel), Webseite (http). */
+export type ContactLinkKind = 'email' | 'phone' | 'url';
+
+function contactLink(kind: ContactLinkKind, raw: string) {
+  const v = raw.trim();
+  if (kind === 'email')
+    return {
+      href: `mailto:${v}`,
+      Icon: Mail,
+      title: 'E-Mail schreiben',
+      external: false,
+    };
+  if (kind === 'phone')
+    return {
+      href: `tel:${v.replace(/[^+\d]/g, '')}`,
+      Icon: Phone,
+      title: 'Anrufen',
+      external: false,
+    };
+  return {
+    href: /^https?:\/\//i.test(v) ? v : `https://${v}`,
+    Icon: Globe,
+    title: 'Webseite öffnen',
+    external: true,
+  };
+}
 const EDIT_CLS =
   'w-full rounded-md border border-emerald-600 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-emerald-500';
 
@@ -120,6 +148,7 @@ export function InlineEditText({
   multiline = false,
   required = false,
   placeholder,
+  linkKind,
   onCommit,
 }: {
   label: string;
@@ -128,6 +157,8 @@ export function InlineEditText({
   /** Pflichtfeld: leerer Draft wird verworfen (kein Commit/422-Roundtrip). */
   required?: boolean;
   placeholder?: string;
+  /** Macht den Read-Wert klickbar (mailto/tel/http) mit Aktions-Icon. */
+  linkKind?: ContactLinkKind;
   onCommit: (next: string | null) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -187,11 +218,37 @@ export function InlineEditText({
   }
 
   if (!editing) {
+    const link =
+      linkKind && value && value.trim() !== '' ? contactLink(linkKind, value) : null;
     return (
       <FieldShell label={label} state={state}>
-        <ReadButton label={label} onOpen={() => setEditing(true)}>
-          {value ? value : <span className="text-zinc-600">— leer —</span>}
-        </ReadButton>
+        {link ? (
+          <div className="flex items-stretch gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label={`${label} bearbeiten`}
+              title="Zum Bearbeiten klicken"
+              className="min-w-0 flex-1 truncate rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-left text-sm text-zinc-300 transition-colors hover:border-emerald-600/60"
+            >
+              {value}
+            </button>
+            <a
+              href={link.href}
+              {...(link.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+              onClick={(e) => e.stopPropagation()}
+              title={link.title}
+              aria-label={link.title}
+              className="flex shrink-0 items-center rounded-md border border-zinc-700 bg-zinc-950 px-2.5 text-zinc-400 transition-colors hover:border-emerald-600/60 hover:text-emerald-300"
+            >
+              <link.Icon className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        ) : (
+          <ReadButton label={label} onOpen={() => setEditing(true)}>
+            {value ? value : <span className="text-zinc-600">— leer —</span>}
+          </ReadButton>
+        )}
       </FieldShell>
     );
   }
