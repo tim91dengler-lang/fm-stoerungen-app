@@ -26,7 +26,7 @@ import {
 } from '../api/endpoints';
 import type { TicketPrioritaetSlug, TicketRead, TicketStatusSlug } from '../api/types';
 import { PrioBadge, StatusBadge } from '../components/StatusBadge';
-import { DateFilter, dateLteFilter } from '../core/felder/listFields';
+import { DateFilter, dateLteFilter, selectFilter } from '../core/felder/listFields';
 import { usePartnerTypLookup } from '../lib/usePartnerTypLookup';
 import { TicketErfassenModal } from './TicketErfassenModal';
 import {
@@ -45,7 +45,7 @@ import { iconForKategorie } from '../lib/kategorieIcon';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter, type SelectOption } from '../core/liste/columnFilters';
+import { TextFilter, type SelectOption } from '../core/liste/columnFilters';
 
 interface TicketsViewConfig {
   sorting: SortingState;
@@ -366,12 +366,8 @@ function columnFilterSlugs<T extends string>(
 
 const filterRenderers = {
   titel: TextFilter,
-  status: (props: { value: unknown; onChange: (v: unknown) => void }) => (
-    <SelectFilter {...props} options={STATUS_FILTER_OPTIONS} />
-  ),
-  prioritaet: (props: { value: unknown; onChange: (v: unknown) => void }) => (
-    <SelectFilter {...props} options={PRIO_FILTER_OPTIONS} />
-  ),
+  status: selectFilter(STATUS_FILTER_OPTIONS),
+  prioritaet: selectFilter(PRIO_FILTER_OPTIONS),
   kategorie: TextFilter,
   objekt: TextFilter,
   partner: TextFilter,

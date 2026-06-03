@@ -20,8 +20,9 @@ import type {
 } from '../api/types';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import { selectFilter } from '../core/felder/listFields';
 import { isModulStandard } from '../core/featureFlags';
 import { ProjektDetailOverlay } from '../components/projekt/ProjektDetailOverlay';
 import { ProjektModal } from '../components/ProjektModal';
@@ -226,9 +227,7 @@ export function ProjektePage() {
   const bulkStatusMut = useMutation({
     mutationFn: async (vars: { ids: string[]; statusSlug: string }) => {
       await Promise.all(
-        vars.ids.map((id) =>
-          projektApi.update(id, { status_slug: vars.statusSlug }),
-        ),
+        vars.ids.map((id) => projektApi.update(id, { status_slug: vars.statusSlug })),
       );
     },
     onSuccess: () => {
@@ -313,9 +312,7 @@ export function ProjektePage() {
                 </Link>
               )}
               {p.beschreibung && (
-                <div className="text-xs text-zinc-500 line-clamp-1">
-                  {p.beschreibung}
-                </div>
+                <div className="line-clamp-1 text-xs text-zinc-500">{p.beschreibung}</div>
               )}
             </div>
           );
@@ -350,9 +347,7 @@ export function ProjektePage() {
         },
         cell: (ctx) => {
           const s = ctx.row.original.status;
-          return (
-            <StatusPill keyValue={s.key} label={s.label} farbe={s.farbe} />
-          );
+          return <StatusPill keyValue={s.key} label={s.label} farbe={s.farbe} />;
         },
       },
       {
@@ -372,8 +367,7 @@ export function ProjektePage() {
         filterFn: 'includesString',
         cell: (ctx) => {
           const p = ctx.row.original;
-          if (!p.start_am && !p.ende_am)
-            return <span className="text-zinc-500">—</span>;
+          if (!p.start_am && !p.ende_am) return <span className="text-zinc-500">—</span>;
           return (
             <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
               <Calendar className="h-3 w-3" />
@@ -384,14 +378,12 @@ export function ProjektePage() {
       },
       {
         id: 'objekte',
-        accessorFn: (row) =>
-          row.objekte.map((o) => o.name).join(' '),
+        accessorFn: (row) => row.objekte.map((o) => o.name).join(' '),
         header: 'Objekte',
         filterFn: 'includesString',
         cell: (ctx) => {
           const objekte = ctx.row.original.objekte;
-          if (objekte.length === 0)
-            return <span className="text-zinc-500">—</span>;
+          if (objekte.length === 0) return <span className="text-zinc-500">—</span>;
           const first = objekte[0]!;
           const titleText = objekte.map((o) => o.name).join(', ');
           return (
@@ -462,8 +454,7 @@ export function ProjektePage() {
             <FolderKanban className="h-5 w-5 text-emerald-400" /> Projekte
           </h1>
           <p className="mt-0.5 text-sm text-zinc-500">
-            Bündel zusammengehöriger Tickets mit Verantwortlichem, Status und
-            Objekten
+            Bündel zusammengehöriger Tickets mit Verantwortlichem, Status und Objekten
           </p>
         </div>
         <button
@@ -486,9 +477,7 @@ export function ProjektePage() {
         sorting={config.sorting}
         onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
         columnFilters={config.columnFilters}
-        onColumnFiltersChange={(f) =>
-          setConfig((p) => ({ ...p, columnFilters: f }))
-        }
+        onColumnFiltersChange={(f) => setConfig((p) => ({ ...p, columnFilters: f }))}
         columnOrder={config.columnOrder}
         onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
         grouping={config.grouping}
@@ -497,15 +486,9 @@ export function ProjektePage() {
           name: TextFilter,
           zeitraum: TextFilter,
           objekte: TextFilter,
-          projekttyp: (props) => (
-            <SelectFilter {...props} options={projekttypFilterOptions} />
-          ),
-          status: (props) => (
-            <SelectFilter {...props} options={statusFilterOptions} />
-          ),
-          verantwortlich: (props) => (
-            <SelectFilter {...props} options={verantwortlichFilterOptions} />
-          ),
+          projekttyp: selectFilter(projekttypFilterOptions),
+          status: selectFilter(statusFilterOptions),
+          verantwortlich: selectFilter(verantwortlichFilterOptions),
         }}
         enableRowSelection
         getRowId={(p) => p.id}
@@ -556,13 +539,13 @@ export function ProjektePage() {
         message={
           bulkConfirm && bulkConfirm.length === 1 ? (
             <span>
-              Projekt <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen?
-              Diese Aktion kann nicht rückgängig gemacht werden.
+              Projekt <strong>{bulkConfirm[0]?.name}</strong> wirklich löschen? Diese
+              Aktion kann nicht rückgängig gemacht werden.
             </span>
           ) : (
             <span>
-              {bulkConfirm?.length ?? 0} ausgewählte Projekte werden
-              unwiderruflich gelöscht.
+              {bulkConfirm?.length ?? 0} ausgewählte Projekte werden unwiderruflich
+              gelöscht.
             </span>
           )
         }

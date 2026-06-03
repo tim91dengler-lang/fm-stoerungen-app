@@ -14,8 +14,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatDateTime } from '../lib/format';
 import { PowerListenView } from '../core/liste/PowerListenView';
 import { SavedViewsMenu } from '../core/liste/SavedViewsMenu';
-import { SelectFilter, TextFilter } from '../core/liste/columnFilters';
+import { TextFilter } from '../core/liste/columnFilters';
 import { ConfirmDialog } from '../core/liste/ConfirmDialog';
+import { boolStatusFilter } from '../core/felder/listFields';
 
 interface ViewConfig {
   sorting: SortingState;
@@ -60,8 +61,7 @@ export function UsersListePage() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['users', search],
-    queryFn: () =>
-      userApi.list({ search: search.trim() || undefined, limit: 100 }),
+    queryFn: () => userApi.list({ search: search.trim() || undefined, limit: 100 }),
     enabled: isAdmin,
   });
 
@@ -128,7 +128,9 @@ export function UsersListePage() {
         accessorKey: 'created_at',
         header: 'Angelegt',
         cell: (ctx) => (
-          <span className="text-zinc-400">{formatDateTime(ctx.row.original.created_at)}</span>
+          <span className="text-zinc-400">
+            {formatDateTime(ctx.row.original.created_at)}
+          </span>
         ),
       },
     ],
@@ -155,9 +157,7 @@ export function UsersListePage() {
     <div className="space-y-4 px-4 py-6 lg:px-8">
       <div>
         <h1 className="text-xl font-semibold text-zinc-100">Benutzer</h1>
-        <p className="text-sm text-zinc-500">
-          {data ? `${data.total} Treffer` : '—'}
-        </p>
+        <p className="text-sm text-zinc-500">{data ? `${data.total} Treffer` : '—'}</p>
       </div>
 
       {error && (
@@ -178,9 +178,7 @@ export function UsersListePage() {
           sorting={config.sorting}
           onSortingChange={(s) => setConfig((p) => ({ ...p, sorting: s }))}
           columnFilters={config.columnFilters}
-          onColumnFiltersChange={(f) =>
-            setConfig((p) => ({ ...p, columnFilters: f }))
-          }
+          onColumnFiltersChange={(f) => setConfig((p) => ({ ...p, columnFilters: f }))}
           columnOrder={config.columnOrder}
           onColumnOrderChange={(o) => setConfig((p) => ({ ...p, columnOrder: o }))}
           grouping={config.grouping}
@@ -189,15 +187,7 @@ export function UsersListePage() {
             full_name: TextFilter,
             email: TextFilter,
             roles: TextFilter,
-            is_active: (props) => (
-              <SelectFilter
-                {...props}
-                options={[
-                  { value: 'aktiv', label: 'aktiv' },
-                  { value: 'inaktiv', label: 'inaktiv' },
-                ]}
-              />
-            ),
+            is_active: boolStatusFilter(),
           }}
           enableRowSelection={isAdmin}
           getRowId={(u) => u.id}
@@ -232,9 +222,7 @@ export function UsersListePage() {
               </button>
             );
           }}
-          onMassEdit={(col, val, rows) =>
-            handleMassEdit(col, val, selfExcluded(rows))
-          }
+          onMassEdit={(col, val, rows) => handleMassEdit(col, val, selfExcluded(rows))}
           count={{
             filtered: data?.items.length ?? 0,
             total: data?.total ?? 0,
@@ -267,8 +255,8 @@ export function UsersListePage() {
           <span>
             {bulkConfirm && bulkConfirm.length > selfExcluded(bulkConfirm).length && (
               <span className="mb-2 block text-xs text-amber-400">
-                Dein eigener Account wurde aus der Auswahl entfernt — du kannst
-                dich nicht selbst löschen.
+                Dein eigener Account wurde aus der Auswahl entfernt — du kannst dich nicht
+                selbst löschen.
               </span>
             )}
             {bulkConfirm && selfExcluded(bulkConfirm).length === 1 ? (
@@ -278,8 +266,8 @@ export function UsersListePage() {
               </>
             ) : (
               <>
-                {bulkConfirm ? selfExcluded(bulkConfirm).length : 0} ausgewählte
-                Benutzer werden per Soft-Delete deaktiviert.
+                {bulkConfirm ? selfExcluded(bulkConfirm).length : 0} ausgewählte Benutzer
+                werden per Soft-Delete deaktiviert.
               </>
             )}
           </span>

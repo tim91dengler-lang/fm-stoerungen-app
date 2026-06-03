@@ -51,18 +51,25 @@ export function boolStatusCell(
   );
 }
 
-/** Filter-Renderer für PowerListenView.filterRenderers (Multi-Select aus true/false-Labels). */
-export function boolStatusFilter(trueLabel = 'aktiv', falseLabel = 'inaktiv') {
-  const options: SelectOption[] = [
-    { value: trueLabel, label: trueLabel },
-    { value: falseLabel, label: falseLabel },
-  ];
-  return function BoolStatusFilter(props: {
+/**
+ * Generischer Multi-Select-Spaltenfilter aus festen Optionen — ersetzt das über
+ * die Seiten wiederholte `(props) => <SelectFilter {...props} options={…} />`.
+ */
+export function selectFilter(options: SelectOption[]) {
+  return function SelectFilterRenderer(props: {
     value: unknown;
     onChange: (v: unknown) => void;
   }): ReactNode {
     return <SelectFilter {...props} options={options} />;
   };
+}
+
+/** Filter-Renderer für das Boolean-„Status"-Muster (true/false-Labels). */
+export function boolStatusFilter(trueLabel = 'aktiv', falseLabel = 'inaktiv') {
+  return selectFilter([
+    { value: trueLabel, label: trueLabel },
+    { value: falseLabel, label: falseLabel },
+  ]);
 }
 
 // ---------------------------------------------------------------------------
