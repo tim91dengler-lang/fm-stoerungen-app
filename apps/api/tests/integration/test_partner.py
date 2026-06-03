@@ -327,3 +327,48 @@ async def test_partner_projekte_endpoint_transitiv(
     assert len(items) == 1
     assert items[0]["name"] == "Sanierung Schwabing 2026"
     assert "eigentuemer" in items[0]["rollen_an_objekten"]
+
+
+@pytest.mark.integration
+async def test_create_partner_unknown_rechtsform_returns_422(client, admin_user) -> None:
+    from uuid import uuid4
+
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    res = await client.post(
+        "/api/v1/partner",
+        headers=headers,
+        json={"name": "Fremd GmbH", "typen": [], "rechtsform_id": str(uuid4())},
+    )
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.integration
+async def test_create_partner_unknown_typ_returns_422(client, admin_user) -> None:
+    from uuid import uuid4
+
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    res = await client.post(
+        "/api/v1/partner",
+        headers=headers,
+        json={"name": "Fremd-Typ GmbH", "typen": [str(uuid4())]},
+    )
+    assert res.status_code == 422, res.text
+
+
+@pytest.mark.integration
+async def test_update_partner_unknown_anrede_returns_422(client, admin_user) -> None:
+    from uuid import uuid4
+
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    created = await client.post(
+        "/api/v1/partner", headers=headers, json={"name": "Anrede-Test", "typen": []}
+    )
+    assert created.status_code == 201, created.text
+    pid = created.json()["id"]
+    res = await client.patch(
+        f"/api/v1/partner/{pid}", headers=headers, json={"anrede_id": str(uuid4())}
+    )
+    assert res.status_code == 422, res.text

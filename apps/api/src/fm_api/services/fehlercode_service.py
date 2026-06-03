@@ -6,11 +6,60 @@ from sqlalchemy import asc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from fm_api.models import Fehlercode, Ticket
+from fm_api.models import Anlage, Fehlercode, Ticket, Tickettyp
+from fm_api.services.auswahlliste_service import (
+    AuswahllistenWertNotFoundError,
+    get_wert_by_id,
+)
 
 
 class FehlercodeNotFoundError(Exception):
     pass
+
+
+class FehlercodeValidationError(Exception):
+    """Ungültiger/fremder referenzierter FK (Kategorie/Prio-Wert, Tickettyp, Anlage) — IDOR-Schutz."""
+
+
+async def _validate_fehlercode_fks(
+    db: AsyncSession, mandant_id: UUID, data: dict[str, Any]
+) -> None:
+    """Mandantengebundene Validierung der user-gelieferten FKs (create + update)."""
+    wert_fks = {
+        "kategorie_wert_id": "ticket_kategorie",
+        "prio_default_wert_id": "ticket_prioritaet",
+    }
+    for field, liste_key in wert_fks.items():
+        if data.get(field) is not None:
+            try:
+                await get_wert_by_id(db, mandant_id, data[field], liste_key)
+            except AuswahllistenWertNotFoundError as exc:
+                raise FehlercodeValidationError(str(exc)) from exc
+    if data.get("tickettyp_default_id") is not None:
+        ok = (
+            await db.execute(
+                select(Tickettyp.id).where(
+                    Tickettyp.id == data["tickettyp_default_id"],
+                    Tickettyp.mandant_id == mandant_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if ok is None:
+            raise FehlercodeValidationError(
+                f"tickettyp {data['tickettyp_default_id']} not in mandant"
+            )
+    if data.get("anlage_id") is not None:
+        ok = (
+            await db.execute(
+                select(Anlage.id).where(
+                    Anlage.id == data["anlage_id"],
+                    Anlage.mandant_id == mandant_id,
+                    Anlage.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if ok is None:
+            raise FehlercodeValidationError(f"anlage {data['anlage_id']} not in mandant")
 
 
 _LOAD_OPTIONS = (
@@ -96,6 +145,7 @@ async def get_fehlercode(
 async def create_fehlercode(
     db: AsyncSession, mandant_id: UUID, *, payload: dict[str, Any]
 ) -> Fehlercode:
+    await _validate_fehlercode_fks(db, mandant_id, payload)
     f = Fehlercode(mandant_id=mandant_id, **payload)
     db.add(f)
     await db.flush()
@@ -110,6 +160,7 @@ async def update_fehlercode(
     updates: dict[str, Any],
 ) -> Fehlercode:
     f, _ = await get_fehlercode(db, mandant_id, fehlercode_id)
+    await _validate_fehlercode_fks(db, mandant_id, updates)
     for key, value in updates.items():
         if value is None and key in ("code", "titel"):
             continue

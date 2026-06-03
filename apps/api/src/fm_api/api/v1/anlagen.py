@@ -12,7 +12,7 @@ from fm_api.schemas.anlage import (
     StockwerkMini,
 )
 from fm_api.services import anlage_service
-from fm_api.services.anlage_service import AnlageNotFoundError
+from fm_api.services.anlage_service import AnlageNotFoundError, AnlageValidationError
 
 router = APIRouter()
 
@@ -90,7 +90,12 @@ async def get_anlage(anlage_id: UUID, db: AuditedDbSession, current: CurrentUser
 async def create_anlage(
     payload: AnlageCreate, db: AuditedDbSession, current: CurrentUserDep
 ) -> AnlageRead:
-    a = await anlage_service.create_anlage(db, current.mandant_id, payload=payload.model_dump())
+    try:
+        a = await anlage_service.create_anlage(db, current.mandant_id, payload=payload.model_dump())
+    except AnlageValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _serialize(a)
 
 
@@ -107,6 +112,10 @@ async def update_anlage(
         )
     except AnlageNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except AnlageValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _serialize(a)
 
 

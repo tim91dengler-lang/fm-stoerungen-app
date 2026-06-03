@@ -35,6 +35,33 @@ from fm_api.models.objektstruktur import (
     StockwerkEigentuemer,
     StockwerkMieter,
 )
+from fm_api.services.auswahlliste_service import (
+    get_wert_by_id,
+)
+
+# Auswahllisten-FKs des Partners → erwartete Liste. User-geliefert, daher
+# mandantengebunden validieren (IDOR/Cross-Mandant-Schutz, Memory fk-mandant-validierung).
+_PARTNER_WERT_FKS = {
+    "rechtsform_id": "rechtsform",
+    "branche_id": "branche",
+    "anrede_id": "anrede",
+}
+
+
+async def _validate_partner_werte(
+    db: AsyncSession,
+    mandant_id: UUID,
+    data: dict[str, Any],
+    typen: list[UUID] | None,
+) -> None:
+    """Stellt sicher, dass alle gesetzten Auswahllisten-FKs (rechtsform/branche/
+    anrede/typen) zum Mandanten und zur richtigen Liste gehören."""
+    for field, liste_key in _PARTNER_WERT_FKS.items():
+        wert_id = data.get(field)
+        if wert_id is not None:
+            await get_wert_by_id(db, mandant_id, wert_id, liste_key)
+    for typ_id in typen or []:
+        await get_wert_by_id(db, mandant_id, typ_id, "partner_typ")
 
 
 class PartnerNotFoundError(Exception):
@@ -191,6 +218,8 @@ async def create_partner(
         if parent_exists is None:
             raise PartnerNotFoundError(f"parent {parent_id} not found")
 
+    await _validate_partner_werte(db, mandant_id, payload, typen)
+
     partner = GeschaeftsPartner(mandant_id=mandant_id, typen=typen, **payload)
     db.add(partner)
     await db.flush()
@@ -209,6 +238,8 @@ async def update_partner(
     if "parent_partner_id" in updates:
         new_parent = updates["parent_partner_id"]
         await _check_circular_hierarchy(db, mandant_id, partner_id, new_parent)
+
+    await _validate_partner_werte(db, mandant_id, updates, updates.get("typen"))
 
     if "typen" in updates and updates["typen"] is not None:
         partner.typen = list(updates.pop("typen"))
