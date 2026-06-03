@@ -30,6 +30,7 @@ export function RelationListTab<T>({
   loading = false,
   itemLabel,
   total,
+  headerAction,
 }: {
   viewKey: string;
   columns: ColumnDef<T>[];
@@ -42,6 +43,8 @@ export function RelationListTab<T>({
   itemLabel?: { singular: string; plural: string };
   /** Gesamtanzahl (Default = data.length); für „N von M". */
   total?: number;
+  /** Optionale Aktion (z. B. „+ Neu"-Button) oberhalb der Liste, rechtsbündig. */
+  headerAction?: React.ReactNode;
 }) {
   const [search, setSearch] = useState('');
   const [visibility, setVisibility] = useState<VisibilityState>({});
@@ -72,6 +75,9 @@ export function RelationListTab<T>({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2">
+      {headerAction && (
+        <div className="mb-2 flex shrink-0 justify-end">{headerAction}</div>
+      )}
       <PowerListenView<T>
         viewKey={viewKey}
         columns={columns}
