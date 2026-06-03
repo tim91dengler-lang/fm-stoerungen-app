@@ -7,6 +7,7 @@ from fastapi.responses import Response
 
 from fm_api.core.deps import AuditedDbSession, CurrentUserDep
 from fm_api.schemas.objektstruktur import (
+    BeteiligterRead,
     EinheitCreate,
     EinheitRead,
     EinheitUpdate,
@@ -30,6 +31,20 @@ from fm_api.services.objektstruktur_service import (
 router = APIRouter()
 
 
+def _serialize_beteiligte(node: object) -> list[BeteiligterRead]:
+    """Baut die Beteiligten-Read aus dem transient angehängten ``_beteiligte``."""
+    return [
+        BeteiligterRead(
+            id=b.id,
+            partner_id=b.partner.id,
+            partner_name=b.partner.name,
+            rolle_id=b.rolle_id,
+            rolle_label=b.rolle_wert.label if b.rolle_wert else None,
+        )
+        for b in getattr(node, "_beteiligte", [])
+    ]
+
+
 def _serialize_haus(h: object) -> HausRead:
     from fm_api.models.objektstruktur import Haus
 
@@ -50,6 +65,7 @@ def _serialize_haus(h: object) -> HausRead:
             "mieter": [
                 PartnerMini(id=link.partner.id, name=link.partner.name) for link in h.mieter_links
             ],
+            "beteiligte": _serialize_beteiligte(h),
             "created_at": h.created_at,
             "updated_at": h.updated_at,
             "stockwerke": [_serialize_stockwerk(s) for s in h.stockwerke],
@@ -76,6 +92,7 @@ def _serialize_stockwerk(s: object) -> StockwerkRead:
                 for link in s.eigentuemer_links
             ],
             "mieter": [PartnerMini(id=m.partner.id, name=m.partner.name) for m in s.mieter_links],
+            "beteiligte": _serialize_beteiligte(s),
             "einheiten": [_serialize_einheit(e) for e in s.einheiten],
             "created_at": s.created_at,
             "updated_at": s.updated_at,
@@ -100,6 +117,7 @@ def _serialize_einheit(e: object) -> EinheitRead:
                 for link in e.eigentuemer_links
             ],
             "mieter": [PartnerMini(id=m.partner.id, name=m.partner.name) for m in e.mieter_links],
+            "beteiligte": _serialize_beteiligte(e),
             "created_at": e.created_at,
             "updated_at": e.updated_at,
         }
