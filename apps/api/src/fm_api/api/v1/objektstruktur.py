@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from fm_api.core.deps import AuditedDbSession, CurrentUserDep
 from fm_api.schemas.objektstruktur import (
     BeteiligterRead,
+    BeteiligterWrite,
     EinheitCreate,
     EinheitRead,
     EinheitUpdate,
@@ -39,9 +40,8 @@ def _kontakt_name(k: object) -> str:
     return name or "Ansprechpartner"
 
 
-def _serialize_beteiligte(node: object) -> list[BeteiligterRead]:
-    """Baut die Beteiligten-Read aus dem transient angehängten ``_beteiligte``
-    (inkl. der aufgelösten Ansprechpartner ``_kontakte``)."""
+def _serialize_beteiligte_rows(rows: object) -> list[BeteiligterRead]:
+    """Serialisiert eine flache Liste Beteiligten-Zeilen (mit ``_kontakte``)."""
     return [
         BeteiligterRead(
             id=b.id,
@@ -60,8 +60,13 @@ def _serialize_beteiligte(node: object) -> list[BeteiligterRead]:
                 for k in getattr(b, "_kontakte", [])
             ],
         )
-        for b in getattr(node, "_beteiligte", [])
+        for b in rows  # type: ignore[attr-defined]
     ]
+
+
+def _serialize_beteiligte(node: object) -> list[BeteiligterRead]:
+    """Baut die Beteiligten-Read aus dem transient angehängten ``_beteiligte``."""
+    return _serialize_beteiligte_rows(getattr(node, "_beteiligte", []))
 
 
 def _serialize_haus(h: object) -> HausRead:
@@ -161,6 +166,48 @@ async def list_haus_for_objekt(
     except ObjektNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return [_serialize_haus(h) for h in items]
+
+
+# -------- Objekt-Ebene Beteiligte (Wurzel-Knoten) --------------------------
+
+
+@router.get(
+    "/objekte/{objekt_id}/beteiligte",
+    response_model=list[BeteiligterRead],
+    summary="Beteiligte direkt am Objekt (Wurzel-Ebene)",
+)
+async def list_objekt_beteiligte(
+    objekt_id: UUID,
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> list[BeteiligterRead]:
+    try:
+        rows = await objektstruktur_service.get_objekt_beteiligte(db, current.mandant_id, objekt_id)
+    except ObjektNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _serialize_beteiligte_rows(rows)
+
+
+@router.patch(
+    "/objekte/{objekt_id}/beteiligte",
+    response_model=list[BeteiligterRead],
+    summary="Beteiligte am Objekt setzen (Voll-Replace)",
+)
+async def set_objekt_beteiligte(
+    objekt_id: UUID,
+    payload: list[BeteiligterWrite],
+    db: AuditedDbSession,
+    current: CurrentUserDep,
+) -> list[BeteiligterRead]:
+    try:
+        rows = await objektstruktur_service.set_objekt_beteiligte(
+            db, current.mandant_id, objekt_id, [b.model_dump() for b in payload]
+        )
+    except ObjektNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BeteiligterValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return _serialize_beteiligte_rows(rows)
 
 
 # -------- Haus -------------------------------------------------------------

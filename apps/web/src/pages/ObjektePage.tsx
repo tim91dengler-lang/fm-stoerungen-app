@@ -254,21 +254,6 @@ export function ObjektePage() {
         },
       },
       {
-        id: 'partner',
-        accessorFn: (row) => row.partner_links.map((l) => l.partner_name).join(' '),
-        header: 'Partner (Objekt)',
-        filterFn: 'includesString',
-        cell: (ctx) => {
-          const links = ctx.row.original.partner_links;
-          if (links.length === 0) return <span className="text-zinc-500">—</span>;
-          return (
-            <span className="text-xs text-zinc-400">
-              {links.map((l) => `${l.partner_name} (${TYP_LABEL[l.rolle]})`).join(', ')}
-            </span>
-          );
-        },
-      },
-      {
         id: 'beteiligte',
         accessorFn: (row) =>
           row.beteiligte_summary

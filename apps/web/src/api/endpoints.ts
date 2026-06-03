@@ -7,6 +7,8 @@ import type {
   AnlageCreate,
   AnlageRead,
   AnlageUpdate,
+  Beteiligter,
+  BeteiligterWrite,
   AuswahllisteCreate,
   AuswahllisteUpdate,
   AuswahllisteRead,
@@ -395,6 +397,15 @@ export const objektstrukturApi = {
       .then((r) => r.data),
   removeEinheit: (einheitId: UUID) =>
     api.delete<void>(`/objektstruktur/einheiten/${einheitId}`).then(() => undefined),
+  // Objekt-Ebene Beteiligte (Wurzel-Knoten)
+  getObjektBeteiligte: (objektId: UUID) =>
+    api
+      .get<Beteiligter[]>(`/objektstruktur/objekte/${objektId}/beteiligte`)
+      .then((r) => r.data),
+  setObjektBeteiligte: (objektId: UUID, payload: BeteiligterWrite[]) =>
+    api
+      .patch<Beteiligter[]>(`/objektstruktur/objekte/${objektId}/beteiligte`, payload)
+      .then((r) => r.data),
 };
 
 export const notificationApi = {

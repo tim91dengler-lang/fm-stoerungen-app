@@ -115,21 +115,32 @@ const columns: ColumnDef<BeteiligterRow>[] = [
 
 export function ObjektBeteiligteTab({
   objektId,
+  objektName,
   onPartner,
 }: {
   objektId: string;
+  objektName?: string;
   onPartner: (partnerId: string) => void;
 }) {
   const q = useQuery({
     queryKey: ['objekt-tree', objektId],
     queryFn: () => objektstrukturApi.listHaus(objektId),
   });
-  const rows = useMemo(() => flatten(q.data ?? []), [q.data]);
+  const objektQ = useQuery({
+    queryKey: ['objekt-beteiligte', objektId],
+    queryFn: () => objektstrukturApi.getObjektBeteiligte(objektId),
+  });
+  const rows = useMemo(() => {
+    const objektRows = (objektQ.data ?? []).map((b) =>
+      mkRow('Objekt', objektName ?? 'Objekt', b),
+    );
+    return [...objektRows, ...flatten(q.data ?? [])];
+  }, [objektQ.data, objektName, q.data]);
 
   return (
     <RelationListTab<BeteiligterRow>
       viewKey="objekt-beteiligte"
-      loading={q.isLoading}
+      loading={q.isLoading || objektQ.isLoading}
       columns={columns}
       data={rows}
       getSearchText={(r) =>

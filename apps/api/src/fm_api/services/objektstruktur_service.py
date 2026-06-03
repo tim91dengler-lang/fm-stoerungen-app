@@ -25,6 +25,7 @@ from fm_api.models import (
     HausEigentuemer,
     HausMieter,
     Objekt,
+    ObjektBeteiligter,
     ObjektStockwerk,
     PartnerKontakt,
     StockwerkAusrichtung,
@@ -118,12 +119,20 @@ async def _attach_kontakte(db: AsyncSession, rows: Sequence[Any]) -> None:
 
 
 # Aggregiert die Struktur-Beteiligten (Haus/Stockwerk/Einheit) je Objekt — für die
-# Spalte „Eigentümer/Beteiligte" in der Objekte-Hauptliste. Distinct (UNION) über die
-# drei Ebenen; nur aktive Knoten + aktive Partner. Feste Bezeichner (kein User-Input).
+# Spalte „Eigentümer/Beteiligte" in der Objekte-Hauptliste. Distinct (UNION) über
+# alle Ebenen (Objekt + Haus + Stockwerk + Einheit); nur aktive Knoten + aktive
+# Partner. Feste Bezeichner (kein User-Input).
 _BETEILIGTE_SUMMARY_SQL = text(
     """
     SELECT objekt_id, partner_name, rolle_label FROM (
-        SELECT h.objekt_id AS objekt_id, p.name AS partner_name, w.label AS rolle_label
+        SELECT ob.objekt_id AS objekt_id, p.name AS partner_name, w.label AS rolle_label
+        FROM objekt_beteiligte ob
+        JOIN objekte o ON o.id = ob.objekt_id AND o.deleted_at IS NULL
+        JOIN geschaeftspartner p ON p.id = ob.partner_id AND p.deleted_at IS NULL
+        LEFT JOIN auswahllisten_werte w ON w.id = ob.rolle_id
+        WHERE ob.mandant_id = :mid AND ob.objekt_id IN :ids
+        UNION
+        SELECT h.objekt_id, p.name, w.label
         FROM haus_beteiligte hb
         JOIN haus h ON h.id = hb.haus_id AND h.deleted_at IS NULL
         JOIN geschaeftspartner p ON p.id = hb.partner_id AND p.deleted_at IS NULL
@@ -168,6 +177,29 @@ async def summarize_struktur_beteiligte(
             {"partner_name": partner_name, "rolle_label": rolle_label}
         )
     return result
+
+
+# -------- Objekt-Ebene Beteiligte (Wurzel-Knoten) --------------------------
+
+
+async def get_objekt_beteiligte(
+    db: AsyncSession, mandant_id: UUID, objekt_id: UUID
+) -> list[ObjektBeteiligter]:
+    """Beteiligte direkt am Objekt (objekt_beteiligte) — inkl. aufgelöster Kontakte."""
+    await _assert_objekt(db, objekt_id, mandant_id)
+    by_objekt = await _load_beteiligte_map(db, ObjektBeteiligter, "objekt_id", [objekt_id])
+    return by_objekt.get(objekt_id, [])
+
+
+async def set_objekt_beteiligte(
+    db: AsyncSession, mandant_id: UUID, objekt_id: UUID, items: list[dict[str, Any]]
+) -> list[ObjektBeteiligter]:
+    """Voll-Replace der Beteiligten am Objekt (mandantengebunden validiert)."""
+    await _assert_objekt(db, objekt_id, mandant_id)
+    await _apply_struktur_beteiligte(
+        db, mandant_id, ObjektBeteiligter, "objekt_id", objekt_id, items
+    )
+    return await get_objekt_beteiligte(db, mandant_id, objekt_id)
 
 
 async def _attach_beteiligte(db: AsyncSession, haeuser: list[Haus]) -> None:

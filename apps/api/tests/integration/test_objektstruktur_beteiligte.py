@@ -425,6 +425,62 @@ async def test_objekte_liste_zeigt_struktur_beteiligte_summary(client, admin_use
 
 
 @pytest.mark.integration
+async def test_objekt_ebene_beteiligte_crud_und_summary(client, admin_user) -> None:
+    """Objekt-Ebene: Beteiligte direkt am Objekt setzen/lesen; erscheinen auch in
+    der Objekte-Listen-Aggregation."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    objekt_id = await _create_objekt(client, headers, "Objekt-Ebene-Test")
+    partner_id = await _create_partner(client, headers, "Objekt-Eigentümer")
+    rollen = await _rolle_ids(client, headers)
+
+    # leer am Anfang
+    res = await client.get(
+        f"/api/v1/objektstruktur/objekte/{objekt_id}/beteiligte", headers=headers
+    )
+    assert res.status_code == 200, res.text
+    assert res.json() == []
+
+    # setzen
+    res = await client.patch(
+        f"/api/v1/objektstruktur/objekte/{objekt_id}/beteiligte",
+        headers=headers,
+        json=[{"partner_id": partner_id, "rolle_id": rollen["eigentuemer"]}],
+    )
+    assert res.status_code == 200, res.text
+    bet = res.json()
+    assert len(bet) == 1 and bet[0]["rolle_label"] == "Eigentümer"
+
+    # GET liefert es
+    res = await client.get(
+        f"/api/v1/objektstruktur/objekte/{objekt_id}/beteiligte", headers=headers
+    )
+    assert len(res.json()) == 1
+
+    # taucht in der Objekte-Listen-Aggregation auf
+    res = await client.get("/api/v1/objekte?limit=500", headers=headers)
+    obj = next(o for o in res.json()["items"] if o["id"] == objekt_id)
+    assert any(
+        s["partner_name"] == "Objekt-Eigentümer" and s["rolle_label"] == "Eigentümer"
+        for s in obj["beteiligte_summary"]
+    )
+
+
+@pytest.mark.integration
+async def test_objekt_beteiligte_unknown_partner_rejected(client, admin_user) -> None:
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    objekt_id = await _create_objekt(client, headers, "Objekt-Ebene-IDOR")
+    rollen = await _rolle_ids(client, headers)
+    res = await client.patch(
+        f"/api/v1/objektstruktur/objekte/{objekt_id}/beteiligte",
+        headers=headers,
+        json=[{"partner_id": NONEXISTENT, "rolle_id": rollen["mieter"]}],
+    )
+    assert res.status_code == 400, res.text
+
+
+@pytest.mark.integration
 async def test_rolle_null_allowed(client, admin_user) -> None:
     """Eine Beteiligten-Zeile ohne Rolle ist erlaubt (Rolle optional)."""
     token = await _login_admin(client, admin_user)

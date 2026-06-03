@@ -519,9 +519,11 @@ export function ObjektStrukturEditor({
         <div className="min-h-0 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
           {activeNode?.type === 'objekt' ? (
             <ObjektNodePanel
+              objektId={objektId}
               objekt={objektQuery.data ?? null}
               loading={objektQuery.isLoading}
               onCommit={commitObjekt}
+              onBeteiligteLockChange={setBeteiligteModalOpen}
             />
           ) : activeEntity ? (
             <DetailPanel
@@ -892,15 +894,47 @@ function EinheitNode({ einheit, isActive, setActive }: EinheitNodeProps) {
 // ============================================================================
 
 function ObjektNodePanel({
+  objektId,
   objekt,
   loading,
   onCommit,
+  onBeteiligteLockChange,
 }: {
+  objektId: string;
   objekt: ObjektRead | null;
   loading: boolean;
   onCommit: (patch: ObjektUpdate) => Promise<void>;
+  onBeteiligteLockChange?: (open: boolean) => void;
 }) {
+  const qc = useQueryClient();
   const [historieOpen, setHistorieOpen] = useState(false);
+
+  // Rollen + Beteiligte auf Objekt-Ebene (objekt_beteiligte).
+  const auswahllistenQuery = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
+    staleTime: 60_000,
+  });
+  const rolleOptions = useMemo(() => {
+    const liste = auswahllistenQuery.data?.find(
+      (l) => l.key === 'objekt_beteiligten_rolle',
+    );
+    return aktiveWerte(liste?.werte).map((w) => ({ id: w.id, label: w.label }));
+  }, [auswahllistenQuery.data]);
+
+  const beteiligteQuery = useQuery({
+    queryKey: ['objekt-beteiligte', objektId],
+    queryFn: () => objektstrukturApi.getObjektBeteiligte(objektId),
+    enabled: !!objektId,
+  });
+  const saveBeteiligte = useMutation({
+    mutationFn: (next: BeteiligterWrite[]) =>
+      objektstrukturApi.setObjektBeteiligte(objektId, next),
+    onSuccess: (rows) => {
+      qc.setQueryData(['objekt-beteiligte', objektId], rows);
+      qc.invalidateQueries({ queryKey: ['objekte'] }); // Listen-Aggregation aktualisieren
+    },
+  });
 
   if (loading || !objekt) {
     return (
@@ -955,6 +989,16 @@ function ObjektNodePanel({
             onCommit={(v) => onCommit({ notiz: v })}
           />
         </div>
+      </DetailSection>
+
+      {/* Beteiligte auf Objekt-Ebene (ersetzt den alten „Partner"-Reiter) */}
+      <DetailSection title="Beteiligte" icon={Users2}>
+        <StrukturBeteiligteBlock
+          beteiligte={beteiligteQuery.data ?? []}
+          rolleOptions={rolleOptions}
+          onChange={(next) => saveBeteiligte.mutate(next)}
+          onInteractionLockChange={onBeteiligteLockChange}
+        />
       </DetailSection>
 
       {/* Historie — klein, eingeklappt */}
