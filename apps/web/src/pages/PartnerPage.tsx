@@ -369,7 +369,7 @@ export function PartnerPage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         rowActions={{
-          onEdit: openEdit,
+          onEdit: (p) => (modulStandard ? setOpenPartnerId(p.id) : openEdit(p)),
           sperren: {
             isGesperrt: (p) => p.gesperrt,
             onToggle: (p) => {

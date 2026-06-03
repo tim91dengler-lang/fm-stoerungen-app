@@ -495,7 +495,7 @@ export function ProjektePage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         rowActions={{
-          onEdit: openEdit,
+          onEdit: (p) => (modulStandard ? setOpenProjektId(p.id) : openEdit(p)),
           onDelete: (rows) => setBulkConfirm(rows),
         }}
         bulkActions={(selected) => (

@@ -216,9 +216,8 @@ function AnlageUebersicht({ a }: { a: Anlage }) {
           }
           right={
             <>
-              <DetailBlock title="Status" blockKey="status" defaultOpen count={2}>
+              <DetailBlock title="Verortung" blockKey="status" defaultOpen count={1}>
                 <div className={grid}>
-                  <Field label="Status" value={a.aktiv ? 'Aktiv' : 'Inaktiv'} />
                   <Field label="Stockwerk" value={a.stockwerk?.bezeichnung} />
                 </div>
               </DetailBlock>

@@ -292,7 +292,7 @@ export function AdressenPage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         rowActions={{
-          onEdit: openEdit,
+          onEdit: (a) => (modulStandard ? setOpenAdresseId(a.id) : openEdit(a)),
           onDelete: (rows) => setBulkConfirm(rows),
         }}
         bulkActions={(selected) => (

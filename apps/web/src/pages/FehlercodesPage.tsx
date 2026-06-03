@@ -384,7 +384,7 @@ export function FehlercodesPage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         rowActions={{
-          onEdit: openEdit,
+          onEdit: (f) => (modulStandard ? setOpenFehlercodeId(f.id) : openEdit(f)),
           onDelete: (rows) => {
             const blocked = rows.find((f) => f.nutzung_count > 0);
             if (blocked) {
