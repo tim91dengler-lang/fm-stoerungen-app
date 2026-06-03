@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Layers } from 'lucide-react';
 import type { Ausrichtung } from '../api/types';
+import { EntitySearchSelect, type SearchOption } from './EntitySearchSelect';
 
 interface StockwerkFormValues {
   bezeichnung: string;
@@ -24,13 +25,24 @@ const EMPTY: StockwerkFormValues = {
   ausrichtung: null,
 };
 
-const AUSRICHTUNG_OPTIONS: Array<{ value: Ausrichtung | ''; label: string }> = [
-  { value: '', label: '– keine –' },
-  { value: 'nord', label: 'Nord' },
-  { value: 'ost', label: 'Ost' },
-  { value: 'sued', label: 'Süd' },
-  { value: 'west', label: 'West' },
-];
+const AUSRICHTUNG_LABEL: Record<Ausrichtung, string> = {
+  nord: 'Nord',
+  ost: 'Ost',
+  sued: 'Süd',
+  west: 'West',
+};
+const AUSRICHTUNG_OPTIONS: SearchOption[] = (
+  Object.keys(AUSRICHTUNG_LABEL) as Ausrichtung[]
+).map((value) => ({ id: value, label: AUSRICHTUNG_LABEL[value] }));
+
+function fetchAusrichtung(search: string): Promise<SearchOption[]> {
+  const needle = search.trim().toLowerCase();
+  return Promise.resolve(
+    needle
+      ? AUSRICHTUNG_OPTIONS.filter((o) => o.label.toLowerCase().includes(needle))
+      : AUSRICHTUNG_OPTIONS,
+  );
+}
 
 export function StockwerkModal({
   open,
@@ -107,9 +119,7 @@ export function StockwerkModal({
               type="text"
               autoFocus
               value={form.bezeichnung}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, bezeichnung: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, bezeichnung: e.target.value }))}
               placeholder="z. B. EG, 1. OG"
               className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
@@ -119,25 +129,17 @@ export function StockwerkModal({
             <label className="mb-1 block text-xs font-medium text-zinc-300">
               Ausrichtung
             </label>
-            <select
-              value={form.ausrichtung ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  ausrichtung:
-                    e.target.value === ''
-                      ? null
-                      : (e.target.value as Ausrichtung),
-                }))
+            <EntitySearchSelect
+              value={form.ausrichtung}
+              onChange={(id) =>
+                setForm((f) => ({ ...f, ausrichtung: id as Ausrichtung | null }))
               }
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
-            >
-              {AUSRICHTUNG_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              fetcher={fetchAusrichtung}
+              queryKey="stockwerk-ausrichtung"
+              initialLabel={form.ausrichtung ? AUSRICHTUNG_LABEL[form.ausrichtung] : null}
+              placeholder="Ausrichtung wählen …"
+              allowClear
+            />
             <p className="mt-1 text-[10px] text-zinc-500">
               Optional – hilft beim Orientieren in Plänen.
             </p>
