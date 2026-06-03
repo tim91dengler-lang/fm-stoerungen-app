@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import { anlageApi, objektApi, ticketApi } from '../../api/endpoints';
+import { ObjektStrukturEditor } from './ObjektStrukturEditor';
 import type {
   AnlageRead,
   ObjektPartnerLinkRead,
@@ -27,8 +29,9 @@ import {
  * Reiter-Modell). Übersicht inline editierbar; Verknüpfungen (Partner, Tickets,
  * Anlagen) als echte Listen-Reiter. Hinter Flag `modul_standard`.
  *
- * Der volle Objektstruktur-Baum (Häuser/Stockwerke/Einheiten) bleibt vorerst im
- * bestehenden Struktur-Editor (Reiter „Struktur" verlinkt dorthin) — Folgeschritt.
+ * Der volle Objektstruktur-Baum (Häuser/Stockwerke/Einheiten) wird im Reiter
+ * „Struktur" über die geteilte `ObjektStrukturEditor`-Komponente eingebettet
+ * (dieselbe wie auf der Seite /stammdaten/objekte/:id).
  */
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -227,6 +230,9 @@ export function ObjektDetailOverlay({
   const navigate = useNavigate();
   const objektQuery = useObjekt(objektId);
   const o = objektQuery.data;
+  // Editor meldet offene Sub-Modals → ESC/Backdrop dürfen das Overlay dann
+  // nicht schließen (sonst bliebe ein Editor-Modal verwaist offen).
+  const [strukturLocked, setStrukturLocked] = useState(false);
 
   const tabs: DetailTab[] = o
     ? [
@@ -273,20 +279,12 @@ export function ObjektDetailOverlay({
           key: 'struktur',
           label: 'Struktur',
           render: () => (
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
-              <div className="mx-auto max-w-lg rounded-lg border border-zinc-800 bg-zinc-900/40 p-5 text-sm text-zinc-400">
-                <p className="mb-3">
-                  Häuser, Stockwerke und Einheiten werden im vollständigen Struktur-Editor
-                  bearbeitet.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/stammdaten/objekte/${objektId}`)}
-                  className="rounded-md border border-emerald-600/50 px-3 py-1.5 text-emerald-300 hover:bg-emerald-500/10"
-                >
-                  Struktur &amp; Etagen bearbeiten →
-                </button>
-              </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-4">
+              <ObjektStrukturEditor
+                objektId={objektId}
+                objektAdresseId={o.adresse_id ?? null}
+                onInteractionLockChange={setStrukturLocked}
+              />
             </div>
           ),
         },
@@ -294,7 +292,13 @@ export function ObjektDetailOverlay({
     : [];
 
   return (
-    <DetailOverlay open onClose={onClose} width="page" fixedHeight>
+    <DetailOverlay
+      open
+      onClose={onClose}
+      width="page"
+      fixedHeight
+      closeLocked={strukturLocked}
+    >
       {objektQuery.isLoading || !o ? (
         <div className="p-8 text-sm text-zinc-500">
           {objektQuery.isError ? 'Objekt konnte nicht geladen werden.' : 'Lade Objekt …'}
