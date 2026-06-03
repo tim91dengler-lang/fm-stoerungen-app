@@ -28,6 +28,7 @@ from fm_api.schemas.partner import (
     PartnerUpdate,
 )
 from fm_api.services import partner_service
+from fm_api.services.auswahlliste_service import AuswahllistenWertNotFoundError
 from fm_api.services.partner_service import (
     PartnerAdresseNotFoundError,
     PartnerCircularHierarchyError,
@@ -94,6 +95,10 @@ async def create_partner(
         )
     except PartnerNotFoundError as exc:  # parent_partner_id existiert nicht
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except AuswahllistenWertNotFoundError as exc:  # fremder/ungültiger Auswahllisten-FK
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return PartnerRead.model_validate(partner)
 
 
@@ -133,6 +138,10 @@ async def update_partner(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PartnerCircularHierarchyError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except AuswahllistenWertNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return PartnerRead.model_validate(partner)
 
 
