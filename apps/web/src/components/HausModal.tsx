@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Building2 } from 'lucide-react';
 import type { AdresseRead } from '../api/types';
+import { EntitySearchSelect, type SearchOption } from './EntitySearchSelect';
 
 interface HausFormValues {
   bezeichnung: string;
@@ -79,6 +80,22 @@ export function HausModal({
     });
   }
 
+  const adresseOptions: SearchOption[] = adressen.map((a) => ({
+    id: a.id,
+    label: formatAdresse(a),
+  }));
+  const fetchAdressen = (search: string): Promise<SearchOption[]> => {
+    const needle = search.trim().toLowerCase();
+    return Promise.resolve(
+      needle
+        ? adresseOptions.filter((o) => o.label.toLowerCase().includes(needle))
+        : adresseOptions,
+    );
+  };
+  const currentAdresseLabel = form.adresse_id
+    ? (adresseOptions.find((o) => o.id === form.adresse_id)?.label ?? null)
+    : null;
+
   return (
     <div
       role="dialog"
@@ -118,9 +135,7 @@ export function HausModal({
               type="text"
               autoFocus
               value={form.bezeichnung}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, bezeichnung: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, bezeichnung: e.target.value }))}
               placeholder="z. B. Haus A"
               className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
             />
@@ -130,33 +145,23 @@ export function HausModal({
             <label className="mb-1 block text-xs font-medium text-zinc-300">
               Adresse
             </label>
-            <select
-              value={form.adresse_id ?? ''}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  adresse_id: e.target.value === '' ? null : e.target.value,
-                }))
-              }
-              className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none"
-            >
-              <option value="">— Keine (verwendet Objekt-Adresse) —</option>
-              {adressen.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {formatAdresse(a)}
-                </option>
-              ))}
-            </select>
+            <EntitySearchSelect
+              value={form.adresse_id}
+              onChange={(id) => setForm((f) => ({ ...f, adresse_id: id }))}
+              fetcher={fetchAdressen}
+              queryKey="haus-adresse"
+              initialLabel={currentAdresseLabel}
+              placeholder="Adresse suchen … (sonst Objekt-Adresse)"
+              allowClear
+            />
             <p className="mt-1 text-[10px] text-zinc-500">
-              Optional — nur setzen wenn das Haus eine eigene Anschrift hat
-              (z. B. großes Grundstück mit verteilten Häusern).
+              Optional — nur setzen wenn das Haus eine eigene Anschrift hat (z. B. großes
+              Grundstück mit verteilten Häusern).
             </p>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-300">
-              Notiz
-            </label>
+            <label className="mb-1 block text-xs font-medium text-zinc-300">Notiz</label>
             <textarea
               value={form.notiz}
               onChange={(e) => setForm((f) => ({ ...f, notiz: e.target.value }))}
