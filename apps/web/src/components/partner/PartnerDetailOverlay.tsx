@@ -1,6 +1,8 @@
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnDef } from '@tanstack/react-table';
+import { Plus, Trash2 } from 'lucide-react';
 
 import { auswahllistenApi, partnerApi } from '../../api/endpoints';
 import type {
@@ -14,6 +16,9 @@ import type {
 } from '../../api/types';
 import { searchPartner } from '../../lib/entitySearch';
 import { usePartnerTypLookup } from '../../lib/usePartnerTypLookup';
+import { ConfirmDialog } from '../../core/liste/ConfirmDialog';
+import { KontaktModal } from '../../pages/partner/KontaktModal';
+import { PartnerAdresseModal } from '../../pages/partner/PartnerAdresseModal';
 import {
   DetailBlock,
   DetailHeader,
@@ -426,6 +431,180 @@ function PartnerUebersicht({ p }: { p: Partner }) {
   );
 }
 
+// --- Sub-CRUD-Reiter (Kontaktpersonen / Adressen) --------------------------
+// Liste = Standard-`RelationListTab` (PowerListenView). Zusätzlich: „+ Neu"
+// (headerAction), Zeilen-Klick = Bearbeiten, Trash-Spalte = Löschen. Die
+// bestehenden Modals (KontaktModal/PartnerAdresseModal) kapseln das Schreiben
+// selbst und invalidieren ['partner', id] → Liste aktualisiert sich.
+
+function useListenMap() {
+  const { data } = useQuery({
+    queryKey: ['auswahllisten'],
+    queryFn: () => auswahllistenApi.list(),
+  });
+  return useMemo(() => new Map((data ?? []).map((l) => [l.key, l] as const)), [data]);
+}
+
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-zinc-950 hover:bg-emerald-400"
+    >
+      <Plus className="h-3.5 w-3.5" />
+      {label}
+    </button>
+  );
+}
+
+function DeleteButton({ onDelete }: { onDelete: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onDelete();
+      }}
+      className="rounded p-1 text-zinc-500 hover:bg-red-500/15 hover:text-red-300"
+      aria-label="Löschen"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function actionsColumn<T>(onDelete: (row: T) => void): ColumnDef<T> {
+  return {
+    id: '_actions',
+    header: '',
+    enableSorting: false,
+    enableHiding: false,
+    enableColumnFilter: false,
+    cell: (c) => <DeleteButton onDelete={() => onDelete(c.row.original)} />,
+  };
+}
+
+function PartnerKontakteTab({ p }: { p: Partner }) {
+  const qc = useQueryClient();
+  const listen = useListenMap();
+  const [editing, setEditing] = useState<{ initial: PartnerKontaktRead | null } | null>(
+    null,
+  );
+  const [delTarget, setDelTarget] = useState<PartnerKontaktRead | null>(null);
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => partnerApi.removeKontakt(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['partner', p.id] });
+      setDelTarget(null);
+    },
+  });
+  const columns = useMemo<ColumnDef<PartnerKontaktRead>[]>(
+    () => [...kontaktColumns, actionsColumn<PartnerKontaktRead>((k) => setDelTarget(k))],
+    [],
+  );
+  return (
+    <>
+      <RelationListTab<PartnerKontaktRead>
+        viewKey="partner-kontakte"
+        columns={columns}
+        data={p.kontakte}
+        getSearchText={(k) => `${k.vorname ?? ''} ${k.nachname ?? ''} ${k.email ?? ''}`}
+        onRowClick={(k) => setEditing({ initial: k })}
+        searchPlaceholder="In Kontaktpersonen suchen …"
+        itemLabel={{ singular: 'Kontakt', plural: 'Kontaktpersonen' }}
+        headerAction={
+          <AddButton
+            label="Kontaktperson"
+            onClick={() => setEditing({ initial: null })}
+          />
+        }
+      />
+      {editing && (
+        <KontaktModal
+          partnerId={p.id}
+          listen={listen}
+          initial={editing.initial}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      <ConfirmDialog
+        open={delTarget !== null}
+        title="Kontakt löschen?"
+        message={
+          delTarget
+            ? `Kontakt „${delTarget.vorname ?? ''} ${delTarget.nachname ?? ''}" wird gelöscht.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        tone="danger"
+        onConfirm={() => delTarget && deleteMut.mutate(delTarget.id)}
+        onCancel={() => setDelTarget(null)}
+      />
+    </>
+  );
+}
+
+function PartnerAdressenTab({ p }: { p: Partner }) {
+  const qc = useQueryClient();
+  const listen = useListenMap();
+  const [editing, setEditing] = useState<{ initial: PartnerAdresseRead | null } | null>(
+    null,
+  );
+  const [delTarget, setDelTarget] = useState<PartnerAdresseRead | null>(null);
+  const deleteMut = useMutation({
+    mutationFn: (linkId: string) => partnerApi.removeAdresse(linkId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['partner', p.id] });
+      setDelTarget(null);
+    },
+  });
+  const columns = useMemo<ColumnDef<PartnerAdresseRead>[]>(
+    () => [...adresseColumns, actionsColumn<PartnerAdresseRead>((a) => setDelTarget(a))],
+    [],
+  );
+  return (
+    <>
+      <RelationListTab<PartnerAdresseRead>
+        viewKey="partner-adressen"
+        columns={columns}
+        data={p.adress_links}
+        getSearchText={(a) =>
+          a.adresse ? `${a.adresse.strasse} ${a.adresse.plz} ${a.adresse.ort}` : ''
+        }
+        onRowClick={(a) => setEditing({ initial: a })}
+        searchPlaceholder="In Adressen suchen …"
+        itemLabel={{ singular: 'Adresse', plural: 'Adressen' }}
+        headerAction={
+          <AddButton label="Adresse" onClick={() => setEditing({ initial: null })} />
+        }
+      />
+      {editing && (
+        <PartnerAdresseModal
+          partnerId={p.id}
+          listen={listen}
+          initial={editing.initial}
+          defaultPrimaer={p.adress_links.length === 0}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      <ConfirmDialog
+        open={delTarget !== null}
+        title="Adresse entfernen?"
+        message={
+          delTarget?.adresse
+            ? `Die Adresse „${delTarget.adresse.strasse}, ${delTarget.adresse.plz} ${delTarget.adresse.ort}" wird vom Partner entfernt.`
+            : 'Die Adress-Verknüpfung wird entfernt.'
+        }
+        confirmLabel="Entfernen"
+        tone="danger"
+        onConfirm={() => delTarget && deleteMut.mutate(delTarget.id)}
+        onCancel={() => setDelTarget(null)}
+      />
+    </>
+  );
+}
+
 export function PartnerDetailOverlay({
   partnerId,
   onClose,
@@ -449,36 +628,14 @@ export function PartnerDetailOverlay({
           label: 'Kontaktpersonen',
           count: p.kontakte.length,
           isRelation: true,
-          render: () => (
-            <RelationListTab<PartnerKontaktRead>
-              viewKey="partner-kontakte"
-              columns={kontaktColumns}
-              data={p.kontakte}
-              getSearchText={(k) =>
-                `${k.vorname ?? ''} ${k.nachname ?? ''} ${k.email ?? ''}`
-              }
-              searchPlaceholder="In Kontaktpersonen suchen …"
-              itemLabel={{ singular: 'Kontakt', plural: 'Kontaktpersonen' }}
-            />
-          ),
+          render: () => <PartnerKontakteTab p={p} />,
         },
         {
           key: 'adressen',
           label: 'Adressen',
           count: p.adress_links.length,
           isRelation: true,
-          render: () => (
-            <RelationListTab<PartnerAdresseRead>
-              viewKey="partner-adressen"
-              columns={adresseColumns}
-              data={p.adress_links}
-              getSearchText={(a) =>
-                a.adresse ? `${a.adresse.strasse} ${a.adresse.plz} ${a.adresse.ort}` : ''
-              }
-              searchPlaceholder="In Adressen suchen …"
-              itemLabel={{ singular: 'Adresse', plural: 'Adressen' }}
-            />
-          ),
+          render: () => <PartnerAdressenTab p={p} />,
         },
         {
           key: 'objekte',
