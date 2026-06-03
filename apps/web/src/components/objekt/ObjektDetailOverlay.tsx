@@ -5,6 +5,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 import { anlageApi, objektApi, ticketApi } from '../../api/endpoints';
 import { ObjektStrukturEditor } from './ObjektStrukturEditor';
+import { ObjektBeteiligteTab } from './ObjektBeteiligteTab';
 import type {
   AnlageRead,
   ObjektPartnerLinkRead,
@@ -281,6 +282,17 @@ export function ObjektDetailOverlay({
               onRowClick={(pl) => navigate(`/stammdaten/partner/${pl.partner_id}`)}
               searchPlaceholder="In Partnern suchen …"
               itemLabel={{ singular: 'Partner', plural: 'Partner' }}
+            />
+          ),
+        },
+        {
+          key: 'beteiligte',
+          label: 'Beteiligte',
+          isRelation: true,
+          render: () => (
+            <ObjektBeteiligteTab
+              objektId={objektId}
+              onPartner={(pid) => navigate(`/stammdaten/partner/${pid}`)}
             />
           ),
         },
