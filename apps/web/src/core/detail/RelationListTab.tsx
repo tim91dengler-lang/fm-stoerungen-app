@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type {
   ColumnDef,
   ColumnFiltersState,
+  GroupingState,
   SortingState,
   VisibilityState,
 } from '@tanstack/react-table';
@@ -31,6 +32,7 @@ export function RelationListTab<T>({
   itemLabel,
   total,
   headerAction,
+  groupableColumns,
 }: {
   viewKey: string;
   columns: ColumnDef<T>[];
@@ -45,12 +47,16 @@ export function RelationListTab<T>({
   total?: number;
   /** Optionale Aktion (z. B. „+ Neu"-Button) oberhalb der Liste, rechtsbündig. */
   headerAction?: React.ReactNode;
+  /** Gesetzt → Gruppierung aktiv: diese Spalten dürfen als Gruppe genutzt werden
+   *  (Standard-Listenfunktion auch in Verknüpfungs-Reitern). */
+  groupableColumns?: { id: string; label: string }[];
 }) {
   const [search, setSearch] = useState('');
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [grouping, setGrouping] = useState<GroupingState>([]);
 
   const filtered = useMemo(() => {
     if (!search.trim() || !getSearchText) return data;
@@ -95,6 +101,13 @@ export function RelationListTab<T>({
         onColumnFiltersChange={setColumnFilters}
         columnOrder={columnOrder}
         onColumnOrderChange={setColumnOrder}
+        {...(groupableColumns && groupableColumns.length > 0
+          ? {
+              grouping,
+              onGroupingChange: setGrouping,
+              groupableColumns,
+            }
+          : {})}
         filterRenderers={filterRenderers}
         onRowClick={onRowClick}
         searchPlaceholder={searchPlaceholder ?? 'Volltextsuche …'}

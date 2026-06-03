@@ -138,6 +138,11 @@ export function ObjektBeteiligteTab({
       onRowClick={(r) => onPartner(r.partnerId)}
       searchPlaceholder="In Beteiligten suchen … (Partner, Rolle, Ort, Ansprechpartner)"
       itemLabel={{ singular: 'Beteiligter', plural: 'Beteiligte' }}
+      groupableColumns={[
+        { id: 'ebene', label: 'Ebene' },
+        { id: 'rolle', label: 'Rolle' },
+        { id: 'partner', label: 'Partner' },
+      ]}
     />
   );
 }
