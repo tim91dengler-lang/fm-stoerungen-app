@@ -146,7 +146,13 @@ function ObjektAnlagenTab({ objektId }: { objektId: string }) {
 
 // --- Übersicht -------------------------------------------------------------
 
-function ObjektUebersicht({ o }: { o: Objekt }) {
+function ObjektUebersicht({
+  o,
+  onInteractionLockChange,
+}: {
+  o: Objekt;
+  onInteractionLockChange: (locked: boolean) => void;
+}) {
   const qc = useQueryClient();
   const mutation = useMutation({
     mutationFn: (patch: ObjektUpdate) => objektApi.update(o.id, patch),
@@ -160,55 +166,74 @@ function ObjektUebersicht({ o }: { o: Objekt }) {
     mutation.mutateAsync(patch).then(() => undefined);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-      <div className="mx-auto w-full max-w-5xl">
-        <DetailRegions
-          left={
-            <>
-              <DetailBlock title="Stammdaten" blockKey="stammdaten" defaultOpen count={3}>
-                <div className={grid}>
-                  <div className="sm:col-span-2">
-                    <InlineEditText
-                      label="Name"
-                      value={o.name}
-                      required
-                      onCommit={(v) => commit({ name: v ?? '' })}
-                    />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Stammdaten kompakt oben */}
+      <div className="max-h-[40%] shrink-0 overflow-y-auto px-5 pb-1 pt-4">
+        <div className="mx-auto w-full max-w-5xl">
+          <DetailRegions
+            left={
+              <>
+                <DetailBlock
+                  title="Stammdaten"
+                  blockKey="stammdaten"
+                  defaultOpen
+                  count={3}
+                >
+                  <div className={grid}>
+                    <div className="sm:col-span-2">
+                      <InlineEditText
+                        label="Name"
+                        value={o.name}
+                        required
+                        onCommit={(v) => commit({ name: v ?? '' })}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <InlineEditEntity
+                        label="Adresse"
+                        value={o.adresse_id}
+                        displayLabel={adresseLabel(o.adresse)}
+                        fetcher={searchAdressen}
+                        queryKey="objekt-adresse"
+                        placeholder="Adresse suchen …"
+                        onCommit={(v) => commit({ adresse_id: v })}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <InlineEditText
+                        label="Notiz"
+                        value={o.notiz}
+                        multiline
+                        onCommit={(v) => commit({ notiz: v })}
+                      />
+                    </div>
                   </div>
-                  <div className="sm:col-span-2">
-                    <InlineEditEntity
-                      label="Adresse"
-                      value={o.adresse_id}
-                      displayLabel={adresseLabel(o.adresse)}
-                      fetcher={searchAdressen}
-                      queryKey="objekt-adresse"
-                      placeholder="Adresse suchen …"
-                      onCommit={(v) => commit({ adresse_id: v })}
-                    />
+                </DetailBlock>
+              </>
+            }
+            right={
+              <>
+                <DetailBlock title="Historie" blockKey="historie" count={3}>
+                  <div className={grid}>
+                    <Field label="Angelegt am" value={fmtDate(o.created_at)} />
+                    <Field label="Zuletzt geändert am" value={fmtDate(o.updated_at)} />
+                    <Field label="Interne ID" value={o.id} />
                   </div>
-                  <div className="sm:col-span-2">
-                    <InlineEditText
-                      label="Notiz"
-                      value={o.notiz}
-                      multiline
-                      onCommit={(v) => commit({ notiz: v })}
-                    />
-                  </div>
-                </div>
-              </DetailBlock>
-            </>
-          }
-          right={
-            <>
-              <DetailBlock title="Historie" blockKey="historie" count={3}>
-                <div className={grid}>
-                  <Field label="Angelegt am" value={fmtDate(o.created_at)} />
-                  <Field label="Zuletzt geändert am" value={fmtDate(o.updated_at)} />
-                  <Field label="Interne ID" value={o.id} />
-                </div>
-              </DetailBlock>
-            </>
-          }
+                </DetailBlock>
+              </>
+            }
+          />
+        </div>
+      </div>
+      {/* Struktur als Hauptinhalt der Übersicht (Tim 2026-06-03) */}
+      <div className="flex min-h-0 flex-1 flex-col border-t border-zinc-800 px-5 pb-3 pt-3">
+        <div className="mb-2 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          Struktur
+        </div>
+        <ObjektStrukturEditor
+          objektId={o.id}
+          objektAdresseId={o.adresse_id ?? null}
+          onInteractionLockChange={onInteractionLockChange}
         />
       </div>
     </div>
@@ -234,7 +259,9 @@ export function ObjektDetailOverlay({
         {
           key: 'uebersicht',
           label: 'Übersicht',
-          render: () => <ObjektUebersicht o={o} />,
+          render: () => (
+            <ObjektUebersicht o={o} onInteractionLockChange={setStrukturLocked} />
+          ),
         },
         {
           key: 'partner',
@@ -269,19 +296,6 @@ export function ObjektDetailOverlay({
           label: 'Anlagen',
           isRelation: true,
           render: () => <ObjektAnlagenTab objektId={objektId} />,
-        },
-        {
-          key: 'struktur',
-          label: 'Struktur',
-          render: () => (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-4">
-              <ObjektStrukturEditor
-                objektId={objektId}
-                objektAdresseId={o.adresse_id ?? null}
-                onInteractionLockChange={setStrukturLocked}
-              />
-            </div>
-          ),
         },
       ]
     : [];
