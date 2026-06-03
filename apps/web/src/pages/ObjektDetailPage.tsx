@@ -35,7 +35,7 @@ export function ObjektDetailPage() {
     return <div className="p-6 text-sm text-zinc-500">Kein Objekt ausgewählt.</div>;
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col gap-6 px-4 py-6 lg:px-8">
+    <div className="flex min-h-0 flex-col gap-6 px-4 py-6 lg:h-[calc(100vh-7rem)] lg:px-8">
       <div className="shrink-0">
         <Link
           to="/stammdaten/objekte"
