@@ -64,7 +64,10 @@ export function RelationListTab<T>({
     const m: Record<string, typeof ComboboxFilter> = {};
     for (const c of columns) {
       const id = c.id ?? (c as { accessorKey?: string }).accessorKey;
-      if (id) m[id] = ComboboxFilter;
+      // Spalten ohne Filter (z. B. die Aktions-/Trash-Spalte ohne accessor) NICHT
+      // verdrahten — sonst rendert ComboboxFilter über undefined-Werte und wirft
+      // (Render-Fehler im Kontaktpersonen-/Adressen-Reiter).
+      if (id && c.enableColumnFilter !== false) m[id] = ComboboxFilter;
     }
     return m;
   }, [columns]);
