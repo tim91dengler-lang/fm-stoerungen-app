@@ -12,7 +12,10 @@ from fm_api.schemas.fehlercode import (
     TickettypMiniRef,
 )
 from fm_api.services import fehlercode_service
-from fm_api.services.fehlercode_service import FehlercodeNotFoundError
+from fm_api.services.fehlercode_service import (
+    FehlercodeNotFoundError,
+    FehlercodeValidationError,
+)
 
 router = APIRouter()
 
@@ -117,9 +120,14 @@ async def get_fehlercode(
 async def create_fehlercode(
     payload: FehlercodeCreate, db: AuditedDbSession, current: CurrentUserDep
 ) -> FehlercodeRead:
-    f = await fehlercode_service.create_fehlercode(
-        db, current.mandant_id, payload=payload.model_dump()
-    )
+    try:
+        f = await fehlercode_service.create_fehlercode(
+            db, current.mandant_id, payload=payload.model_dump()
+        )
+    except FehlercodeValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _serialize(f, 0)
 
 
@@ -137,6 +145,10 @@ async def update_fehlercode(
         _, c = await fehlercode_service.get_fehlercode(db, current.mandant_id, fehlercode_id)
     except FehlercodeNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except FehlercodeValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return _serialize(f, c)
 
 
