@@ -386,15 +386,9 @@ function PartnerUebersicht({ p }: { p: Partner }) {
           }
           right={
             <>
-              <DetailBlock
-                title="Status & Hierarchie"
-                blockKey="status"
-                defaultOpen
-                count={2}
-              >
+              <DetailBlock title="Kennung" blockKey="status" defaultOpen count={1}>
                 <div className={grid}>
                   <Field label="Partner-Nr" value={p.partner_nummer} />
-                  <Field label="Status" value={p.gesperrt ? 'Gesperrt' : 'Aktiv'} />
                 </div>
               </DetailBlock>
               <DetailBlock title="Identifikatoren" blockKey="ident" count={3}>

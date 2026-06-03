@@ -320,7 +320,7 @@ export function AnlagenPage() {
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
         rowActions={{
-          onEdit: openEdit,
+          onEdit: (a) => (modulStandard ? setOpenAnlageId(a.id) : openEdit(a)),
           onDelete: (rows) => setBulkConfirm(rows),
         }}
         bulkActions={(selected) => (

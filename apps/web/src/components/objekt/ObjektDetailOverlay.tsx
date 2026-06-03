@@ -200,11 +200,6 @@ function ObjektUebersicht({ o }: { o: Objekt }) {
           }
           right={
             <>
-              <DetailBlock title="Status" blockKey="status" defaultOpen count={1}>
-                <div className={grid}>
-                  <Field label="Status" value={o.gesperrt ? 'Deaktiviert' : 'Aktiv'} />
-                </div>
-              </DetailBlock>
               <DetailBlock title="Historie" blockKey="historie" count={3}>
                 <div className={grid}>
                   <Field label="Angelegt am" value={fmtDate(o.created_at)} />

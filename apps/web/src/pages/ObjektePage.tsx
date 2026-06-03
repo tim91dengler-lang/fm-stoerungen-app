@@ -335,7 +335,7 @@ export function ObjektePage() {
         getRowId={(o) => o.id}
         rowSelection={rowSelection}
         rowActions={{
-          onEdit: openEdit,
+          onEdit: (o) => (modulStandard ? setOpenObjektId(o.id) : openEdit(o)),
           sperren: {
             isGesperrt: (o) => o.gesperrt,
             onToggle: (o) => {
