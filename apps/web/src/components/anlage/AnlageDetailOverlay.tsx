@@ -2,11 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnDef } from '@tanstack/react-table';
 
-import { anlageApi, auswahllistenApi, fehlercodeApi } from '../../api/endpoints';
+import {
+  anlageApi,
+  auswahllistenApi,
+  fehlercodeApi,
+  ticketApi,
+} from '../../api/endpoints';
 import type {
   AnlageUpdate,
   AuswahllistenWertRead,
   FehlercodeRead,
+  TicketRead,
 } from '../../api/types';
 import { searchObjekte } from '../../lib/entitySearch';
 import {
@@ -65,6 +71,26 @@ const fehlercodeColumns: ColumnDef<FehlercodeRead>[] = [
   { id: 'aktiv', accessorFn: (f) => (f.aktiv ? 'aktiv' : 'inaktiv'), header: 'Status' },
 ];
 
+const ticketColumns: ColumnDef<TicketRead>[] = [
+  {
+    id: 'nummer',
+    accessorFn: (t) => t.nummer,
+    header: 'Nr.',
+    cell: (c) => (
+      <span className="font-medium text-zinc-100">#{c.getValue<number>()}</span>
+    ),
+  },
+  { id: 'titel', accessorKey: 'titel', header: 'Titel' },
+  { id: 'status', accessorFn: (t) => t.status.label, header: 'Status' },
+  { id: 'prioritaet', accessorFn: (t) => t.prioritaet.label, header: 'Priorität' },
+  {
+    id: 'eroeffnet_am',
+    accessorFn: (t) => t.eroeffnet_am,
+    header: 'Eröffnet',
+    cell: (c) => fmtDate(c.getValue<string>()),
+  },
+];
+
 type Anlage = NonNullable<ReturnType<typeof useAnlage>['data']>;
 function useAnlage(anlageId: string) {
   return useQuery({
@@ -95,6 +121,33 @@ function AnlageFehlercodesTab({
       onRowClick={(f) => onRow(f.id)}
       searchPlaceholder="In Fehlercodes suchen …"
       itemLabel={{ singular: 'Fehlercode', plural: 'Fehlercodes' }}
+    />
+  );
+}
+
+function AnlageTicketsTab({
+  anlageId,
+  onRow,
+}: {
+  anlageId: string;
+  onRow: (id: string) => void;
+}) {
+  const q = useQuery({
+    queryKey: ['anlage-tickets', anlageId],
+    queryFn: () => ticketApi.list({ anlage_id: anlageId, limit: 200 }),
+  });
+  const rows = q.data?.items ?? [];
+  return (
+    <RelationListTab<TicketRead>
+      viewKey="anlage-tickets"
+      loading={q.isLoading}
+      columns={ticketColumns}
+      data={rows}
+      total={q.data?.total}
+      getSearchText={(t) => `${t.nummer} ${t.titel} ${t.status.label}`}
+      onRowClick={(t) => onRow(t.id)}
+      searchPlaceholder="In Tickets suchen …"
+      itemLabel={{ singular: 'Ticket', plural: 'Tickets' }}
     />
   );
 }
@@ -210,6 +263,17 @@ export function AnlageDetailOverlay({
             <AnlageFehlercodesTab
               anlageId={anlageId}
               onRow={(id) => navigate(`/stammdaten/fehlercodes?code=${id}`)}
+            />
+          ),
+        },
+        {
+          key: 'tickets',
+          label: 'Tickets',
+          isRelation: true,
+          render: () => (
+            <AnlageTicketsTab
+              anlageId={anlageId}
+              onRow={(id) => navigate(`/tickets/${id}`)}
             />
           ),
         },
