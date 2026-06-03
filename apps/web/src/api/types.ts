@@ -259,6 +259,8 @@ export interface TicketListFilters {
   zugewiesen_an_id?: UUID;
   partner_id?: UUID;
   objekt_id?: UUID;
+  anlage_id?: UUID;
+  fehlercode_id?: UUID;
   limit?: number;
   offset?: number;
 }
