@@ -341,6 +341,18 @@ SYSTEM_AUSWAHLLISTEN_SEED: dict[str, dict[str, Any]] = {
             ("eigentuemer", "Eigentümer", 5, "slate", False),
         ],
     },
+    "objekt_beteiligten_rolle": {
+        "label": "Objekt-Beteiligten-Rolle",
+        "beschreibung": "Rolle eines Beteiligten an Objekt / Haus / Stockwerk / Einheit",
+        "ist_system": False,
+        "werte": [
+            ("eigentuemer", "Eigentümer", 0, "violet", False),
+            ("mieter", "Mieter", 1, "amber", False),
+            ("verwalter", "Verwalter", 2, "sky", False),
+            ("hausmeister", "Hausmeister", 3, "emerald", False),
+            ("reinigung", "Reinigung", 4, "cyan", False),
+        ],
+    },
     "eingangskanal": {
         "label": "Eingangskanal",
         "beschreibung": "Quelle der Ticket-Erfassung",
