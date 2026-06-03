@@ -16,6 +16,7 @@ import type {
 } from '../../api/types';
 import { searchPartner } from '../../lib/entitySearch';
 import { usePartnerTypLookup } from '../../lib/usePartnerTypLookup';
+import { MapsLink } from '../MapsLink';
 import { ConfirmDialog } from '../../core/liste/ConfirmDialog';
 import { KontaktModal } from '../../pages/partner/KontaktModal';
 import { PartnerAdresseModal } from '../../pages/partner/PartnerAdresseModal';
@@ -428,6 +429,39 @@ function PartnerUebersicht({ p }: { p: Partner }) {
                 <div className={grid}>
                   <Field label="Partner-Nr" value={p.partner_nummer} />
                 </div>
+              </DetailBlock>
+              <DetailBlock
+                title="Adressen"
+                blockKey="adressen-overview"
+                defaultOpen
+                count={p.adress_links.length}
+              >
+                {p.adress_links.length === 0 ? (
+                  <p className="text-xs text-zinc-500">Keine Adresse hinterlegt.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {p.adress_links.map((al) => (
+                      <div
+                        key={al.id}
+                        className="rounded-md border border-zinc-800 bg-zinc-950/40 px-3 py-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-sm text-zinc-200">
+                            {al.adresse
+                              ? `${al.adresse.strasse}${al.adresse.hausnummer ? ' ' + al.adresse.hausnummer : ''}, ${al.adresse.plz} ${al.adresse.ort}`
+                              : '—'}
+                          </span>
+                          {al.ist_primaer && (
+                            <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300">
+                              primär
+                            </span>
+                          )}
+                        </div>
+                        {al.adresse && <MapsLink adresse={al.adresse} className="mt-1" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </DetailBlock>
               <DetailBlock title="Identifikatoren" blockKey="ident" count={3}>
                 <div className={grid}>
