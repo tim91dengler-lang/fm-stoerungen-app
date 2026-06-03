@@ -568,6 +568,12 @@ export interface ObjektPartnerLinkRead extends ObjektPartnerLink {
   partner_name: string;
 }
 
+/** Aggregierter Struktur-Beteiligter (Partner + Rolle) für die Objekte-Liste. */
+export interface BeteiligterSummary {
+  partner_name: string;
+  rolle_label: string | null;
+}
+
 export interface ObjektRead {
   id: UUID;
   mandant_id: UUID;
@@ -577,6 +583,7 @@ export interface ObjektRead {
   adresse: AdresseRead | null;
   notiz: string | null;
   partner_links: ObjektPartnerLinkRead[];
+  beteiligte_summary: BeteiligterSummary[];
   created_at: string;
   updated_at: string;
 }

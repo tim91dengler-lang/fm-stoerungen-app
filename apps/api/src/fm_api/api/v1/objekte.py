@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -5,12 +6,13 @@ from fastapi import APIRouter, HTTPException, Query, status
 from fm_api.core.deps import AuditedDbSession, CurrentUserDep
 from fm_api.schemas.common import PaginatedResponse
 from fm_api.schemas.objekt import (
+    BeteiligterSummary,
     ObjektCreate,
     ObjektPartnerLinkRead,
     ObjektRead,
     ObjektUpdate,
 )
-from fm_api.services import objekt_service
+from fm_api.services import objekt_service, objektstruktur_service
 from fm_api.services.objekt_service import (
     InvalidPartnerLinkError,
     ObjektNotFoundError,
@@ -19,7 +21,9 @@ from fm_api.services.objekt_service import (
 router = APIRouter()
 
 
-def _serialize_objekt(o: object) -> ObjektRead:
+def _serialize_objekt(
+    o: object, beteiligte_summary: list[dict[str, Any]] | None = None
+) -> ObjektRead:
     from fm_api.models.objekt import Objekt as ObjektModel
 
     if not isinstance(o, ObjektModel):
@@ -46,6 +50,7 @@ def _serialize_objekt(o: object) -> ObjektRead:
         )
         for link in o.partner_links
     ]
+    base.beteiligte_summary = [BeteiligterSummary(**b) for b in (beteiligte_summary or [])]
     return base
 
 
@@ -72,8 +77,11 @@ async def list_objekte(
         limit=limit,
         offset=offset,
     )
+    summary = await objektstruktur_service.summarize_struktur_beteiligte(
+        db, current.mandant_id, [o.id for o in items]
+    )
     return PaginatedResponse[ObjektRead](
-        items=[_serialize_objekt(o) for o in items],
+        items=[_serialize_objekt(o, summary.get(o.id)) for o in items],
         total=total,
         limit=limit,
         offset=offset,

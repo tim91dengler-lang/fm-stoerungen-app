@@ -396,6 +396,35 @@ async def test_foreign_node_id_creates_new_row_no_hijack(client, admin_user) -> 
 
 
 @pytest.mark.integration
+async def test_objekte_liste_zeigt_struktur_beteiligte_summary(client, admin_user) -> None:
+    """Die Objekte-Hauptliste aggregiert die Struktur-Beteiligten (Haus/Stockwerk/
+    Einheit) je Objekt in `beteiligte_summary`."""
+    token = await _login_admin(client, admin_user)
+    headers = auth_header(token)
+    objekt_id = await _create_objekt(client, headers, "Summary-Objekt")
+    haus_id = await _create_haus(client, headers, objekt_id)
+    partner_id = await _create_partner(client, headers, "Summary-Eigentümer")
+    rollen = await _rolle_ids(client, headers)
+
+    # Beteiligter auf Haus-Ebene
+    res = await client.patch(
+        f"/api/v1/objektstruktur/haus/{haus_id}",
+        headers=headers,
+        json={"beteiligte": [{"partner_id": partner_id, "rolle_id": rollen["eigentuemer"]}]},
+    )
+    assert res.status_code == 200, res.text
+
+    res = await client.get("/api/v1/objekte?limit=500", headers=headers)
+    assert res.status_code == 200, res.text
+    obj = next(o for o in res.json()["items"] if o["id"] == objekt_id)
+    summary = obj["beteiligte_summary"]
+    assert any(
+        s["partner_name"] == "Summary-Eigentümer" and s["rolle_label"] == "Eigentümer"
+        for s in summary
+    ), summary
+
+
+@pytest.mark.integration
 async def test_rolle_null_allowed(client, admin_user) -> None:
     """Eine Beteiligten-Zeile ohne Rolle ist erlaubt (Rolle optional)."""
     token = await _login_admin(client, admin_user)
