@@ -1,27 +1,16 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import { anlageApi, objektApi, ticketApi } from '../../api/endpoints';
 import { ObjektStrukturEditor } from './ObjektStrukturEditor';
 import { ObjektBeteiligteTab } from './ObjektBeteiligteTab';
-import type {
-  AnlageRead,
-  ObjektPartnerLinkRead,
-  ObjektUpdate,
-  TicketRead,
-} from '../../api/types';
-import { searchAdressen } from '../../lib/entitySearch';
-import { MapsLink } from '../MapsLink';
+import type { AnlageRead, ObjektPartnerLinkRead, TicketRead } from '../../api/types';
 import {
-  DetailBlock,
   DetailHeader,
   DetailOverlay,
-  DetailRegions,
   DetailTabs,
-  InlineEditEntity,
-  InlineEditText,
   RelationListTab,
   type DetailTab,
 } from '../../core/detail';
@@ -36,21 +25,6 @@ import {
  * (dieselbe wie auf der Seite /stammdaten/objekte/:id).
  */
 
-function Field({ label, value }: { label: string; value?: React.ReactNode }) {
-  const empty = value === null || value === undefined || value === '';
-  return (
-    <div>
-      <label className="mb-0.5 block text-[11px] uppercase tracking-wide text-zinc-500">
-        {label}
-      </label>
-      <div className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-300">
-        {empty ? <span className="text-zinc-600">—</span> : value}
-      </div>
-    </div>
-  );
-}
-
-const grid = 'grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2';
 const fmtDate = (s?: string | null) =>
   s ? s.slice(0, 10).split('-').reverse().join('.') : null;
 const adresseLabel = (
@@ -155,92 +129,16 @@ function ObjektUebersicht({
   o: Objekt;
   onInteractionLockChange: (locked: boolean) => void;
 }) {
-  const qc = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: (patch: ObjektUpdate) => objektApi.update(o.id, patch),
-    onSuccess: (updated) => {
-      qc.setQueryData(['objekt', o.id], updated);
-      qc.invalidateQueries({ queryKey: ['objekte'] });
-      qc.invalidateQueries({ queryKey: ['tickets'] }); // Tickets betten Objektname ein
-    },
-  });
-  const commit = (patch: ObjektUpdate) =>
-    mutation.mutateAsync(patch).then(() => undefined);
-
+  // Struktur = ganzer Inhalt der Übersicht (Tim 2026-06-03). Die Objektdaten
+  // (Name, Adresse, Notiz) + Historie leben jetzt als Wurzel-Knoten „Objekt" IM
+  // Struktur-Editor — keine getrennten Stammdaten-/Historie-Blöcke mehr oben.
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Stammdaten kompakt oben */}
-      <div className="max-h-[40%] shrink-0 overflow-y-auto px-5 pb-1 pt-4">
-        <div className="mx-auto w-full max-w-5xl">
-          <DetailRegions
-            left={
-              <>
-                <DetailBlock
-                  title="Stammdaten"
-                  blockKey="stammdaten"
-                  defaultOpen
-                  count={3}
-                >
-                  <div className={grid}>
-                    <div className="sm:col-span-2">
-                      <InlineEditText
-                        label="Name"
-                        value={o.name}
-                        required
-                        onCommit={(v) => commit({ name: v ?? '' })}
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <InlineEditEntity
-                        label="Adresse"
-                        value={o.adresse_id}
-                        displayLabel={adresseLabel(o.adresse)}
-                        fetcher={searchAdressen}
-                        queryKey="objekt-adresse"
-                        placeholder="Adresse suchen …"
-                        onCommit={(v) => commit({ adresse_id: v })}
-                      />
-                      {o.adresse && (
-                        <MapsLink adresse={o.adresse} className="mt-1 px-1" />
-                      )}
-                    </div>
-                    <div className="sm:col-span-2">
-                      <InlineEditText
-                        label="Notiz"
-                        value={o.notiz}
-                        multiline
-                        onCommit={(v) => commit({ notiz: v })}
-                      />
-                    </div>
-                  </div>
-                </DetailBlock>
-              </>
-            }
-            right={
-              <>
-                <DetailBlock title="Historie" blockKey="historie" count={3}>
-                  <div className={grid}>
-                    <Field label="Angelegt am" value={fmtDate(o.created_at)} />
-                    <Field label="Zuletzt geändert am" value={fmtDate(o.updated_at)} />
-                    <Field label="Interne ID" value={o.id} />
-                  </div>
-                </DetailBlock>
-              </>
-            }
-          />
-        </div>
-      </div>
-      {/* Struktur als Hauptinhalt der Übersicht (Tim 2026-06-03) */}
-      <div className="flex min-h-0 flex-1 flex-col border-t border-zinc-800 px-5 pb-3 pt-3">
-        <div className="mb-2 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-          Struktur
-        </div>
-        <ObjektStrukturEditor
-          objektId={o.id}
-          objektAdresseId={o.adresse_id ?? null}
-          onInteractionLockChange={onInteractionLockChange}
-        />
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-3 pt-3">
+      <ObjektStrukturEditor
+        objektId={o.id}
+        objektAdresseId={o.adresse_id ?? null}
+        onInteractionLockChange={onInteractionLockChange}
+      />
     </div>
   );
 }
