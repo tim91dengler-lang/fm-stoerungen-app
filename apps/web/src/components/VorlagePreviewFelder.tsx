@@ -21,7 +21,7 @@ import { GripVertical, Lock, Star, X } from 'lucide-react';
 import type { TickettypFeldRead, TickettypRead } from '../api/types';
 import { farbeClass } from './TickettypFarbe';
 import { iconFor } from './TickettypIcon';
-import { DatePicker } from './DatePicker';
+import { renderInput } from './ticket/ticketFieldDefs';
 
 /**
  * Live-Vorschau des Erfassungsformulars für den Vorlagen-Designer.
@@ -45,98 +45,10 @@ import { DatePicker } from './DatePicker';
  * PREVIEW_BLOCKS hier (sonst landet das Feld im Block „Weitere Felder").
  */
 
-type FeldRenderer = (feld: TickettypFeldRead) => React.ReactNode;
-
 // Kernfelder bleiben in jeder Vorlage fix (Konzept "Das Ticket", Tim 2026-05-31,
 // Entscheidung A): nicht abwählbar, immer Pflicht. Synchron zu KERNFELD_KEYS im
 // Backend (tickettyp_service.py).
 const KERNFELD_KEYS = new Set<string>(['titel']);
-
-const INPUT_CLASS =
-  'mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 disabled:opacity-60';
-
-function PreviewInput({ id, placeholder = '' }: { id: string; placeholder?: string }) {
-  return <input id={id} disabled placeholder={placeholder} className={INPUT_CLASS} />;
-}
-
-function PreviewTextarea({ id, placeholder = '' }: { id: string; placeholder?: string }) {
-  return (
-    <textarea
-      id={id}
-      disabled
-      rows={3}
-      placeholder={placeholder}
-      className={INPUT_CLASS}
-    />
-  );
-}
-
-function PreviewSelect({ id, hint }: { id: string; hint: string }) {
-  return (
-    <select id={id} disabled className={INPUT_CLASS}>
-      <option>— {hint} —</option>
-    </select>
-  );
-}
-
-// Pro System-Feld eine Render-Funktion (nur die Input-Form, ohne Label-
-// Bereich — der wird von der Karten-Hülle gerendert). Fallback unten.
-const INPUT_RENDERERS: Record<string, FeldRenderer> = {
-  titel: (f) => (
-    <PreviewInput
-      id={`preview-${f.feld_key}`}
-      placeholder="Kurze Beschreibung des Problems"
-    />
-  ),
-  beschreibung: (f) => (
-    <PreviewTextarea id={`preview-${f.feld_key}`} placeholder="Details zur Störung" />
-  ),
-  prio: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Priorität wählen" />,
-  kategorie: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Kategorie" />,
-  quelle: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Eingangskanal" />,
-  objekt: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Objekt auswählen" />,
-  haus: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Haus" />,
-  stockwerk: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Stockwerk" />,
-  einheit: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Einheit" />,
-  anlage: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Anlage" />,
-  adresse: () => (
-    <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
-      Adresse (Objekt-Default, überschreibbar) + Google-Maps-Link.
-    </div>
-  ),
-  partner: () => (
-    <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
-      Beteiligte: mehrere Geschäftspartner + Ansprechpartner mit Rolle.
-    </div>
-  ),
-  projekt: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Projekt" />,
-  faelligkeit_am: () => (
-    <DatePicker value={null} onChange={() => {}} disabled className="mt-1" />
-  ),
-  wiederholung: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Wiederholung" />,
-  fehlercode: (f) => <PreviewSelect id={`preview-${f.feld_key}`} hint="Fehlercode" />,
-  pin: () => (
-    <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
-      Foto-Pin wird beim Ticket per Klick auf den Grundriss gesetzt.
-    </div>
-  ),
-  foto: () => (
-    <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
-      Foto-Upload erfolgt nach Anlage am Ticket.
-    </div>
-  ),
-  dokumente: () => (
-    <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-500">
-      Dokumente werden nach Anlage am Ticket verknüpft.
-    </div>
-  ),
-};
-
-function renderInput(feld: TickettypFeldRead): React.ReactNode {
-  const r = INPUT_RENDERERS[feld.feld_key];
-  if (r) return r(feld);
-  return <PreviewInput id={`preview-${feld.feld_key}`} placeholder={feld.label} />;
-}
 
 export interface FeldUpdate {
   label?: string;

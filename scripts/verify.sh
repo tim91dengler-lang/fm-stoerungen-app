@@ -115,7 +115,16 @@ if $frontend_changed; then
     run "eslint"    apps/web "npm run lint --silent"
     run "typecheck" apps/web "npm run typecheck --silent"
     run "vitest"    apps/web "npm test --silent"
-    run "build"     apps/web "npm run build"
+    # build (tsc -b && vite build) ist speicherhungrig. Auf RAM-knappen Dev-Boxen
+    # (z. B. neben VS Code) killt der OOM-Killer den Build — das ist KEIN Code-Fehler.
+    # Daher lokal nur bauen, wenn genug RAM frei ist; sonst überspringen (CI baut mit
+    # genug RAM und ist der harte Build-Gate). Erzwingen: VERIFY_FORCE_BUILD=1.
+    avail="$(free -m 2>/dev/null | awk '/^Mem:/{print $7}')"
+    if [ "${VERIFY_FORCE_BUILD:-0}" != "1" ] && [ -n "$avail" ] && [ "$avail" -lt 1200 ]; then
+      log "  ⚠ build übersprungen — nur ${avail} MB RAM frei (<1200), OOM-Gefahr. CI baut. Erzwingen: VERIFY_FORCE_BUILD=1."
+    else
+      run "build" apps/web "npm run build"
+    fi
   fi
 fi
 
