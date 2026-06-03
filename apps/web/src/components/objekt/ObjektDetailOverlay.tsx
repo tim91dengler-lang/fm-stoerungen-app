@@ -12,6 +12,7 @@ import type {
   TicketRead,
 } from '../../api/types';
 import { searchAdressen } from '../../lib/entitySearch';
+import { MapsLink } from '../MapsLink';
 import {
   DetailBlock,
   DetailHeader,
@@ -198,6 +199,9 @@ function ObjektUebersicht({
                         placeholder="Adresse suchen …"
                         onCommit={(v) => commit({ adresse_id: v })}
                       />
+                      {o.adresse && (
+                        <MapsLink adresse={o.adresse} className="mt-1 px-1" />
+                      )}
                     </div>
                     <div className="sm:col-span-2">
                       <InlineEditText

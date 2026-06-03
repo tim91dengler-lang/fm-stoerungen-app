@@ -90,8 +90,42 @@ const kontaktColumns: ColumnDef<PartnerKontaktRead>[] = [
     accessorFn: (k) => [k.vorname, k.nachname].filter(Boolean).join(' ') || '—',
     header: 'Name',
   },
-  { id: 'email', accessorFn: (k) => k.email ?? '—', header: 'E-Mail' },
-  { id: 'telefon', accessorFn: (k) => k.telefon ?? k.mobil ?? '—', header: 'Telefon' },
+  {
+    id: 'email',
+    accessorFn: (k) => k.email ?? '—',
+    header: 'E-Mail',
+    cell: (c) =>
+      c.row.original.email ? (
+        <a
+          href={`mailto:${c.row.original.email}`}
+          onClick={(e) => e.stopPropagation()}
+          className="text-emerald-400 hover:text-emerald-300"
+        >
+          {c.row.original.email}
+        </a>
+      ) : (
+        '—'
+      ),
+  },
+  {
+    id: 'telefon',
+    accessorFn: (k) => k.telefon ?? k.mobil ?? '—',
+    header: 'Telefon',
+    cell: (c) => {
+      const v = c.row.original.telefon ?? c.row.original.mobil;
+      return v ? (
+        <a
+          href={`tel:${v.replace(/[^+\d]/g, '')}`}
+          onClick={(e) => e.stopPropagation()}
+          className="text-emerald-400 hover:text-emerald-300"
+        >
+          {v}
+        </a>
+      ) : (
+        '—'
+      );
+    },
+  },
   {
     id: 'haupt',
     accessorFn: (k) => (k.ist_hauptkontakt ? 'Hauptkontakt' : '—'),
@@ -356,16 +390,19 @@ function PartnerUebersicht({ p }: { p: Partner }) {
                   <InlineEditText
                     label="E-Mail"
                     value={p.email}
+                    linkKind="email"
                     onCommit={(v) => commit({ email: v })}
                   />
                   <InlineEditText
                     label="Telefon"
                     value={p.telefon}
+                    linkKind="phone"
                     onCommit={(v) => commit({ telefon: v })}
                   />
                   <InlineEditText
                     label="Mobil"
                     value={p.mobil}
+                    linkKind="phone"
                     onCommit={(v) => commit({ mobil: v })}
                   />
                   <InlineEditText
@@ -377,6 +414,7 @@ function PartnerUebersicht({ p }: { p: Partner }) {
                     <InlineEditText
                       label="Website"
                       value={p.website}
+                      linkKind="url"
                       onCommit={(v) => commit({ website: v })}
                     />
                   </div>
