@@ -13,15 +13,19 @@ from sqlalchemy.orm import selectinload
 
 from fm_api.core.config import get_settings
 from fm_api.models import (
+    Auswahlliste,
+    AuswahllistenWert,
     EinheitBeteiligter,
     EinheitEigentuemer,
     EinheitMieter,
+    GeschaeftsPartner,
     Haus,
     HausBeteiligter,
     HausEigentuemer,
     HausMieter,
     Objekt,
     ObjektStockwerk,
+    PartnerKontakt,
     StockwerkAusrichtung,
     StockwerkBeteiligter,
     StockwerkEigentuemer,
@@ -30,8 +34,18 @@ from fm_api.models import (
 )
 from fm_api.services.photo_service import _ensure_dir, _upload_root  # reuse
 
+# Rollen-Auswahlliste für Beteiligte (Partner + freie Rolle) an Struktur-Knoten.
+_BETEILIGTEN_ROLLE_LISTE_KEY = "objekt_beteiligten_rolle"
+
 
 class ObjektNotFoundError(Exception):
+    pass
+
+
+class BeteiligterValidationError(Exception):
+    """Ungültige Beteiligten-Eingabe (fremder/unbekannter Partner, Kontakt oder
+    Rolle). Wird in der API auf 400 gemappt — mandantengebundener IDOR-Schutz."""
+
     pass
 
 
@@ -47,6 +61,36 @@ class EinheitNotFoundError(Exception):
     pass
 
 
+async def _load_beteiligte_map(
+    db: AsyncSession, model: Any, fk_attr: str, ids: list[UUID]
+) -> dict[UUID, list[Any]]:
+    """Lädt Beteiligten-Zeilen (mit Partner + Rolle) für die FK-IDs, gruppiert je
+    Eltern-ID, sortiert nach ``reihenfolge``."""
+    result: dict[UUID, list[Any]] = {}
+    if not ids:
+        return result
+    rows = (
+        (
+            await db.execute(
+                select(model)
+                .where(getattr(model, fk_attr).in_(ids))
+                .options(
+                    selectinload(model.partner),
+                    selectinload(model.rolle_wert),
+                )
+                # Deterministische Reihenfolge auch bei gleicher ``reihenfolge``
+                # (Tiebreaker), sonst undefinierte Sortierung im Read.
+                .order_by(model.reihenfolge, model.created_at, model.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for row in rows:
+        result.setdefault(getattr(row, fk_attr), []).append(row)
+    return result
+
+
 async def _attach_beteiligte(db: AsyncSession, haeuser: list[Haus]) -> None:
     """Lädt die neuen Beteiligten (haus_/stockwerk_/einheit_beteiligte) für den
     Baum nach und hängt sie als transientes ``_beteiligte`` an jeden Knoten.
@@ -58,32 +102,13 @@ async def _attach_beteiligte(db: AsyncSession, haeuser: list[Haus]) -> None:
     stockwerke = [s for h in haeuser for s in h.stockwerke]
     einheiten = [e for s in stockwerke for e in s.einheiten]
 
-    async def _load(model: Any, fk_attr: str, ids: list[UUID]) -> dict[UUID, list[Any]]:
-        result: dict[UUID, list[Any]] = {}
-        if not ids:
-            return result
-        rows = (
-            (
-                await db.execute(
-                    select(model)
-                    .where(getattr(model, fk_attr).in_(ids))
-                    .options(
-                        selectinload(model.partner),
-                        selectinload(model.rolle_wert),
-                    )
-                    .order_by(model.reihenfolge)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for row in rows:
-            result.setdefault(getattr(row, fk_attr), []).append(row)
-        return result
-
-    haus_map = await _load(HausBeteiligter, "haus_id", [h.id for h in haeuser])
-    sw_map = await _load(StockwerkBeteiligter, "stockwerk_id", [s.id for s in stockwerke])
-    e_map = await _load(EinheitBeteiligter, "einheit_id", [e.id for e in einheiten])
+    haus_map = await _load_beteiligte_map(db, HausBeteiligter, "haus_id", [h.id for h in haeuser])
+    sw_map = await _load_beteiligte_map(
+        db, StockwerkBeteiligter, "stockwerk_id", [s.id for s in stockwerke]
+    )
+    e_map = await _load_beteiligte_map(
+        db, EinheitBeteiligter, "einheit_id", [e.id for e in einheiten]
+    )
 
     for h in haeuser:
         h._beteiligte = haus_map.get(h.id, [])  # type: ignore[attr-defined]
@@ -91,6 +116,121 @@ async def _attach_beteiligte(db: AsyncSession, haeuser: list[Haus]) -> None:
             s._beteiligte = sw_map.get(s.id, [])  # type: ignore[attr-defined]
             for e in s.einheiten:
                 e._beteiligte = e_map.get(e.id, [])  # type: ignore[attr-defined]
+
+
+# -------- Beteiligte: Validierung + Voll-Replace -------------------------------
+
+
+async def _validate_partner(db: AsyncSession, partner_id: UUID, mandant_id: UUID) -> None:
+    stmt = select(GeschaeftsPartner.id).where(
+        GeschaeftsPartner.id == partner_id,
+        GeschaeftsPartner.mandant_id == mandant_id,
+        GeschaeftsPartner.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise BeteiligterValidationError(f"partner {partner_id} not found")
+
+
+async def _validate_partner_kontakt(
+    db: AsyncSession, kontakt_id: UUID, partner_id: UUID, mandant_id: UUID
+) -> None:
+    stmt = select(PartnerKontakt.id).where(
+        PartnerKontakt.id == kontakt_id,
+        PartnerKontakt.partner_id == partner_id,
+        PartnerKontakt.mandant_id == mandant_id,
+        PartnerKontakt.deleted_at.is_(None),
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise BeteiligterValidationError(
+            f"partner_kontakt {kontakt_id} not found for partner {partner_id}"
+        )
+
+
+async def _validate_beteiligten_rolle(db: AsyncSession, rolle_id: UUID, mandant_id: UUID) -> None:
+    """Die Rolle muss ein Wert aus der Liste ``objekt_beteiligten_rolle`` DIESES
+    Mandanten sein — verhindert das Setzen einer fremden/falschen Auswahllisten-ID."""
+    stmt = (
+        select(AuswahllistenWert.id)
+        .join(Auswahlliste, Auswahlliste.id == AuswahllistenWert.auswahlliste_id)
+        .where(
+            AuswahllistenWert.id == rolle_id,
+            Auswahlliste.mandant_id == mandant_id,
+            Auswahlliste.key == _BETEILIGTEN_ROLLE_LISTE_KEY,
+        )
+    )
+    if (await db.execute(stmt)).scalar_one_or_none() is None:
+        raise BeteiligterValidationError(
+            f"rolle {rolle_id} not valid for '{_BETEILIGTEN_ROLLE_LISTE_KEY}'"
+        )
+
+
+async def _apply_struktur_beteiligte(
+    db: AsyncSession,
+    mandant_id: UUID,
+    model: Any,
+    fk_attr: str,
+    fk_value: UUID,
+    items: list[dict[str, Any]],
+) -> None:
+    """Voll-Replace der Beteiligten-Liste eines Struktur-Knotens (Reconcile by id).
+
+    ``id`` gesetzt + zu diesem Knoten gehörend → Zeile aktualisieren; sonst neu
+    anlegen. Bestehende Zeilen, die nicht mehr in ``items`` vorkommen, werden
+    gelöscht. Partner / Ansprechpartner / Rolle werden mandantengebunden validiert
+    (FK-Mandantenvalidierung — IDOR-Schutz).
+    """
+    existing_rows = (
+        (await db.execute(select(model).where(getattr(model, fk_attr) == fk_value))).scalars().all()
+    )
+    existing: dict[UUID, Any] = {r.id: r for r in existing_rows}
+    seen_ids: set[UUID] = set()
+    updated_rows: list[Any] = []
+
+    for idx, item in enumerate(items):
+        partner_id = item["partner_id"]
+        await _validate_partner(db, partner_id, mandant_id)
+        kontakt_id = item.get("partner_kontakt_id")
+        if kontakt_id is not None:
+            await _validate_partner_kontakt(db, kontakt_id, partner_id, mandant_id)
+        rolle_id = item.get("rolle_id")
+        if rolle_id is not None:
+            await _validate_beteiligten_rolle(db, rolle_id, mandant_id)
+        reihenfolge = item.get("reihenfolge")
+        reihenfolge = idx if reihenfolge is None else reihenfolge
+
+        existing_id = item.get("id")
+        if existing_id is not None and existing_id in existing:
+            row = existing[existing_id]
+            row.partner_id = partner_id
+            row.partner_kontakt_id = kontakt_id
+            row.rolle_id = rolle_id
+            row.reihenfolge = reihenfolge
+            seen_ids.add(existing_id)
+            updated_rows.append(row)
+        else:
+            db.add(
+                model(
+                    mandant_id=mandant_id,
+                    partner_id=partner_id,
+                    partner_kontakt_id=kontakt_id,
+                    rolle_id=rolle_id,
+                    reihenfolge=reihenfolge,
+                    **{fk_attr: fk_value},
+                )
+            )
+
+    for bid, row in existing.items():
+        if bid not in seen_ids:
+            await db.delete(row)
+    await db.flush()
+
+    # Bereits geladene Relationships (partner/rolle_wert) der aktualisierten Zeilen
+    # expiren — sonst überschreibt das anschließende selectinload im Read die alten
+    # Werte NICHT (geänderte Rolle/Partner würde sonst stale gelesen). Nur die
+    # Relationships expiren, die _load_beteiligte_map auch nachlädt — partner_kontakt
+    # wird nicht serialisiert und nicht nachgeladen (sonst latente lazy="raise"-Falle).
+    for row in updated_rows:
+        db.expire(row, ["partner", "rolle_wert"])
 
 
 class UnsupportedMimeError(Exception):
@@ -228,6 +368,7 @@ async def update_haus(
     haus = await get_haus(db, mandant_id, haus_id)
     new_eigentuemer = updates.pop("eigentuemer_ids", None)
     new_mieter = updates.pop("mieter_ids", None)
+    new_beteiligte = updates.pop("beteiligte", None)
     for key, value in updates.items():
         if value is None and key in ("bezeichnung",):
             continue
@@ -248,6 +389,10 @@ async def update_haus(
                 insert(HausMieter),
                 [{"haus_id": haus.id, "partner_id": pid} for pid in new_mieter],
             )
+    if new_beteiligte is not None:
+        await _apply_struktur_beteiligte(
+            db, mandant_id, HausBeteiligter, "haus_id", haus.id, new_beteiligte
+        )
     await db.flush()
     return await get_haus(db, mandant_id, haus_id)
 
@@ -297,6 +442,13 @@ async def get_stockwerk(db: AsyncSession, mandant_id: UUID, stockwerk_id: UUID) 
     sw = (await db.execute(stmt)).scalar_one_or_none()
     if sw is None:
         raise StockwerkNotFoundError(f"stockwerk {stockwerk_id} not found")
+    sw_map = await _load_beteiligte_map(db, StockwerkBeteiligter, "stockwerk_id", [sw.id])
+    sw._beteiligte = sw_map.get(sw.id, [])  # type: ignore[attr-defined]
+    e_map = await _load_beteiligte_map(
+        db, EinheitBeteiligter, "einheit_id", [e.id for e in sw.einheiten]
+    )
+    for e in sw.einheiten:
+        e._beteiligte = e_map.get(e.id, [])  # type: ignore[attr-defined]
     return sw
 
 
@@ -342,6 +494,7 @@ async def update_stockwerk(
     sw = await get_stockwerk(db, mandant_id, stockwerk_id)
     new_eigentuemer = updates.pop("eigentuemer_ids", None)
     new_mieter = updates.pop("mieter_ids", None)
+    new_beteiligte = updates.pop("beteiligte", None)
     ausr_str = updates.pop("ausrichtung", "__unset__")
 
     for key, value in updates.items():
@@ -369,6 +522,10 @@ async def update_stockwerk(
                 insert(StockwerkMieter),
                 [{"stockwerk_id": sw.id, "partner_id": pid} for pid in new_mieter],
             )
+    if new_beteiligte is not None:
+        await _apply_struktur_beteiligte(
+            db, mandant_id, StockwerkBeteiligter, "stockwerk_id", sw.id, new_beteiligte
+        )
 
     await db.flush()
     return await get_stockwerk(db, mandant_id, stockwerk_id)
@@ -472,6 +629,8 @@ async def get_einheit(db: AsyncSession, mandant_id: UUID, einheit_id: UUID) -> S
     e = (await db.execute(stmt)).scalar_one_or_none()
     if e is None:
         raise EinheitNotFoundError(f"einheit {einheit_id} not found")
+    e_map = await _load_beteiligte_map(db, EinheitBeteiligter, "einheit_id", [e.id])
+    e._beteiligte = e_map.get(e.id, [])  # type: ignore[attr-defined]
     return e
 
 
@@ -511,6 +670,7 @@ async def update_einheit(
     e = await get_einheit(db, mandant_id, einheit_id)
     new_eigentuemer = updates.pop("eigentuemer_ids", None)
     new_mieter = updates.pop("mieter_ids", None)
+    new_beteiligte = updates.pop("beteiligte", None)
     for key, value in updates.items():
         if value is None and key in ("bezeichnung",):
             continue
@@ -531,6 +691,10 @@ async def update_einheit(
                 insert(EinheitMieter),
                 [{"einheit_id": e.id, "partner_id": pid} for pid in new_mieter],
             )
+    if new_beteiligte is not None:
+        await _apply_struktur_beteiligte(
+            db, mandant_id, EinheitBeteiligter, "einheit_id", e.id, new_beteiligte
+        )
     await db.flush()
     return await get_einheit(db, mandant_id, einheit_id)
 

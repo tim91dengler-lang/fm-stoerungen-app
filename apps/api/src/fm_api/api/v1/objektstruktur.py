@@ -21,6 +21,7 @@ from fm_api.schemas.objektstruktur import (
 )
 from fm_api.services import objektstruktur_service
 from fm_api.services.objektstruktur_service import (
+    BeteiligterValidationError,
     EinheitNotFoundError,
     HausNotFoundError,
     ObjektNotFoundError,
@@ -180,6 +181,8 @@ async def update_haus(
         )
     except HausNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BeteiligterValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _serialize_haus(h)
 
 
@@ -235,6 +238,8 @@ async def update_stockwerk(
         )
     except StockwerkNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BeteiligterValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _serialize_stockwerk(s)
 
 
@@ -360,6 +365,8 @@ async def update_einheit(
         )
     except EinheitNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BeteiligterValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _serialize_einheit(e)
 
 
