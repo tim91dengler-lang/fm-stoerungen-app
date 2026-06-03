@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import bindparam, delete, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -115,6 +115,59 @@ async def _attach_kontakte(db: AsyncSession, rows: Sequence[Any]) -> None:
         by_id = {k.id: k for k in kontakte}
     for row in rows:
         row._kontakte = [by_id[kid] for kid in (row.partner_kontakt_ids or []) if kid in by_id]
+
+
+# Aggregiert die Struktur-Beteiligten (Haus/Stockwerk/Einheit) je Objekt — für die
+# Spalte „Eigentümer/Beteiligte" in der Objekte-Hauptliste. Distinct (UNION) über die
+# drei Ebenen; nur aktive Knoten + aktive Partner. Feste Bezeichner (kein User-Input).
+_BETEILIGTE_SUMMARY_SQL = text(
+    """
+    SELECT objekt_id, partner_name, rolle_label FROM (
+        SELECT h.objekt_id AS objekt_id, p.name AS partner_name, w.label AS rolle_label
+        FROM haus_beteiligte hb
+        JOIN haus h ON h.id = hb.haus_id AND h.deleted_at IS NULL
+        JOIN geschaeftspartner p ON p.id = hb.partner_id AND p.deleted_at IS NULL
+        LEFT JOIN auswahllisten_werte w ON w.id = hb.rolle_id
+        WHERE hb.mandant_id = :mid AND h.objekt_id IN :ids
+        UNION
+        SELECT h.objekt_id, p.name, w.label
+        FROM stockwerk_beteiligte sb
+        JOIN objekt_stockwerk s ON s.id = sb.stockwerk_id AND s.deleted_at IS NULL
+        JOIN haus h ON h.id = s.haus_id AND h.deleted_at IS NULL
+        JOIN geschaeftspartner p ON p.id = sb.partner_id AND p.deleted_at IS NULL
+        LEFT JOIN auswahllisten_werte w ON w.id = sb.rolle_id
+        WHERE sb.mandant_id = :mid AND h.objekt_id IN :ids
+        UNION
+        SELECT h.objekt_id, p.name, w.label
+        FROM einheit_beteiligte eb
+        JOIN stockwerk_einheit e ON e.id = eb.einheit_id AND e.deleted_at IS NULL
+        JOIN objekt_stockwerk s ON s.id = e.stockwerk_id AND s.deleted_at IS NULL
+        JOIN haus h ON h.id = s.haus_id AND h.deleted_at IS NULL
+        JOIN geschaeftspartner p ON p.id = eb.partner_id AND p.deleted_at IS NULL
+        LEFT JOIN auswahllisten_werte w ON w.id = eb.rolle_id
+        WHERE eb.mandant_id = :mid AND h.objekt_id IN :ids
+    ) sub
+    ORDER BY rolle_label NULLS LAST, partner_name
+    """
+).bindparams(bindparam("ids", expanding=True))
+
+
+async def summarize_struktur_beteiligte(
+    db: AsyncSession, mandant_id: UUID, objekt_ids: Sequence[UUID]
+) -> dict[UUID, list[dict[str, Any]]]:
+    """Liefert je Objekt-ID die distinct (Partner-Name, Rolle-Label) aus den
+    Struktur-Beteiligten aller Ebenen — für die Objekte-Listenspalte."""
+    result: dict[UUID, list[dict[str, Any]]] = {}
+    if not objekt_ids:
+        return result
+    rows = (
+        await db.execute(_BETEILIGTE_SUMMARY_SQL, {"mid": mandant_id, "ids": list(objekt_ids)})
+    ).all()
+    for objekt_id, partner_name, rolle_label in rows:
+        result.setdefault(objekt_id, []).append(
+            {"partner_name": partner_name, "rolle_label": rolle_label}
+        )
+    return result
 
 
 async def _attach_beteiligte(db: AsyncSession, haeuser: list[Haus]) -> None:

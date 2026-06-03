@@ -22,6 +22,14 @@ class ObjektPartnerLinkRead(BaseModel):
     partner_name: str
 
 
+class BeteiligterSummary(BaseModel):
+    """Aggregierter Struktur-Beteiligter (Partner + Rolle) für die Objekte-Liste —
+    über Haus/Stockwerk/Einheit zusammengefasst, distinct."""
+
+    partner_name: str
+    rolle_label: str | None = None
+
+
 class ObjektBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     adresse_id: UUID | None = None
@@ -46,3 +54,4 @@ class ObjektRead(TimestampedRead, ObjektBase):
     gesperrt: bool = False
     adresse: AdresseRead | None = None
     partner_links: list[ObjektPartnerLinkRead] = Field(default_factory=list)
+    beteiligte_summary: list[BeteiligterSummary] = Field(default_factory=list)

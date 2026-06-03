@@ -256,7 +256,7 @@ export function ObjektePage() {
       {
         id: 'partner',
         accessorFn: (row) => row.partner_links.map((l) => l.partner_name).join(' '),
-        header: 'Partner',
+        header: 'Partner (Objekt)',
         filterFn: 'includesString',
         cell: (ctx) => {
           const links = ctx.row.original.partner_links;
@@ -264,6 +264,28 @@ export function ObjektePage() {
           return (
             <span className="text-xs text-zinc-400">
               {links.map((l) => `${l.partner_name} (${TYP_LABEL[l.rolle]})`).join(', ')}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'beteiligte',
+        accessorFn: (row) =>
+          row.beteiligte_summary
+            .map((b) => `${b.partner_name} ${b.rolle_label ?? ''}`)
+            .join(' '),
+        header: 'Eigentümer/Beteiligte',
+        filterFn: 'includesString',
+        cell: (ctx) => {
+          const bet = ctx.row.original.beteiligte_summary;
+          if (bet.length === 0) return <span className="text-zinc-500">—</span>;
+          return (
+            <span className="text-xs text-zinc-400">
+              {bet
+                .map((b) =>
+                  b.rolle_label ? `${b.partner_name} (${b.rolle_label})` : b.partner_name,
+                )
+                .join(', ')}
             </span>
           );
         },
