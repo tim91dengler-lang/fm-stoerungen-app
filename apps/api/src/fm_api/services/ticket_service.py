@@ -406,6 +406,8 @@ async def list_tickets(
     zugewiesen_an_id: UUID | None = None,
     partner_id: UUID | None = None,
     objekt_id: UUID | None = None,
+    anlage_id: UUID | None = None,
+    fehlercode_id: UUID | None = None,
     include_deleted: bool = False,
     limit: int = 50,
     offset: int = 0,
@@ -453,6 +455,12 @@ async def list_tickets(
 
     if objekt_id is not None:
         base = base.where(Ticket.objekt_id == objekt_id)
+
+    if anlage_id is not None:
+        base = base.where(Ticket.anlage_id == anlage_id)
+
+    if fehlercode_id is not None:
+        base = base.where(Ticket.fehlercode_id == fehlercode_id)
 
     count_stmt = select(func.count()).select_from(base.subquery())
     total = (await db.execute(count_stmt)).scalar_one()

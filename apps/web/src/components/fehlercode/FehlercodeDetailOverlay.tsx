@@ -1,8 +1,19 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import type { ColumnDef } from '@tanstack/react-table';
 
-import { auswahllistenApi, fehlercodeApi, tickettypApi } from '../../api/endpoints';
-import type { AuswahllistenWertRead, FehlercodeUpdate } from '../../api/types';
+import {
+  auswahllistenApi,
+  fehlercodeApi,
+  ticketApi,
+  tickettypApi,
+} from '../../api/endpoints';
+import type {
+  AuswahllistenWertRead,
+  FehlercodeUpdate,
+  TicketRead,
+} from '../../api/types';
 import { makeAnlageSearch } from '../../lib/entitySearch';
 import {
   DetailBlock,
@@ -13,14 +24,15 @@ import {
   InlineEditEntity,
   InlineEditSelect,
   InlineEditText,
+  RelationListTab,
   type DetailTab,
 } from '../../core/detail';
 
 /**
  * Fehlercode-Detail als zentriertes Overlay (Master-Layout-Standard, Reiter-
- * Modell). Übersicht inline editierbar. Hinter Flag `modul_standard`. Eine echte
- * Verknüpfungs-Liste (Verwendung in Tickets) gibt es serverseitig noch nicht —
- * Folgeschritt; aktuell nur die `nutzung`-Anzahl.
+ * Modell). Übersicht inline editierbar. Hinter Flag `modul_standard`. Reiter
+ * „Verwendung in Tickets" listet Tickets mit diesem Fehlercode (Filter
+ * `fehlercode_id`); die Übersicht zeigt zusätzlich die `nutzung`-Anzahl.
  */
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -53,12 +65,59 @@ function selectOptions(
   ];
 }
 
+const ticketColumns: ColumnDef<TicketRead>[] = [
+  {
+    id: 'nummer',
+    accessorFn: (t) => t.nummer,
+    header: 'Nr.',
+    cell: (c) => (
+      <span className="font-medium text-zinc-100">#{c.getValue<number>()}</span>
+    ),
+  },
+  { id: 'titel', accessorKey: 'titel', header: 'Titel' },
+  { id: 'status', accessorFn: (t) => t.status.label, header: 'Status' },
+  { id: 'prioritaet', accessorFn: (t) => t.prioritaet.label, header: 'Priorität' },
+  {
+    id: 'eroeffnet_am',
+    accessorFn: (t) => t.eroeffnet_am,
+    header: 'Eröffnet',
+    cell: (c) => fmtDate(c.getValue<string>()),
+  },
+];
+
 type Fehlercode = NonNullable<ReturnType<typeof useFehlercode>['data']>;
 function useFehlercode(fehlercodeId: string) {
   return useQuery({
     queryKey: ['fehlercode', fehlercodeId],
     queryFn: () => fehlercodeApi.get(fehlercodeId),
   });
+}
+
+function FehlercodeTicketsTab({
+  fehlercodeId,
+  onRow,
+}: {
+  fehlercodeId: string;
+  onRow: (id: string) => void;
+}) {
+  const q = useQuery({
+    queryKey: ['fehlercode-tickets', fehlercodeId],
+    queryFn: () => ticketApi.list({ fehlercode_id: fehlercodeId, limit: 200 }),
+  });
+  const rows = q.data?.items ?? [];
+  return (
+    <RelationListTab<TicketRead>
+      viewKey="fehlercode-tickets"
+      loading={q.isLoading}
+      columns={ticketColumns}
+      data={rows}
+      total={q.data?.total}
+      getSearchText={(t) => `${t.nummer} ${t.titel} ${t.status.label}`}
+      onRowClick={(t) => onRow(t.id)}
+      searchPlaceholder="In Tickets suchen …"
+      itemLabel={{ singular: 'Ticket', plural: 'Tickets' }}
+    />
+  );
 }
 
 function FehlercodeUebersicht({ f }: { f: Fehlercode }) {
@@ -212,6 +271,7 @@ export function FehlercodeDetailOverlay({
   fehlercodeId: string;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const fehlercodeQuery = useFehlercode(fehlercodeId);
   const f = fehlercodeQuery.data;
 
@@ -221,6 +281,17 @@ export function FehlercodeDetailOverlay({
           key: 'uebersicht',
           label: 'Übersicht',
           render: () => <FehlercodeUebersicht f={f} />,
+        },
+        {
+          key: 'tickets',
+          label: 'Verwendung in Tickets',
+          isRelation: true,
+          render: () => (
+            <FehlercodeTicketsTab
+              fehlercodeId={fehlercodeId}
+              onRow={(id) => navigate(`/tickets/${id}`)}
+            />
+          ),
         },
       ]
     : [];
