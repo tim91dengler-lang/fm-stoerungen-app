@@ -13,14 +13,17 @@ from sqlalchemy.orm import selectinload
 
 from fm_api.core.config import get_settings
 from fm_api.models import (
+    EinheitBeteiligter,
     EinheitEigentuemer,
     EinheitMieter,
     Haus,
+    HausBeteiligter,
     HausEigentuemer,
     HausMieter,
     Objekt,
     ObjektStockwerk,
     StockwerkAusrichtung,
+    StockwerkBeteiligter,
     StockwerkEigentuemer,
     StockwerkEinheit,
     StockwerkMieter,
@@ -42,6 +45,52 @@ class StockwerkNotFoundError(Exception):
 
 class EinheitNotFoundError(Exception):
     pass
+
+
+async def _attach_beteiligte(db: AsyncSession, haeuser: list[Haus]) -> None:
+    """Lädt die neuen Beteiligten (haus_/stockwerk_/einheit_beteiligte) für den
+    Baum nach und hängt sie als transientes ``_beteiligte`` an jeden Knoten.
+
+    Die neuen Modelle haben bewusst KEIN Parent-Relationship (Import-Zyklus-frei),
+    daher separat laden + zuordnen. Expand-Phase: läuft zusätzlich zu den alten
+    eigentuemer/mieter-Links.
+    """
+    stockwerke = [s for h in haeuser for s in h.stockwerke]
+    einheiten = [e for s in stockwerke for e in s.einheiten]
+
+    async def _load(model: Any, fk_attr: str, ids: list[UUID]) -> dict[UUID, list[Any]]:
+        result: dict[UUID, list[Any]] = {}
+        if not ids:
+            return result
+        rows = (
+            (
+                await db.execute(
+                    select(model)
+                    .where(getattr(model, fk_attr).in_(ids))
+                    .options(
+                        selectinload(model.partner),
+                        selectinload(model.rolle_wert),
+                    )
+                    .order_by(model.reihenfolge)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for row in rows:
+            result.setdefault(getattr(row, fk_attr), []).append(row)
+        return result
+
+    haus_map = await _load(HausBeteiligter, "haus_id", [h.id for h in haeuser])
+    sw_map = await _load(StockwerkBeteiligter, "stockwerk_id", [s.id for s in stockwerke])
+    e_map = await _load(EinheitBeteiligter, "einheit_id", [e.id for e in einheiten])
+
+    for h in haeuser:
+        h._beteiligte = haus_map.get(h.id, [])  # type: ignore[attr-defined]
+        for s in h.stockwerke:
+            s._beteiligte = sw_map.get(s.id, [])  # type: ignore[attr-defined]
+            for e in s.einheiten:
+                e._beteiligte = e_map.get(e.id, [])  # type: ignore[attr-defined]
 
 
 class UnsupportedMimeError(Exception):
@@ -103,7 +152,9 @@ async def list_haus(db: AsyncSession, mandant_id: UUID, objekt_id: UUID) -> list
         )
         .order_by(Haus.reihenfolge, Haus.bezeichnung)
     )
-    return list((await db.execute(stmt)).scalars().unique().all())
+    haeuser = list((await db.execute(stmt)).scalars().unique().all())
+    await _attach_beteiligte(db, haeuser)
+    return haeuser
 
 
 async def get_haus(db: AsyncSession, mandant_id: UUID, haus_id: UUID) -> Haus:
@@ -137,6 +188,7 @@ async def get_haus(db: AsyncSession, mandant_id: UUID, haus_id: UUID) -> Haus:
     haus = (await db.execute(stmt)).scalar_one_or_none()
     if haus is None:
         raise HausNotFoundError(f"haus {haus_id} not found")
+    await _attach_beteiligte(db, [haus])
     return haus
 
 

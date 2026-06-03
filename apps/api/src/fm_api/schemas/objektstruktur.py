@@ -17,6 +17,19 @@ class PartnerMini(BaseModel):
     name: str
 
 
+class BeteiligterRead(BaseModel):
+    """Ein Beteiligter (Partner + freie Rolle) an einem Struktur-Knoten.
+
+    Neues einheitliches Modell (ersetzt schrittweise eigentuemer/mieter).
+    """
+
+    id: UUID
+    partner_id: UUID
+    partner_name: str
+    rolle_id: UUID | None = None
+    rolle_label: str | None = None
+
+
 # -------- Einheit ----------------------------------------------------------
 
 
@@ -45,6 +58,7 @@ class EinheitRead(TimestampedRead):
     reihenfolge: int
     eigentuemer: list[PartnerMini] = Field(default_factory=list)
     mieter: list[PartnerMini] = Field(default_factory=list)
+    beteiligte: list[BeteiligterRead] = Field(default_factory=list)
 
 
 # -------- Stockwerk --------------------------------------------------------
@@ -80,6 +94,7 @@ class StockwerkRead(TimestampedRead):
     grundriss_mime: str | None
     eigentuemer: list[PartnerMini] = Field(default_factory=list)
     mieter: list[PartnerMini] = Field(default_factory=list)
+    beteiligte: list[BeteiligterRead] = Field(default_factory=list)
     einheiten: list[EinheitRead] = Field(default_factory=list)
 
 
@@ -114,4 +129,5 @@ class HausRead(TimestampedRead):
     adresse: AdresseRead | None = None
     eigentuemer: list[PartnerMini] = Field(default_factory=list)
     mieter: list[PartnerMini] = Field(default_factory=list)
+    beteiligte: list[BeteiligterRead] = Field(default_factory=list)
     stockwerke: list[StockwerkRead] = Field(default_factory=list)
