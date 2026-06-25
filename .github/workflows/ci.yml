@@ -20,7 +20,7 @@ jobs:
     name: Pre-Checks (Secrets, Großdateien)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -65,7 +65,7 @@ jobs:
       JWT_SECRET: ci-test-secret-32-chars-not-for-prod
       ENV: test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -114,7 +114,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
@@ -156,7 +156,7 @@ jobs:
     name: Dependency-Audit (pip-audit + npm audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -184,7 +184,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: returntocorp/semgrep-action@v1
         with:
           config: >-
@@ -198,7 +198,7 @@ jobs:
     name: Doku-Checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Markdown-Lint
         uses: DavidAnson/markdownlint-cli2-action@v23
         continue-on-error: true
