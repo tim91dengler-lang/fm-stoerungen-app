@@ -24,7 +24,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Compute tag
         id: meta
@@ -80,7 +80,7 @@ jobs:
       name: staging
       url: http://178.105.172.110:8080
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup SSH agent
         # webfactory/ssh-agent parses the key robustly (handles CR, BOM, missing
